@@ -4,7 +4,7 @@
 **Project:** chess-ai  
 **Phase:** 1 — Reinforcement Learning Foundations  
 **Date:** May 2026  
-**Authors:** Rob Kirkland, Claude Sonnet 4.6
+**Authors:** Rob Kirkland, Ellis
 
 ---
 
