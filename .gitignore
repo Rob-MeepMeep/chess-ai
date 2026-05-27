@@ -1,0 +1,19 @@
+# Virtual environment — never commit this, it's huge and machine-specific
+venv/
+
+# Python bytecode cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Model checkpoints and training data (will be large files)
+checkpoints/
+*.pt
+*.pth
+replay_buffer/
+
+# TensorBoard logs
+runs/
+
+# OS files
+.DS_Store
