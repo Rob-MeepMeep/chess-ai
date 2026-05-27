@@ -8,6 +8,7 @@ __pycache__/
 
 # Model checkpoints and training data (will be large files)
 checkpoints/
+logs/
 *.pt
 *.pth
 replay_buffer/
