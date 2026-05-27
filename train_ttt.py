@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 from tictactoe.env import TicTacToeEnv
 from tictactoe.agent import QLearningAgent
 
-NUM_EPISODES  = 50_000
+NUM_EPISODES  = 200_000
 LOG_INTERVAL  = 1_000   # print stats and write to CSV every N games
 DEMO_INTERVAL = 5_000   # play a visible demo game every N episodes
 
@@ -78,8 +78,8 @@ def train():
     os.makedirs('checkpoints', exist_ok=True)
 
     env = TicTacToeEnv()
-    hal_x = QLearningAgent('HAL-X')
-    hal_o = QLearningAgent('HAL-O')
+    hal_x = QLearningAgent('HAL-X', epsilon_min=0.02)
+    hal_o = QLearningAgent('HAL-O', epsilon_min=0.02)
 
     results = []   # 'x', 'o', or 'd' for each episode
     log_rows = []  # one row per LOG_INTERVAL for the CSV
