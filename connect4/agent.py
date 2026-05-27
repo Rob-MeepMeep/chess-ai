@@ -34,7 +34,7 @@ class DQNAgent:
         self,
         player,          # 1 or 2 — which player this agent is
         device,          # torch.device (MPS or CPU)
-        lr=1e-3,         # learning rate for Adam optimiser
+        lr=1e-4,         # learning rate for Adam optimiser
         gamma=0.99,      # discount factor — how much future rewards matter
         epsilon=1.0,     # starting exploration rate (100% random)
         epsilon_min=0.02,
@@ -165,6 +165,9 @@ class DQNAgent:
 
         self.optimizer.zero_grad()  # clear gradients from last step
         loss.backward()             # compute new gradients via backpropagation
+        # Clip gradients before the weight update — prevents Q-values spiralling
+        # upward in a feedback loop when the network starts winning consistently.
+        nn.utils.clip_grad_norm_(self.policy_net.parameters(), max_norm=1.0)
         self.optimizer.step()       # nudge weights in the direction that reduces loss
 
         # --- Periodically update the target network ---

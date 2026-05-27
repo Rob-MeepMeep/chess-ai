@@ -177,4 +177,60 @@ training.
 
 ---
 
-*This document is updated as new concepts are introduced. Last updated: Phase 2 start.*
+## Phase 2 Lessons Learned
+
+### L6 — Q-value divergence is the central DQN stability problem
+Without safeguards, Q-values spiral upward in a feedback loop: the network
+starts winning consistently, reinforces those winning moves heavily, the
+Q-values grow large, which become training targets, which push them larger.
+The loss explodes exponentially and the weights become meaningless.
+Run 1 reached a loss of 321,000 by episode 10,500 without any safeguards.
+
+### L7 — Gradient clipping delays but does not prevent divergence
+Capping the gradient norm (max_norm=10.0) prevents any single weight update
+from being catastrophically large. In Run 2 this delayed the divergence by
+~10,000 episodes and allowed the network to self-correct once (loss dropped
+from 15.5 at ep8500 back to 1.6 at ep9000). But with a learning rate of
+1e-3, the updates were still large enough to diverge eventually — reaching
+a loss of 2,608 and game lengths of 9.7 moves by episode 18,500.
+
+### L8 — Learning rate is the root cause, not just the symptom
+A learning rate of 1e-3 is too aggressive for DQN on Connect Four. Each
+weight update is large enough that Q-values drift faster than the target
+network can stabilise them. Standard DQN uses 1e-4 or lower. Combining
+a lower learning rate (1e-4) with tighter gradient clipping (max_norm=1.0)
+is the correct fix — both levers together constrain how fast Q-values move.
+
+### L9 — Game length is the clearest collapse signal
+Average game length dropping sharply is a more reliable early warning than
+win rate alone. In both runs, game length started falling before the loss
+exploded or win rates became extreme. A game averaging 10 moves means one
+player is winning in roughly 5 moves each — near the physical minimum for
+Connect Four and a definitive sign of co-evolutionary collapse.
+
+### L10 — The exploit/counter cycle is real and measurable
+In Run 2, between episodes 8,000–12,500, a clear cycle was visible:
+HAL-1 found an exploit (win rate rose to 65–70%), the loss spiked, gradient
+clipping helped the network recover (loss self-corrected to 0.83), and
+HAL-2 adapted (win rates returned to 54/46 by ep12500). This is the
+competitive dynamic self-play is designed to produce. It was only visible
+because the divergence was delayed long enough by gradient clipping to
+observe it.
+
+### L11 — Action masking must apply in training, not just inference
+When computing the Bellman target, the max Q-value over next-state actions
+must exclude full columns. If illegal columns can have high Q-values, they
+corrupt the training target silently — the loss looks normal but the network
+is learning from bad targets. This was caught before any training run
+(credit: external review by Dave).
+
+### L12 — Perspective-correct transitions require deferred push
+In alternating self-play, if HAL-1's transition is pushed immediately after
+HAL-1 moves, the stored next_state is the board before HAL-2 responds. The
+Q-value computed for that state is "best move from here" — but HAL-1 won't
+see that state on its next turn. Fix: hold HAL-1's transition until HAL-2
+has moved, then push with the real next_state.
+
+---
+
+*This document is updated as new concepts are introduced. Last updated: Phase 2 Run 2 complete.*

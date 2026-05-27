@@ -87,10 +87,28 @@ def free_gb():
     """Return free disk space in GB for the current directory."""
     return shutil.disk_usage(".").free / (1024 ** 3)
 
-with open(LOG_PATH, "w", newline="") as f:
-    writer = csv.writer(f)
-    writer.writerow(["episode", "hal1_wins", "hal2_wins", "draws",
-                     "hal1_epsilon", "hal2_epsilon", "avg_loss", "avg_game_length"])
+# ---------------------------------------------------------------------------
+# Resume from checkpoint if one exists
+# ---------------------------------------------------------------------------
+
+start_episode = 1
+
+if os.path.exists(CKPT_HAL1) and os.path.exists(CKPT_HAL2):
+    hal1.load(CKPT_HAL1)
+    hal2.load(CKPT_HAL2)
+    # Find the last logged episode from the CSV to know where to resume
+    if os.path.exists(LOG_PATH):
+        with open(LOG_PATH, newline="") as f:
+            rows = list(csv.reader(f))
+        if len(rows) > 1:
+            start_episode = int(rows[-1][0]) + 1
+    print(f"Resuming from episode {start_episode:,} (ε={hal1.epsilon:.3f})")
+else:
+    # Fresh run — write CSV header
+    with open(LOG_PATH, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["episode", "hal1_wins", "hal2_wins", "draws",
+                         "hal1_epsilon", "hal2_epsilon", "avg_loss", "avg_game_length"])
 
 # ---------------------------------------------------------------------------
 # Demo game function
@@ -146,9 +164,9 @@ loss_log     = []
 game_lengths = []   # moves per episode — watch for early convergence collapse
 start        = time.time()
 
-print(f"\nTraining HAL-3000 for {NUM_EPISODES:,} episodes...\n")
+print(f"\nTraining HAL-3000 — episodes {start_episode:,} to {NUM_EPISODES:,}...\n")
 
-for episode in range(1, NUM_EPISODES + 1):
+for episode in range(start_episode, NUM_EPISODES + 1):
 
     # --- Storage safety check ---
     if episode % LOG_INTERVAL == 0:
