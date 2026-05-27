@@ -60,7 +60,9 @@ class QLearningAgent:
             return random.choice(legal_actions)
 
         q_values = self._get_q_values(state)
-        return max(legal_actions, key=lambda a: q_values[a])
+        best_value = max(q_values[a] for a in legal_actions)
+        best_actions = [a for a in legal_actions if q_values[a] == best_value]
+        return random.choice(best_actions)
 
     def update(self, state, action, reward, next_state, next_legal_actions, done):
         """
