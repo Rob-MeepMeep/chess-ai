@@ -17,3 +17,6 @@ runs/
 
 # OS files
 .DS_Store
+
+# Project context — local only, never upload
+CLAUDE.md
