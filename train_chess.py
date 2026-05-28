@@ -1,0 +1,160 @@
+"""
+train_chess.py — AlphaZero-style self-play training loop for HAL-4000.
+
+Each game: use MCTS to select every move, store (position, policy, turn) in
+a GameBuffer. At game end fill in outcomes and commit to the ReplayBuffer.
+Once the buffer is large enough, run a batch of training steps.
+
+Speed guide (MacBook Air M3, MPS, untrained network):
+  N_SIMULATIONS = 200  — ~64s/game, ~178 hours for 10k games  (desktop training)
+  N_SIMULATIONS = 100  — ~32s/game, ~89 hours for 10k games
+  N_SIMULATIONS =  50  — ~16s/game, ~45 hours for 10k games   (recommended for M3)
+  N_SIMULATIONS =  25  — ~8s/game,  ~22 hours for 10k games   (quick test run)
+
+To run overnight (prevents sleep, sleeps Mac on completion):
+  caffeinate -dims python3 train_chess.py; osascript -e 'tell application "System Events" to sleep'
+"""
+
+import os
+import csv
+import chess
+import torch
+
+from chessai.agent   import ChessAgent
+from chessai.encoder import encode
+from chessai.logger  import Logger
+from chessai.replay  import ReplayBuffer, GameBuffer
+
+# ---------------------------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------------------------
+
+N_GAMES          = 10_000
+N_SIMULATIONS    = 50       # reduce for faster iteration; increase on desktop GPU
+BATCH_SIZE       = 64
+TRAIN_STEPS      = 5        # gradient updates per game (once buffer is ready)
+MIN_BUFFER       = 500      # don't train until buffer holds this many positions
+MAX_GAME_MOVES   = 200      # hard cap — prevents runaway games early in training
+CHECKPOINT_EVERY = 100      # save checkpoint every N games
+SNAPSHOT_EVERY   = 500      # log MCTS strategy snapshots every N games
+PRINT_EVERY      = 10       # print progress line every N games
+
+CKPT_PATH = "checkpoints/hal_chess.pt"
+LOG_DIR   = "logs/chess"
+
+# ---------------------------------------------------------------------------
+# Device
+# ---------------------------------------------------------------------------
+
+if torch.backends.mps.is_available():
+    device = torch.device("mps")
+else:
+    device = torch.device("cpu")
+
+print(f"Device: {device}")
+
+# ---------------------------------------------------------------------------
+# Initialise or resume
+# ---------------------------------------------------------------------------
+
+os.makedirs("checkpoints", exist_ok=True)
+
+agent  = ChessAgent(device, n_simulations=N_SIMULATIONS)
+replay = ReplayBuffer()
+logger = Logger(log_dir=LOG_DIR, snapshot_interval=SNAPSHOT_EVERY)
+
+start_game = 0
+if os.path.exists(CKPT_PATH):
+    agent.load(CKPT_PATH)
+    # Read last completed game number from the openings log
+    openings_path = os.path.join(LOG_DIR, "openings.csv")
+    if os.path.exists(openings_path):
+        with open(openings_path) as f:
+            rows = list(csv.reader(f))
+        if len(rows) > 1:
+            start_game = int(rows[-1][0])
+    print(f"Resumed from checkpoint — starting at game {start_game + 1}")
+    print(f"  Trained steps so far: {agent.steps:,}")
+else:
+    print("Starting fresh training run.")
+
+print(f"N_SIMULATIONS = {N_SIMULATIONS} | N_GAMES = {N_GAMES:,}\n")
+
+# ---------------------------------------------------------------------------
+# Training loop
+# ---------------------------------------------------------------------------
+
+for game_num in range(start_game + 1, N_GAMES + 1):
+
+    board   = chess.Board()
+    history = []
+    game_buf = GameBuffer()
+    moves   = []
+    loss    = 0.0
+
+    # --- Self-play: one complete game ---
+    while not board.is_game_over() and len(moves) < MAX_GAME_MOVES:
+
+        # Encode current position BEFORE making the move
+        state = encode([board] + history)
+
+        # MCTS selects a move — stochastic during training
+        move_uci, policy = agent.choose_move(
+            board, history, greedy=False
+        )
+
+        # Store this position in the game buffer
+        game_buf.push(state, policy, board.turn)
+        moves.append(move_uci)
+
+        # Keep only the last 3 boards — encoder uses current + 3 history = 4 total
+        history = ([board.copy()] + history)[:3]
+        board.push_uci(move_uci)
+
+    # --- Determine winner ---
+    result = board.result()
+    if result == "1-0":
+        winner = chess.WHITE
+    elif result == "0-1":
+        winner = chess.BLACK
+    else:
+        winner = None   # draw, stalemate, 50-move, or max-moves cap
+
+    # Commit game positions with outcomes to replay buffer
+    game_buf.commit(replay, winner)
+
+    # --- Training steps ---
+    if replay.ready(BATCH_SIZE):
+        for _ in range(TRAIN_STEPS):
+            batch = replay.sample(BATCH_SIZE)
+            loss  = agent.train(batch)
+
+    # --- Logging ---
+    logger.record_game(game_num, winner, moves, loss)
+
+    if game_num % SNAPSHOT_EVERY == 0:
+        logger.record_snapshot(game_num, agent)
+
+    # --- Checkpoint ---
+    if game_num % CHECKPOINT_EVERY == 0:
+        agent.save(CKPT_PATH)
+
+    # --- Terminal progress ---
+    if game_num % PRINT_EVERY == 0 or game_num <= 5:
+        w_str = "W" if winner == chess.WHITE else "B" if winner == chess.BLACK else "D"
+        print(
+            f"Game {game_num:>5} | {w_str} | "
+            f"moves: {len(moves):>3} | "
+            f"loss: {loss:.4f} | "
+            f"buffer: {len(replay):>6} | "
+            f"steps: {agent.steps:>6}"
+        )
+
+# ---------------------------------------------------------------------------
+# Final checkpoint and summary
+# ---------------------------------------------------------------------------
+
+agent.save(CKPT_PATH)
+print(f"\nTraining complete — {N_GAMES:,} games, {agent.steps:,} training steps.")
+print(f"Checkpoint: {CKPT_PATH}")
+print(f"Logs:       {LOG_DIR}/")
