@@ -17,6 +17,7 @@ To run overnight (prevents sleep, sleeps Mac on completion):
 
 import os
 import csv
+import time
 import chess
 import torch
 
@@ -34,9 +35,9 @@ N_SIMULATIONS    = 50       # reduce for faster iteration; increase on desktop G
 BATCH_SIZE       = 64
 TRAIN_STEPS      = 5        # gradient updates per game (once buffer is ready)
 MIN_BUFFER       = 500      # don't train until buffer holds this many positions
-MAX_GAME_MOVES   = 200      # hard cap — prevents runaway games early in training
-CHECKPOINT_EVERY = 100      # save checkpoint every N games
-SNAPSHOT_EVERY   = 500      # log MCTS strategy snapshots every N games
+MAX_GAME_MOVES   = 100      # hard cap — 200 was too slow; increase once games finish naturally
+CHECKPOINT_EVERY = 10       # save checkpoint every N games
+SNAPSHOT_EVERY   = 100      # log MCTS strategy snapshots every N games
 PRINT_EVERY      = 10       # print progress line every N games
 
 CKPT_PATH = "checkpoints/hal_chess.pt"
@@ -84,7 +85,10 @@ print(f"N_SIMULATIONS = {N_SIMULATIONS} | N_GAMES = {N_GAMES:,}\n")
 # Training loop
 # ---------------------------------------------------------------------------
 
+_game_times: list = []   # rolling window for seconds-per-game estimate
+
 for game_num in range(start_game + 1, N_GAMES + 1):
+    _t_game_start = time.time()
 
     board   = chess.Board()
     history = []
@@ -124,7 +128,7 @@ for game_num in range(start_game + 1, N_GAMES + 1):
     game_buf.commit(replay, winner)
 
     # --- Training steps ---
-    if replay.ready(BATCH_SIZE):
+    if replay.ready(MIN_BUFFER):
         for _ in range(TRAIN_STEPS):
             batch = replay.sample(BATCH_SIZE)
             loss  = agent.train(batch)
@@ -140,14 +144,23 @@ for game_num in range(start_game + 1, N_GAMES + 1):
         agent.save(CKPT_PATH)
 
     # --- Terminal progress ---
+    _game_times.append(time.time() - _t_game_start)
+    if len(_game_times) > 20:
+        _game_times.pop(0)
+
     if game_num % PRINT_EVERY == 0 or game_num <= 5:
-        w_str = "W" if winner == chess.WHITE else "B" if winner == chess.BLACK else "D"
+        w_str    = "W" if winner == chess.WHITE else "B" if winner == chess.BLACK else "D"
+        secs     = sum(_game_times) / len(_game_times)
+        games_left = N_GAMES - game_num
+        eta_h    = (secs * games_left) / 3600
         print(
             f"Game {game_num:>5} | {w_str} | "
             f"moves: {len(moves):>3} | "
             f"loss: {loss:.4f} | "
             f"buffer: {len(replay):>6} | "
-            f"steps: {agent.steps:>6}"
+            f"steps: {agent.steps:>6} | "
+            f"{secs:.0f}s/game | "
+            f"ETA: {eta_h:.1f}h"
         )
 
 # ---------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 """
-mcts.py — Monte Carlo Tree Search guided by the neural network.
+mcts.py — Batched Monte Carlo Tree Search guided by the neural network.
 
 Each simulation does four things:
   1. SELECT   — walk the tree using UCB until an unexpanded node
@@ -8,16 +8,18 @@ Each simulation does four things:
   4. BACKUP   — propagate the value back up the path, flipping sign at each
                 level (what's good for me is bad for my opponent)
 
-After N simulations the visit counts are normalised to a policy. More visited
-= the network and the search together think this move is better.
+BATCHING:
+  Instead of running simulations one at a time (50 separate network calls),
+  we run BATCH_SIMS simulations in parallel up to their leaf nodes, then
+  evaluate all leaves in one network call. Reduces MPS round-trips from 50
+  to ~7 (50 / BATCH_SIMS), keeping the GPU busy.
 
-UCB formula (controls the select step):
-  UCB(s, a) = Q(s,a)  +  c_puct × P(s,a) × √N(s) / (1 + N(s,a))
-               exploit          explore
+VIRTUAL LOSS:
+  To prevent all parallel simulations selecting the same path, we apply a
+  temporary penalty to in-flight nodes so other simulations choose different
+  branches. Removed when the real value is backed up.
 
-  Q is the average value seen from this action so far.
-  The exploration term is large when a move has a high prior but few visits —
-  it shrinks as the node accumulates visits, letting Q take over.
+Expected speedup over sequential MCTS: 2–4× on MPS.
 """
 
 import numpy as np
@@ -27,28 +29,21 @@ import chess
 from chessai.encoder import encode
 from chessai.moves  import move_to_index, index_to_move, legal_move_mask
 
-C_PUCT          = 1.5    # exploration constant — higher = more exploration
-DIRICHLET_ALPHA = 0.3    # concentration for root noise (AlphaZero chess value)
-DIRICHLET_EPS   = 0.25   # fraction of prior replaced by noise at the root
+C_PUCT          = 1.5
+DIRICHLET_ALPHA = 0.3
+DIRICHLET_EPS   = 0.25
+BATCH_SIMS      = 8      # leaves evaluated per network call
+VIRTUAL_LOSS    = 1.0    # penalty applied to in-flight nodes
 
 
 class MCTSNode:
-    """
-    One node in the search tree — one board position.
-
-    N : visit count
-    W : total value accumulated across visits (sum, not average)
-    P : prior probability from the network (its first guess, before search)
-    Q = W / N — average value (computed on demand)
-    """
-
     __slots__ = ("N", "W", "P", "parent", "children", "is_expanded")
 
     def __init__(self, prior: float, parent: "MCTSNode" = None):
-        self.N          = 0
-        self.W          = 0.0
-        self.P          = prior
-        self.parent     = parent
+        self.N           = 0
+        self.W           = 0.0
+        self.P           = prior
+        self.parent      = parent
         self.children: dict[int, "MCTSNode"] = {}
         self.is_expanded = False
 
@@ -57,8 +52,6 @@ class MCTSNode:
         return self.W / self.N if self.N > 0 else 0.0
 
     def ucb(self, c_puct: float) -> float:
-        # Parent's visit count drives the exploration term —
-        # as the parent accumulates visits, less-visited children look more attractive
         n_parent = self.parent.N if self.parent else 1
         return self.Q + c_puct * self.P * (n_parent ** 0.5) / (1 + self.N)
 
@@ -75,48 +68,88 @@ class MCTS:
     def search(self, board: chess.Board, history: list,
                n_simulations: int, add_noise: bool = False) -> torch.Tensor:
         """
-        Run n_simulations from the current position.
-
-        board   : current chess.Board (not modified)
-        history : list of recent chess.Board states, most recent first
-                  (does not include the current board — encoder prepends it)
-        add_noise : True during training to encourage exploration at the root;
-                    False during evaluation for pure exploitation
-
-        Returns: policy tensor of shape (4096,), normalised visit counts.
+        Run n_simulations from the current position using batched leaf evaluation.
+        Returns a policy tensor of shape (4096,), normalised visit counts.
         """
-        # Expand root before simulations so all children have priors
         root = MCTSNode(prior=1.0)
-        self._expand(root, board, history)
+        self._expand_node(root, board, history)
 
         if add_noise and root.children:
             self._add_dirichlet_noise(root)
 
-        for _ in range(n_simulations):
-            node        = root
-            sim_board   = board.copy()
-            sim_history = list(history)
-            path        = [node]
+        sims_done = 0
+        while sims_done < n_simulations:
+            wave = min(BATCH_SIMS, n_simulations - sims_done)
 
-            # --- 1. SELECT ---
-            # Descend the tree, choosing the highest-UCB child at each level,
-            # until we reach an unexpanded node or a terminal position.
-            while node.is_expanded and not sim_board.is_game_over():
-                move_idx, node = self._select(node)
-                move = index_to_move(move_idx, sim_board)
-                # Prepend board BEFORE the move so history stays in order
-                sim_history = [sim_board.copy()] + sim_history
-                sim_board.push(move)
-                path.append(node)
+            # --- 1. Select leaves for this wave ---
+            wave_data = []   # list of (path, sim_board, sim_history)
+            for _ in range(wave):
+                path, sim_board, sim_hist = self._select_to_leaf(
+                    root, board.copy(), list(history)
+                )
+                wave_data.append((path, sim_board, sim_hist))
+                self._apply_virtual_loss(path)
 
-            # --- 2 + 3. EXPAND + EVALUATE ---
-            if sim_board.is_game_over():
-                value = self._terminal_value(sim_board)
-            else:
-                value = self._expand(node, sim_board, sim_history)
+            # --- 2. Batch-expand unique non-terminal leaves ---
+            # leaf node = path[-1]; use id() to deduplicate shared leaves
+            node_values: dict[int, float] = {}
+            to_expand: dict[int, tuple]   = {}   # node_id → (node, board, hist)
 
-            # --- 4. BACKUP ---
-            self._backup(path, value)
+            for path, sim_board, sim_hist in wave_data:
+                leaf    = path[-1]
+                node_id = id(leaf)
+                if (not sim_board.is_game_over()
+                        and not leaf.is_expanded
+                        and node_id not in to_expand):
+                    to_expand[node_id] = (leaf, sim_board, sim_hist)
+
+            if to_expand:
+                node_ids = list(to_expand.keys())
+                leaves   = [to_expand[nid][0] for nid in node_ids]
+                boards   = [to_expand[nid][1] for nid in node_ids]
+                hists    = [to_expand[nid][2] for nid in node_ids]
+
+                # Single batched network call
+                batch_tensor = torch.cat(
+                    [encode([b] + h).unsqueeze(0) for b, h in zip(boards, hists)],
+                    dim=0
+                ).to(self.device)
+
+                with torch.no_grad():
+                    logits_batch, value_batch = self.network(batch_tensor)
+
+                for i, (node_id, node, sim_board) in enumerate(
+                        zip(node_ids, leaves, boards)):
+                    logits = logits_batch[i].clone()
+                    mask   = legal_move_mask(sim_board).to(self.device)
+                    logits[~mask] = float("-inf")
+                    priors = torch.softmax(logits, dim=0)
+
+                    for move in sim_board.legal_moves:
+                        idx = move_to_index(move)
+                        node.children[idx] = MCTSNode(
+                            prior=priors[idx].item(), parent=node
+                        )
+                    node.is_expanded   = True
+                    node_values[node_id] = value_batch[i].item()
+
+            # --- 3. Remove virtual loss and backup ---
+            for path, sim_board, sim_hist in wave_data:
+                self._remove_virtual_loss(path)
+                leaf    = path[-1]
+                node_id = id(leaf)
+
+                if sim_board.is_game_over():
+                    value = self._terminal_value(sim_board)
+                elif node_id in node_values:
+                    value = node_values[node_id]
+                else:
+                    # Leaf was already expanded by another sim this wave
+                    value = leaf.Q
+
+                self._backup(path, value)
+
+            sims_done += wave
 
         # Normalise visit counts → policy
         policy = torch.zeros(4096)
@@ -128,67 +161,62 @@ class MCTS:
         return policy
 
     # ------------------------------------------------------------------
-    # Internal steps
-    # ------------------------------------------------------------------
 
-    def _select(self, node: MCTSNode) -> tuple[int, MCTSNode]:
-        """Return the child with the highest UCB score."""
+    def _select_to_leaf(self, root: MCTSNode, sim_board: chess.Board,
+                        sim_history: list) -> tuple:
+        """Walk the tree to a leaf using UCB. Returns (path, board, history)."""
+        node = root
+        path = [node]
+
+        while node.is_expanded and not sim_board.is_game_over():
+            move_idx, node = self._select(node)
+            move = index_to_move(move_idx, sim_board)
+            sim_history = ([sim_board.copy()] + sim_history)[:3]
+            sim_board.push(move)
+            path.append(node)
+
+        return path, sim_board, sim_history
+
+    def _select(self, node: MCTSNode) -> tuple:
         best_idx = max(node.children,
                        key=lambda idx: node.children[idx].ucb(self.c_puct))
         return best_idx, node.children[best_idx]
 
-    def _expand(self, node: MCTSNode, board: chess.Board,
-                history: list) -> float:
-        """
-        Call the network on this position.
-        Create a child node for each legal move, initialised with network priors.
-        Returns the value estimate for this position (from the current player's view).
-        """
+    def _expand_node(self, node: MCTSNode, board: chess.Board,
+                     history: list) -> None:
+        """Synchronous single-node expansion — used for the root only."""
         encoded = encode([board] + list(history)).unsqueeze(0).to(self.device)
-
         with torch.no_grad():
-            policy_logits, value = self.network(encoded)
-
-        # Mask illegal moves to -inf, then softmax over legal ones
+            policy_logits, _ = self.network(encoded)
         policy_logits = policy_logits.squeeze(0)
         mask = legal_move_mask(board).to(self.device)
         policy_logits[~mask] = float("-inf")
         priors = torch.softmax(policy_logits, dim=0)
-
         for move in board.legal_moves:
             idx = move_to_index(move)
             node.children[idx] = MCTSNode(prior=priors[idx].item(), parent=node)
-
         node.is_expanded = True
-        return value.item()
+
+    def _apply_virtual_loss(self, path: list) -> None:
+        for node in path:
+            node.N += 1
+            node.W -= VIRTUAL_LOSS
+
+    def _remove_virtual_loss(self, path: list) -> None:
+        for node in path:
+            node.N -= 1
+            node.W += VIRTUAL_LOSS
 
     def _backup(self, path: list, value: float) -> None:
-        """
-        Walk back up the path, adding the value at each node.
-        Flip the sign at every level — the two-player flip.
-        """
         for node in reversed(path):
             node.N += 1
             node.W += value
             value   = -value
 
     def _terminal_value(self, board: chess.Board) -> float:
-        """
-        Value for a finished game, from the perspective of the player to move.
-        After checkmate the player to move was just mated — they lost: -1.
-        Any draw: 0.
-        """
-        result = board.result()
-        if result == "1/2-1/2":
-            return 0.0
-        return -1.0   # checkmate: player to move lost
+        return 0.0 if board.result() == "1/2-1/2" else -1.0
 
     def _add_dirichlet_noise(self, root: MCTSNode) -> None:
-        """
-        Mix Dirichlet noise into the root's priors.
-        Prevents the search from always exploring the same lines early in training
-        when the network's priors are still unreliable.
-        """
         noise = np.random.dirichlet([DIRICHLET_ALPHA] * len(root.children))
         for child, n in zip(root.children.values(), noise):
             child.P = (1 - DIRICHLET_EPS) * child.P + DIRICHLET_EPS * n
