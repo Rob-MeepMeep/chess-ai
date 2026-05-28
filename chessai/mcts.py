@@ -44,7 +44,7 @@ class MCTSNode:
 
     __slots__ = ("N", "W", "P", "parent", "children", "is_expanded")
 
-    def __init__(self, prior: float, parent: "MCTSNode | None" = None):
+    def __init__(self, prior: float, parent: "MCTSNode" = None):
         self.N          = 0
         self.W          = 0.0
         self.P          = prior
