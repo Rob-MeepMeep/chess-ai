@@ -50,6 +50,7 @@ class Logger:
         self._perf_path     = os.path.join(log_dir, "training.csv")
         self._opening_path  = os.path.join(log_dir, "openings.csv")
         self._snapshot_path = os.path.join(log_dir, "snapshots.csv")
+        self._games_path    = os.path.join(log_dir, "games.csv")
 
         self._end_reason_path = os.path.join(log_dir, "end_reasons.csv")
 
@@ -61,6 +62,9 @@ class Logger:
         self._init_csv(self._end_reason_path, [
             "game", "checkmates", "material_resigns", "value_resigns",
             "cap_draws", "rule_draws",
+        ])
+        self._init_csv(self._games_path, [
+            "game", "outcome", "end_reason", "n_moves", "loss", "moves",
         ])
         self._init_csv(self._opening_path, ["game", "moves"])
         self._init_csv(self._snapshot_path, [
@@ -87,7 +91,14 @@ class Logger:
         end_reason : one of "checkmate", "material_resign", "value_resign",
                      "cap_draw", "rule_draw"
         """
-        # Opening sequence — write immediately, useful at full resolution
+        # Full game record — every move, raw stats, written per game
+        outcome_str = "W" if winner == chess.WHITE else "B" if winner == chess.BLACK else "D"
+        self._append(self._games_path, [
+            game_num, outcome_str, end_reason,
+            len(moves), f"{loss:.6f}", " ".join(moves),
+        ])
+
+        # Opening sequence — first 12 moves for pattern analysis
         opening = " ".join(moves[:12]) if moves else ""
         self._append(self._opening_path, [game_num, opening])
 

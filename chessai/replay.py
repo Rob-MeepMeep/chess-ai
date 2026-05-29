@@ -16,6 +16,7 @@ If white won and it was black's turn → -1. Same two-player logic as MCTS backu
 """
 
 import random
+import os
 from typing import Optional
 import chess
 import torch
@@ -51,6 +52,15 @@ class ReplayBuffer:
     def ready(self, batch_size: int) -> bool:
         """True once the buffer has enough entries to sample a full batch."""
         return len(self._buffer) >= batch_size
+
+    def save(self, path: str) -> None:
+        """Persist the buffer to disk so it survives a restart."""
+        torch.save(list(self._buffer), path)
+
+    def load(self, path: str) -> None:
+        """Reload a previously saved buffer."""
+        items = torch.load(path, weights_only=False)
+        self._buffer = deque(items, maxlen=self._buffer.maxlen)
 
     def __len__(self) -> int:
         return len(self._buffer)

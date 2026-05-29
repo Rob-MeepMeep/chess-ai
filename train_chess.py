@@ -44,8 +44,9 @@ RESIGN_THRESHOLD   = -0.95  # value head score below which a position is hopeles
 RESIGN_CONSECUTIVE = 3      # consecutive moves below threshold before resigning
 RESIGN_MATERIAL    = 5      # resign if down by more than a rook in material (bootstraps early training)
 
-CKPT_PATH = "checkpoints/hal_chess.pt"
-LOG_DIR   = "logs/chess"
+CKPT_PATH   = "checkpoints/hal_chess.pt"
+BUFFER_PATH = "checkpoints/replay_buffer.pt"
+LOG_DIR     = "logs/chess"
 
 # ---------------------------------------------------------------------------
 # Device
@@ -80,6 +81,9 @@ if os.path.exists(CKPT_PATH):
             start_game = int(rows[-1][0])
     print(f"Resumed from checkpoint — starting at game {start_game + 1}")
     print(f"  Trained steps so far: {agent.steps:,}")
+    if os.path.exists(BUFFER_PATH):
+        replay.load(BUFFER_PATH)
+        print(f"  Replay buffer loaded: {len(replay):,} positions")
 else:
     print("Starting fresh training run.")
 
@@ -196,6 +200,7 @@ for game_num in range(start_game + 1, N_GAMES + 1):
     # --- Checkpoint ---
     if game_num % CHECKPOINT_EVERY == 0:
         agent.save(CKPT_PATH)
+        replay.save(BUFFER_PATH)
 
     # --- Terminal progress ---
     _game_times.append(time.time() - _t_game_start)
