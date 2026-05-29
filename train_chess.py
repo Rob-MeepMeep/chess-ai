@@ -44,9 +44,14 @@ RESIGN_THRESHOLD   = -0.95  # value head score below which a position is hopeles
 RESIGN_CONSECUTIVE = 3      # consecutive moves below threshold before resigning
 RESIGN_MATERIAL    = 5      # resign if down by more than a rook in material (bootstraps early training)
 
-CKPT_PATH   = "checkpoints/hal_chess.pt"
-BUFFER_PATH = "checkpoints/replay_buffer.pt"
-LOG_DIR     = "logs/chess"
+# Run identity — change this to start a new named run with its own checkpoint and buffer.
+# To resume a previous run's buffer, set BUFFER_LOAD to that run's buffer path.
+RUN_NAME    = "run3"
+BUFFER_LOAD = None   # None = load RUN_NAME's own buffer; set to a path to load from another run
+
+CKPT_PATH   = f"checkpoints/{RUN_NAME}_hal_chess.pt"
+BUFFER_PATH = f"checkpoints/{RUN_NAME}_replay_buffer.pt"
+LOG_DIR     = f"logs/{RUN_NAME}"
 
 # ---------------------------------------------------------------------------
 # Device
@@ -81,9 +86,10 @@ if os.path.exists(CKPT_PATH):
             start_game = int(rows[-1][0])
     print(f"Resumed from checkpoint — starting at game {start_game + 1}")
     print(f"  Trained steps so far: {agent.steps:,}")
-    if os.path.exists(BUFFER_PATH):
-        replay.load(BUFFER_PATH)
-        print(f"  Replay buffer loaded: {len(replay):,} positions")
+    _buf_to_load = BUFFER_LOAD or BUFFER_PATH
+    if os.path.exists(_buf_to_load):
+        replay.load(_buf_to_load)
+        print(f"  Replay buffer loaded: {len(replay):,} positions ({_buf_to_load})")
 else:
     print("Starting fresh training run.")
 
