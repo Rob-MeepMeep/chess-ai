@@ -21,9 +21,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import chess
 
-from chessai.model  import ChessNet
-from chessai.mcts   import MCTS
-from chessai.moves  import index_to_move
+from chessai.model   import ChessNet
+from chessai.mcts    import MCTS
+from chessai.moves   import index_to_move
+from chessai.encoder import encode
 
 LR           = 1e-4
 WEIGHT_DECAY = 1e-4   # L2 regularisation — prevents overfitting on a deeper network
@@ -74,6 +75,13 @@ class ChessAgent:
 
         move = index_to_move(move_idx, board)
         return move.uci(), policy
+
+    def get_value(self, board: chess.Board, history: list) -> float:
+        """Single forward pass value estimate. Used for resignation check."""
+        encoded = encode([board] + list(history)).unsqueeze(0).to(self.device)
+        with torch.no_grad():
+            _, value = self.network(encoded)
+        return value.item()
 
     # ------------------------------------------------------------------
     # Learning

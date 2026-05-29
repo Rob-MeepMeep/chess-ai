@@ -39,6 +39,9 @@ MAX_GAME_MOVES   = 100      # hard cap — 200 was too slow; increase once games
 CHECKPOINT_EVERY = 10       # save checkpoint every N games
 SNAPSHOT_EVERY   = 100      # log MCTS strategy snapshots every N games
 PRINT_EVERY      = 10       # print progress line every N games
+RESIGN_THRESHOLD   = -0.95  # value head score below which a position is hopeless
+RESIGN_CONSECUTIVE = 5      # consecutive moves below threshold before resigning
+RESIGN_MATERIAL    = 9      # resign if down by more than a queen in material (bootstraps early training)
 
 CKPT_PATH = "checkpoints/hal_chess.pt"
 LOG_DIR   = "logs/chess"
@@ -85,6 +88,18 @@ print(f"N_SIMULATIONS = {N_SIMULATIONS} | N_GAMES = {N_GAMES:,}\n")
 # Training loop
 # ---------------------------------------------------------------------------
 
+_PIECE_VALUES = {chess.PAWN: 1, chess.KNIGHT: 3, chess.BISHOP: 3,
+                 chess.ROOK: 5, chess.QUEEN: 9}
+
+def _material_balance(board: chess.Board) -> int:
+    """Positive = white ahead. Used for material-based resignation."""
+    score = 0
+    for piece, val in _PIECE_VALUES.items():
+        score += val * len(board.pieces(piece, chess.WHITE))
+        score -= val * len(board.pieces(piece, chess.BLACK))
+    return score
+
+
 _game_times: list = []   # rolling window for seconds-per-game estimate
 
 for game_num in range(start_game + 1, N_GAMES + 1):
@@ -97,6 +112,8 @@ for game_num in range(start_game + 1, N_GAMES + 1):
     loss    = 0.0
 
     # --- Self-play: one complete game ---
+    resign_streak = 0   # consecutive moves where the side to move is hopeless
+
     while not board.is_game_over() and len(moves) < MAX_GAME_MOVES:
 
         # Encode current position BEFORE making the move
@@ -115,14 +132,30 @@ for game_num in range(start_game + 1, N_GAMES + 1):
         history = ([board.copy()] + history)[:3]
         board.push_uci(move_uci)
 
+        # Check whether the player now to move is in a hopeless position.
+        # Either condition triggers: value head says hopeless, OR down more than a queen.
+        # Material check bootstraps early training before the value head has learned anything.
+        v   = agent.get_value(board, history)
+        mat = _material_balance(board)
+        mat_from_mover = mat if board.turn == chess.WHITE else -mat
+        if v < RESIGN_THRESHOLD or mat_from_mover < -RESIGN_MATERIAL:
+            resign_streak += 1
+        else:
+            resign_streak = 0
+        if resign_streak >= RESIGN_CONSECUTIVE:
+            break   # losing side resigns
+
     # --- Determine winner ---
     result = board.result()
     if result == "1-0":
         winner = chess.WHITE
     elif result == "0-1":
         winner = chess.BLACK
+    elif resign_streak >= RESIGN_CONSECUTIVE:
+        # Player to move resigned — their opponent wins
+        winner = chess.BLACK if board.turn == chess.WHITE else chess.WHITE
     else:
-        winner = None   # draw, stalemate, 50-move, or max-moves cap
+        winner = None   # genuine draw, stalemate, 50-move, or max-moves cap
 
     # Commit game positions with outcomes to replay buffer
     game_buf.commit(replay, winner)
