@@ -1,92 +1,103 @@
 """
-main.py — The FastAPI service that the Electron chess-trainer talks to.
+main.py — FastAPI service for HAL-4000.
 
-FastAPI is a Python web framework. It lets us define API endpoints
-(URLs the Electron app can send requests to) with almost no boilerplate.
+Loads the trained chess model on startup and serves moves via HTTP.
+Chess-trainer calls this to get HAL's chosen move for any position.
 
-To run this server:
+To run:
   venv/bin/uvicorn main:app --reload --port 8765
-
-'uvicorn' is the server that runs FastAPI.
-'--reload' means it restarts automatically when you edit this file.
-'--port 8765' keeps it away from common ports so nothing clashes.
 """
 
+import torch
+import chess
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel
 
-from game.chess_env import ChessEnvironment
+from chessai.agent import ChessAgent
 
-# Create the FastAPI application
-app = FastAPI(title="Chess AI Service", version="0.1.0")
+# ── Load HAL on startup ───────────────────────────────────────────────────────
 
-# CORS (Cross-Origin Resource Sharing) — without this, the Electron
-# renderer would be blocked from calling our API due to browser security rules.
+device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+agent  = ChessAgent(device, n_simulations=50)
+
+CKPT = "checkpoints/hal_chess.pt"
+try:
+    agent.load(CKPT)
+    print(f"HAL-4000 loaded from {CKPT} ({agent.steps:,} training steps)")
+except FileNotFoundError:
+    print(f"WARNING: no checkpoint at {CKPT} — HAL will play randomly via untrained network")
+
+app = FastAPI(title="HAL-4000 Chess Service", version="1.0.0")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # allow requests from anywhere (fine for local dev)
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# --- Request / Response models ------------------------------------------------
-# Pydantic models define the shape of data coming in and going out.
-# FastAPI validates requests automatically against these.
+# ── Request / Response ────────────────────────────────────────────────────────
 
 class MoveRequest(BaseModel):
-    fen: str                      # the current board position
-    move: Optional[str] = None    # optional: a specific move to apply
+    fen: str                     # current board position (used as a sanity check)
+    moves: List[str] = []        # all moves played so far in UCI format — used to
+                                 # reconstruct board history for the 4-frame encoder
+    n_simulations: int = 50      # MCTS rollouts per move (lower = faster but weaker)
 
 class MoveResponse(BaseModel):
-    move: str                     # the move chosen (UCI format, e.g. 'e2e4')
-    fen: str                      # the board position after the move
-    done: bool                    # is the game over?
-    result: Optional[str]         # '1-0', '0-1', '1/2-1/2', or None
+    move: str                    # HAL's chosen move in UCI format (e.g. 'e2e4')
+    fen: str                     # board position after the move
+    done: bool                   # is the game over?
+    result: Optional[str] = None # '1-0', '0-1', '1/2-1/2' or None
 
+# ── Helper ────────────────────────────────────────────────────────────────────
 
-# --- Endpoints ----------------------------------------------------------------
+def replay_moves(moves: List[str]) -> tuple:
+    """
+    Replay a list of UCI moves from the starting position.
+    Returns (current_board, history) where history is the last 3 board states.
+    History is what the 4-frame encoder expects alongside the current board.
+    """
+    board   = chess.Board()
+    history = []
+    for uci in moves:
+        history = ([board.copy()] + history)[:3]
+        board.push_uci(uci)
+    return board, history
+
+# ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @app.get("/health")
 def health():
-    """
-    Simple health check — the Electron app calls this on startup
-    to confirm the Python service is running.
-    """
-    return {"status": "ok", "message": "Chess AI service is running"}
-
+    return {
+        "status": "ok",
+        "model":  "HAL-4000",
+        "steps":  agent.steps,
+        "device": str(device),
+    }
 
 @app.post("/move", response_model=MoveResponse)
 def get_move(request: MoveRequest):
-    """
-    Given a board position (FEN), return the AI's chosen move.
-
-    Right now the AI picks a random legal move — this is our placeholder
-    until we build the neural network in later phases. The important thing
-    is that the pipeline works end-to-end.
-    """
     try:
-        env = ChessEnvironment()
+        board, history = replay_moves(request.moves)
 
-        # If the Electron app sent a FEN, load that position.
-        # Otherwise start from the beginning.
-        import chess
-        env.board = chess.Board(request.fen)
-
-        # Pick the AI's move (random for now)
-        chosen_move = env.random_move()
-
-        # Apply it and get the new state
-        result = env.step(chosen_move)
-
-        return MoveResponse(
-            move=chosen_move,
-            fen=result["fen"],
-            done=result["done"],
-            result=result["result"]
+        move_uci, _ = agent.choose_move(
+            board, history,
+            greedy=True,
+            n_simulations=request.n_simulations
         )
 
+        board.push_uci(move_uci)
+        done   = board.is_game_over()
+        result = board.result() if done else None
+
+        return MoveResponse(
+            move=move_uci,
+            fen=board.fen(),
+            done=done,
+            result=result,
+        )
     except Exception as e:
-        # If anything goes wrong, send a clear error back to Electron
         raise HTTPException(status_code=400, detail=str(e))
