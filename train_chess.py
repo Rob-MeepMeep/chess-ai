@@ -31,18 +31,18 @@ from chessai.replay  import ReplayBuffer, GameBuffer
 # ---------------------------------------------------------------------------
 
 N_GAMES          = 10_000
-N_SIMULATIONS    = 50       # reduce for faster iteration; increase on desktop GPU
+N_SIMULATIONS    = 100      # reduce for faster iteration; increase on desktop GPU
 BATCH_SIZE       = 64
 TRAIN_STEPS      = 5        # gradient updates per game (once buffer is ready)
 MIN_BUFFER       = 500      # don't train until buffer holds this many positions
 MAX_GAME_MOVES   = 150      # hard cap — bumped from 100; resign logic should terminate most games first
 CHECKPOINT_EVERY = 10       # save checkpoint every N games
-SNAPSHOT_EVERY   = 100      # log MCTS strategy snapshots every N games
+SNAPSHOT_EVERY   = 50      # log MCTS strategy snapshots every N games
 PRINT_EVERY      = 10       # print progress line every N games
 RESIGN_THRESHOLD   = -0.95  # value head score below which a position is hopeless
                              # -0.95 is conservative — loosen to -0.85 if decisive games remain rare after 500 games
-RESIGN_CONSECUTIVE = 5      # consecutive moves below threshold before resigning
-RESIGN_MATERIAL    = 9      # resign if down by more than a queen in material (bootstraps early training)
+RESIGN_CONSECUTIVE = 3      # consecutive moves below threshold before resigning
+RESIGN_MATERIAL    = 5      # resign if down by more than a rook in material (bootstraps early training)
 
 CKPT_PATH = "checkpoints/hal_chess.pt"
 LOG_DIR   = "logs/chess"

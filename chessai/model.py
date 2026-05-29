@@ -16,9 +16,8 @@ Illegal moves are masked to -inf by the agent before argmax or softmax.
 The value head outputs a scalar in [-1, 1]: positive = current player is winning.
 This is what MCTS uses to evaluate leaf nodes without playing the game to completion.
 
-AlphaZero uses 20 residual blocks and 256 filters. We use 8 blocks and 128 filters —
-about 4× smaller — to fit comfortably in 16GB unified memory. Can be increased
-when training moves to the Windows desktop.
+AlphaZero uses 20 residual blocks and 256 filters. We use 10 blocks and 160 filters —
+about 3× smaller — running on a MacBook Pro M5 Pro with 24GB unified memory.
 """
 
 import torch
@@ -26,8 +25,8 @@ import torch.nn as nn
 
 from chessai.encoder import N_PLANES   # 55
 
-N_CHANNELS = 128
-N_BLOCKS   = 8
+N_CHANNELS = 160
+N_BLOCKS   = 10
 N_MOVES    = 4096   # 64 × 64 flat move encoding
 
 

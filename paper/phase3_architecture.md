@@ -308,4 +308,60 @@ plumbing works before training begins.
 
 ---
 
+---
+
+## Training Runs
+
+### Run 1 — MacBook Air M3 (abandoned at game 1090)
+
+**Config:** 128 channels, 8 blocks, 50 simulations  
+**Hardware:** MacBook Air M3, 16GB  
+**Games completed:** 1090  
+**Training steps:** 5,480  
+**Final loss:** ~3.35  
+
+**Eval at game 1090:**
+- vs Random (White): 0W / 9L / 91D — 0% win rate
+- vs Random (Black): 0W / 15L / 85D — 0% win rate
+- vs Stockfish depth 1: 0W / 50L / 0D
+
+**Why abandoned:** Moved to MacBook Pro M5 Pro. Scaled up model and simulations for new hardware.
+
+---
+
+### Run 2 — MacBook Pro M5 Pro (abandoned at game 200)
+
+**Config:** 160 channels, 10 blocks, 100 simulations  
+**Hardware:** MacBook Pro M5 Pro, 24GB  
+**Games completed:** 200  
+**Training steps:** 970  
+**Final loss:** ~4.87  
+
+**Eval at game 200:**
+- vs Random (White): 0W / 10L / 90D — 0% win rate
+- vs Random (Black): 0W / 12L / 88D — 0% win rate
+
+**Value head regression test:**
+- Start position: -0.049 (expect ~0.0) ✓ (trivially correct)
+- K+Q vs K (white wins): -0.069 (expect near +1) ✗
+- K+Q vs K (black to move): +0.007 (expect near -1) ✗
+- White missing queen: -0.041 (expect < 0) ✗
+
+**Why abandoned:** Draw-collapse confirmed. The value head output ~0 for all positions including trivially decisive endgames. Root cause: with 200 games all ending as cap-draws, every position in the replay buffer carries an outcome of 0. The value head MSE loss is already minimised by predicting zero everywhere — the gradient is flat and the value head learns nothing. MCTS evaluations are therefore meaningless, and the policy head is learning move frequencies rather than strategy.
+
+**Fix for Run 3:** Lower `RESIGN_MATERIAL` and `RESIGN_CONSECUTIVE` to generate decisive games earlier in training, seeding the replay buffer with non-zero outcomes so the value head receives real gradient signal from the start.
+
+---
+
+### Run 3 — MacBook Pro M5 Pro (in progress)
+
+**Config:** 160 channels, 10 blocks, 100 simulations  
+**Hardware:** MacBook Pro M5 Pro, 24GB  
+**Key changes from Run 2:**
+- `RESIGN_MATERIAL` lowered from 9 → 5 (rook rather than queen) — triggers decisive games earlier
+- `RESIGN_CONSECUTIVE` lowered from 5 → 3 — resignation fires faster once condition is met
+- Goal: seed replay buffer with non-zero outcomes from the start so value head receives real gradient signal
+
+---
+
 *Architecture document — chess-ai Phase 3. Updated as build progresses.*
