@@ -35,11 +35,12 @@ N_SIMULATIONS    = 50       # reduce for faster iteration; increase on desktop G
 BATCH_SIZE       = 64
 TRAIN_STEPS      = 5        # gradient updates per game (once buffer is ready)
 MIN_BUFFER       = 500      # don't train until buffer holds this many positions
-MAX_GAME_MOVES   = 100      # hard cap — 200 was too slow; increase once games finish naturally
+MAX_GAME_MOVES   = 150      # hard cap — bumped from 100; resign logic should terminate most games first
 CHECKPOINT_EVERY = 10       # save checkpoint every N games
 SNAPSHOT_EVERY   = 100      # log MCTS strategy snapshots every N games
 PRINT_EVERY      = 10       # print progress line every N games
 RESIGN_THRESHOLD   = -0.95  # value head score below which a position is hopeless
+                             # -0.95 is conservative — loosen to -0.85 if decisive games remain rare after 500 games
 RESIGN_CONSECUTIVE = 5      # consecutive moves below threshold before resigning
 RESIGN_MATERIAL    = 9      # resign if down by more than a queen in material (bootstraps early training)
 
@@ -112,7 +113,8 @@ for game_num in range(start_game + 1, N_GAMES + 1):
     loss    = 0.0
 
     # --- Self-play: one complete game ---
-    resign_streak = 0   # consecutive moves where the side to move is hopeless
+    resign_streak = 0     # consecutive moves where the side to move is hopeless
+    resign_cause  = None  # "material" or "value" — which condition fired
 
     while not board.is_game_over() and len(moves) < MAX_GAME_MOVES:
 
@@ -133,29 +135,47 @@ for game_num in range(start_game + 1, N_GAMES + 1):
         board.push_uci(move_uci)
 
         # Check whether the player now to move is in a hopeless position.
-        # Either condition triggers: value head says hopeless, OR down more than a queen.
-        # Material check bootstraps early training before the value head has learned anything.
-        v   = agent.get_value(board, history)
-        mat = _material_balance(board)
+        # Material check fires independently of the network — bootstraps early training.
+        # Value check kicks in once the value head has learned to distinguish positions.
+        v              = agent.get_value(board, history)
+        mat            = _material_balance(board)
         mat_from_mover = mat if board.turn == chess.WHITE else -mat
-        if v < RESIGN_THRESHOLD or mat_from_mover < -RESIGN_MATERIAL:
+        mat_hopeless   = mat_from_mover < -RESIGN_MATERIAL
+        val_hopeless   = v < RESIGN_THRESHOLD
+        if mat_hopeless or val_hopeless:
             resign_streak += 1
+            # Record which condition fired first (material takes priority if both true)
+            if resign_cause is None:
+                resign_cause = "material" if mat_hopeless else "value"
         else:
             resign_streak = 0
+            resign_cause  = None
         if resign_streak >= RESIGN_CONSECUTIVE:
             break   # losing side resigns
 
-    # --- Determine winner ---
+    # --- Determine winner and end reason ---
     result = board.result()
-    if result == "1-0":
-        winner = chess.WHITE
+    if resign_streak >= RESIGN_CONSECUTIVE:
+        winner     = chess.BLACK if board.turn == chess.WHITE else chess.WHITE
+        end_reason = f"{resign_cause}_resign"
+    elif result == "1-0":
+        winner     = chess.WHITE
+        end_reason = "checkmate"
     elif result == "0-1":
-        winner = chess.BLACK
-    elif resign_streak >= RESIGN_CONSECUTIVE:
-        # Player to move resigned — their opponent wins
-        winner = chess.BLACK if board.turn == chess.WHITE else chess.WHITE
+        winner     = chess.BLACK
+        end_reason = "checkmate"
+    elif board.is_stalemate() or board.is_insufficient_material():
+        winner     = None
+        end_reason = "rule_draw"
+    elif board.is_fifty_moves() or board.is_repetition():
+        winner     = None
+        end_reason = "rule_draw"
+    elif len(moves) >= MAX_GAME_MOVES:
+        winner     = None
+        end_reason = "cap_draw"
     else:
-        winner = None   # genuine draw, stalemate, 50-move, or max-moves cap
+        winner     = None
+        end_reason = "rule_draw"
 
     # Commit game positions with outcomes to replay buffer
     game_buf.commit(replay, winner)
@@ -167,7 +187,7 @@ for game_num in range(start_game + 1, N_GAMES + 1):
             loss  = agent.train(batch)
 
     # --- Logging ---
-    logger.record_game(game_num, winner, moves, loss)
+    logger.record_game(game_num, winner, moves, loss, end_reason)
 
     if game_num % SNAPSHOT_EVERY == 0:
         logger.record_snapshot(game_num, agent)

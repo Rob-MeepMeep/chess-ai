@@ -51,10 +51,16 @@ class Logger:
         self._opening_path  = os.path.join(log_dir, "openings.csv")
         self._snapshot_path = os.path.join(log_dir, "snapshots.csv")
 
+        self._end_reason_path = os.path.join(log_dir, "end_reasons.csv")
+
         self._init_csv(self._perf_path, [
             "game", "white_wins", "black_wins", "draws",
             "avg_loss", "avg_game_length",
             "len_0_20", "len_21_40", "len_41_60", "len_61_80", "len_81plus",
+        ])
+        self._init_csv(self._end_reason_path, [
+            "game", "checkmates", "material_resigns", "value_resigns",
+            "cap_draws", "rule_draws",
         ])
         self._init_csv(self._opening_path, ["game", "moves"])
         self._init_csv(self._snapshot_path, [
@@ -70,13 +76,16 @@ class Logger:
     # ------------------------------------------------------------------
 
     def record_game(self, game_num: int, winner,
-                    moves: list, loss: float) -> None:
+                    moves: list, loss: float,
+                    end_reason: str = "unknown") -> None:
         """
         Call after every completed game.
 
-        winner : chess.WHITE, chess.BLACK, or None for draw
-        moves  : list of UCI strings played in the game
-        loss   : training loss for this game's batch (0.0 if no training step yet)
+        winner     : chess.WHITE, chess.BLACK, or None for draw
+        moves      : list of UCI strings played in the game
+        loss       : training loss for this game's batch (0.0 if no training step yet)
+        end_reason : one of "checkmate", "material_resign", "value_resign",
+                     "cap_draw", "rule_draw"
         """
         # Opening sequence — write immediately, useful at full resolution
         opening = " ".join(moves[:12]) if moves else ""
@@ -89,6 +98,11 @@ class Logger:
             self._window["black_wins"] += 1
         else:
             self._window["draws"] += 1
+
+        # Track game-end distribution
+        key = end_reason.replace("-", "_")
+        if key in self._window:
+            self._window[key] += 1
 
         self._window["losses"].append(loss)
         game_length = len(moves)
@@ -132,6 +146,8 @@ class Logger:
         self._window = {
             "white_wins": 0, "black_wins": 0, "draws": 0,
             "losses": [], "lengths": [],
+            "checkmates": 0, "material_resigns": 0,
+            "value_resigns": 0, "cap_draws": 0, "rule_draws": 0,
         }
 
     def _flush_performance(self, game_num: int) -> None:
@@ -156,6 +172,11 @@ class Logger:
             buckets.get("41_60", 0),
             buckets.get("61_80", 0),
             buckets.get("81_81plus", 0),
+        ])
+        self._append(self._end_reason_path, [
+            game_num,
+            w["checkmates"], w["material_resigns"], w["value_resigns"],
+            w["cap_draws"], w["rule_draws"],
         ])
         self._reset_window()
 

@@ -52,6 +52,28 @@ print(f"  Trained steps: {hal.steps:,}")
 print(f"  Checkpoint:    {CKPT_PATH}\n")
 
 # ---------------------------------------------------------------------------
+# Value head regression test
+# Checks whether the value head has learned to distinguish positions.
+# A draw-collapsed network outputs ~0 everywhere.
+# A trained network should approach +1 / -1 on decisive endgames.
+# ---------------------------------------------------------------------------
+
+REGRESSION_POSITIONS = {
+    # FEN                                                    description          expect
+    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1": ("start",              "~0.0"),
+    "8/8/8/8/8/6K1/6Q1/7k w - - 0 1":                            ("K+Q vs K (w wins)", "near +1"),
+    "8/8/8/8/8/6K1/6Q1/7k b - - 0 1":                            ("K+Q vs K (b move)", "near -1"),
+    "rnbqkbnr/pppppppp/8/8/8/8/PPPP1PPP/RNBQKBNR w KQkq - 0 1": ("white missing queen", "< 0"),
+}
+
+print("── Value Head Regression ───────────────────────────────────\n")
+for fen, (label, expected) in REGRESSION_POSITIONS.items():
+    board = chess.Board(fen)
+    v = hal.get_value(board, [])
+    print(f"  {label:<24}  value={v:+.4f}  (expect {expected})")
+print()
+
+# ---------------------------------------------------------------------------
 # Move functions
 # ---------------------------------------------------------------------------
 
