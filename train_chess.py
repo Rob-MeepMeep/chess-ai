@@ -145,14 +145,14 @@ for game_num in range(start_game + 1, N_GAMES + 1):
         history = ([board.copy()] + history)[:3]
         board.push_uci(move_uci)
 
-        # Check whether the player now to move is in a hopeless position.
+        # Check whether either side is in a hopeless position.
         # Material check fires independently of the network — bootstraps early training.
         # Value check kicks in once the value head has learned to distinguish positions.
-        v              = agent.get_value(board, history)
-        mat            = _material_balance(board)
-        mat_from_mover = mat if board.turn == chess.WHITE else -mat
-        mat_hopeless   = mat_from_mover < -RESIGN_MATERIAL
-        val_hopeless   = v < RESIGN_THRESHOLD
+        # abs() used for both: we want to resign regardless of which side is losing.
+        v            = agent.get_value(board, history)
+        mat          = _material_balance(board)
+        mat_hopeless = abs(mat) > RESIGN_MATERIAL
+        val_hopeless = abs(v) > abs(RESIGN_THRESHOLD)
         if mat_hopeless or val_hopeless:
             resign_streak += 1
             # Record which condition fired first (material takes priority if both true)
@@ -167,7 +167,8 @@ for game_num in range(start_game + 1, N_GAMES + 1):
     # --- Determine winner and end reason ---
     result = board.result()
     if resign_streak >= RESIGN_CONSECUTIVE:
-        winner     = chess.BLACK if board.turn == chess.WHITE else chess.WHITE
+        # Side with more material wins; imbalance was already confirmed by resign_streak
+        winner     = chess.WHITE if _material_balance(board) > 0 else chess.BLACK
         end_reason = f"{resign_cause}_resign"
     elif result == "1-0":
         winner     = chess.WHITE

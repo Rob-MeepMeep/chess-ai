@@ -72,6 +72,17 @@ A record of significant decisions, config changes, and architectural pivots acro
 - `MAX_GAME_MOVES` 100 → 150
 - `resign_cause` tracking (material vs value)
 
+### Run 3 abandoned — resign logic never fired (game 400, 2026-05-30)
+- **Problem 1 (resign streak):** `mat_from_mover` was calculated per-side-to-move,
+  so with white down 6 the streak went 1 (white's turn) → 0 (black's turn, black is UP 6)
+  → 1 → 0... and never reached 3. All 400 games hit the 150-move cap.
+- **Fix:** Use `abs(mat) > RESIGN_MATERIAL` — checks the absolute imbalance regardless
+  of whose turn it is. Winner determined by which side has more material at resignation.
+- **Problem 2 (logger key mismatch):** `end_reasons.csv` showed all zeros because window
+  dict keys were plural (`"cap_draws"`, `"checkmates"`) but `end_reason` strings are
+  singular (`"cap_draw"`, `"checkmate"`). The `if key in self._window` check never matched.
+- **Fix:** Renamed window keys to match end_reason strings exactly.
+
 ### Run 2 abandoned — draw-collapse confirmed (game 200, 2026-05-29)
 - **Problem:** Value head completely draw-collapsed. All 200 games ended as cap-draws,
   giving every position an outcome of 0. Value head MSE loss already minimised at zero

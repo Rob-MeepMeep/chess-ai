@@ -157,8 +157,9 @@ class Logger:
         self._window = {
             "white_wins": 0, "black_wins": 0, "draws": 0,
             "losses": [], "lengths": [],
-            "checkmates": 0, "material_resigns": 0,
-            "value_resigns": 0, "cap_draws": 0, "rule_draws": 0,
+            # Keys match end_reason strings from train_chess.py exactly
+            "checkmate": 0, "material_resign": 0,
+            "value_resign": 0, "cap_draw": 0, "rule_draw": 0,
         }
 
     def _flush_performance(self, game_num: int) -> None:
@@ -186,8 +187,8 @@ class Logger:
         ])
         self._append(self._end_reason_path, [
             game_num,
-            w["checkmates"], w["material_resigns"], w["value_resigns"],
-            w["cap_draws"], w["rule_draws"],
+            w["checkmate"], w["material_resign"], w["value_resign"],
+            w["cap_draw"], w["rule_draw"],
         ])
         self._reset_window()
 
