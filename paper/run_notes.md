@@ -111,10 +111,17 @@ Resign firing from game 2. Loss trending down: 3.737 → 3.49 by game 457.
 | 300–400 | 0 | 64 | 34 | 2 |
 | 400–500 | **1** | 18 | 21 | 3 |
 
-**★ First checkmate — Game 461, White wins, 95 moves (~2026-05-31)**
-HAL delivered its first checkmate. The network learned to finish a game rather than resign on material.
-Final move sequence ends: `g5f6 f8d6 f6d6#` — white pawn captures on f6, black bishop retreats to d6, white takes on d6 delivering checkmate.
-Full move record in `logs/run4/games.csv` game 461.
+**★ Checkmate 1 — Game 461, White wins, 95 moves (~2026-05-31)**
+Final moves: `g5f6 f8d6 f6d6#` — pawn captures f6, bishop retreats to d6, pawn takes d6 checkmate.
+Full record in `logs/run4/games.csv`.
+
+**★ Checkmate 2 — Game 858, Black wins, 34 moves (~2026-05-31)**
+Final moves: `h3g3 c6a7` — black knight retreats to a7, delivering checkmate.
+34 moves is significantly shorter than the first. Black builds an attack and closes it out. Full record in `logs/run4/games.csv`.
+
+**★ Checkmate 3 — Game 996, Black wins, 112 moves (~2026-05-31)**
+Final moves: `d1e2 f8g8 f3f2 g8g7 e2d1 g7h7 d1e2 e6f7` — complex endgame, black king walks into a mating net over many moves.
+Full record in `logs/run4/games.csv`.
 
 Value resigns now outnumber material resigns for the first time (21 vs 18). The value head is the dominant resign signal — the network has genuine positional conviction, not just material counting.
 
