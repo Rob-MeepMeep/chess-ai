@@ -94,8 +94,33 @@ self._window = {"cap_draw": 0, "checkmate": 0, ...}   # singular
 | 30 | W | 61 | 3.6648 | 2040 | 59 |
 | 40 | W | 41 | 3.6981 | 2090 | 56 |
 | 50 | D | 150 | 3.6606 | 2140 | 60 |
+| 400 | B | 10 | 3.8698 | 3890 | 40 |
+| 450 | B | 15 | 3.6516 | 4140 | 31 |
+| 457 | B | 20 | 3.4902 | — | — |
+| 530 | W | 130 | 4.0085 | 4505 | 47 |
 
-Resign firing from game 2. Loss trending down: 3.737 → 3.661 over first 50 games. ~60s/game settled.
+Resign firing from game 2. Loss trending down: 3.737 → 3.49 by game 457.
+
+**100-game window stats (from end_reasons.csv):**
+
+| Window | Checkmates | Material resigns | Value resigns | Cap draws |
+|--------|------------|-----------------|---------------|-----------|
+| 0–100 | 0 | 77 | 10 | 13 |
+| 100–200 | 0 | 59 | 29 | 12 |
+| 200–300 | 0 | 60 | 31 | 9 |
+| 300–400 | 0 | 64 | 34 | 2 |
+| 400–500 | **1** | 18 | 21 | 3 |
+
+**★ First checkmate — Game 461, White wins, 95 moves (~2026-05-31)**
+HAL delivered its first checkmate. The network learned to finish a game rather than resign on material.
+Final move sequence ends: `g5f6 f8d6 f6d6#` — white pawn captures on f6, black bishop retreats to d6, white takes on d6 delivering checkmate.
+Full move record in `logs/run4/games.csv` game 461.
+
+Value resigns now outnumber material resigns for the first time (21 vs 18). The value head is the dominant resign signal — the network has genuine positional conviction, not just material counting.
+
+Average game length: 84 → 77 → 69 → 68 → 60 moves. Consistently shortening each window.
+
+**Run interrupted at game 457** (terminal session closed). Resumed cleanly from game 450 checkpoint. CKPT_LOAD set to None to prevent loading wrong weights on future restarts.
 
 ---
 
