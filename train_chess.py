@@ -44,10 +44,12 @@ RESIGN_THRESHOLD   = -0.95  # value head score below which a position is hopeles
 RESIGN_CONSECUTIVE = 3      # consecutive moves below threshold before resigning
 RESIGN_MATERIAL    = 5      # resign if down by more than a rook in material (bootstraps early training)
 
-# Run identity — change this to start a new named run with its own checkpoint and buffer.
-# To resume a previous run's buffer, set BUFFER_LOAD to that run's buffer path.
-RUN_NAME    = "run3"
-BUFFER_LOAD = None   # None = load RUN_NAME's own buffer; set to a path to load from another run
+# Run identity — change RUN_NAME to start a new named run with its own logs and buffer.
+# CKPT_LOAD: None = load RUN_NAME's own checkpoint; set to a path to seed weights from another run.
+# BUFFER_LOAD: None = load RUN_NAME's own buffer; set to a path to load from another run.
+RUN_NAME    = "run4"
+CKPT_LOAD   = "checkpoints/hal_chess.pt"   # resume weights from run3; None for fully fresh start
+BUFFER_LOAD = None                          # no buffer — start clean so draw-poisoned data is discarded
 
 CKPT_PATH   = f"checkpoints/{RUN_NAME}_hal_chess.pt"
 BUFFER_PATH = f"checkpoints/{RUN_NAME}_replay_buffer.pt"
@@ -75,21 +77,25 @@ replay = ReplayBuffer()
 logger = Logger(log_dir=LOG_DIR, snapshot_interval=SNAPSHOT_EVERY)
 
 start_game = 0
-if os.path.exists(CKPT_PATH):
-    agent.load(CKPT_PATH)
-    # Read last completed game number from the openings log
-    openings_path = os.path.join(LOG_DIR, "openings.csv")
-    if os.path.exists(openings_path):
-        with open(openings_path) as f:
-            rows = list(csv.reader(f))
-        if len(rows) > 1:
-            start_game = int(rows[-1][0])
-    print(f"Resumed from checkpoint — starting at game {start_game + 1}")
+_ckpt_to_load = CKPT_LOAD or CKPT_PATH
+if os.path.exists(_ckpt_to_load):
+    agent.load(_ckpt_to_load)
+    # Only resume game number if continuing the same run's own checkpoint
+    if _ckpt_to_load == CKPT_PATH:
+        openings_path = os.path.join(LOG_DIR, "openings.csv")
+        if os.path.exists(openings_path):
+            with open(openings_path) as f:
+                rows = list(csv.reader(f))
+            if len(rows) > 1:
+                start_game = int(rows[-1][0])
+    print(f"Loaded weights from {_ckpt_to_load} — starting at game {start_game + 1}")
     print(f"  Trained steps so far: {agent.steps:,}")
     _buf_to_load = BUFFER_LOAD or BUFFER_PATH
     if os.path.exists(_buf_to_load):
         replay.load(_buf_to_load)
         print(f"  Replay buffer loaded: {len(replay):,} positions ({_buf_to_load})")
+    else:
+        print("  Replay buffer: empty (starting clean)")
 else:
     print("Starting fresh training run.")
 
