@@ -176,19 +176,18 @@ mask in the Connect Four agent.
 Input: (55, 8, 8) tensor from encoder.py
 
 ```
-Input conv:    Conv2d(55 → 128, 3×3, padding 1) + BatchNorm + ReLU
-Residual ×8:   Conv2d(128 → 128, 3×3, padding 1) + BatchNorm + ReLU
-               Conv2d(128 → 128, 3×3, padding 1) + BatchNorm
+Input conv:    Conv2d(55 → 160, 3×3, padding 1) + BatchNorm + ReLU
+Residual ×10:  Conv2d(160 → 160, 3×3, padding 1) + BatchNorm + ReLU
+               Conv2d(160 → 160, 3×3, padding 1) + BatchNorm
                + skip connection → ReLU
-Policy head:   Conv2d(128 → 2, 1×1) + BatchNorm + ReLU
+Policy head:   Conv2d(160 → 2, 1×1) + BatchNorm + ReLU
                → flatten → Linear(128, 4096)
-Value  head:   Conv2d(128 → 1, 1×1) + BatchNorm + ReLU
+Value  head:   Conv2d(160 → 1, 1×1) + BatchNorm + ReLU
                → flatten → Linear(64, 256) → Linear(256, 1) → Tanh
 ```
 
-AlphaZero uses 20 residual blocks and 256 filters. We use 8 blocks and 128
-filters — scaled for the MacBook Air M3. Can be increased when training
-moves to the Windows desktop.
+AlphaZero uses 20 residual blocks and 256 filters. We use 10 blocks and 160
+filters — scaled for the MacBook Pro M5 Pro with 24GB unified memory.
 
 BatchNorm is new relative to Phase 2 — it normalises activations between
 layers, which is important for stability in deeper networks.
@@ -353,14 +352,44 @@ plumbing works before training begins.
 
 ---
 
-### Run 3 — MacBook Pro M5 Pro (in progress)
+### Run 3 — MacBook Pro M5 Pro (abandoned at game 400)
 
 **Config:** 160 channels, 10 blocks, 100 simulations  
 **Hardware:** MacBook Pro M5 Pro, 24GB  
-**Key changes from Run 2:**
-- `RESIGN_MATERIAL` lowered from 9 → 5 (rook rather than queen) — triggers decisive games earlier
-- `RESIGN_CONSECUTIVE` lowered from 5 → 3 — resignation fires faster once condition is met
-- Goal: seed replay buffer with non-zero outcomes from the start so value head receives real gradient signal
+**Games completed:** 400  
+**Training steps:** 1,915  
+**Key changes from Run 2:** `RESIGN_MATERIAL` 9 → 5, `RESIGN_CONSECUTIVE` 5 → 3
+
+**Result:** All 400 games were cap-draws. Resign logic never fired.
+
+**Two bugs discovered:**
+
+**Bug 1 — resign streak never accumulates:**  
+The streak checked `mat_from_mover < -RESIGN_MATERIAL`, where `mat_from_mover`
+flips sign every half-move. With white down 6: white's turn → streak = 1;
+black's turn → from black's perspective black is UP 6, streak resets to 0.
+Alternated 1/0/1/0 indefinitely, never reaching 3.  
+**Fix:** Check `abs(mat) > RESIGN_MATERIAL` — imbalance is absolute, independent of
+whose turn it is. Winner at resignation determined by which side has more material.
+
+**Bug 2 — end_reasons.csv all zeros:**  
+Logger window dict used plural keys (`"cap_draws"`, `"checkmates"`) but `end_reason`
+strings from the training loop are singular (`"cap_draw"`, `"checkmate"`). The
+`if key in self._window` guard silently discarded every event.  
+**Fix:** Renamed window keys to match the end_reason strings exactly.
+
+**Loss curve:** 6.66 → 4.97 → 3.88 → 3.87 (flatlined last 100 games). Policy head
+learned some structure; value head fully collapsed to ~0.
+
+---
+
+### Run 4 — MacBook Pro M5 Pro (in progress, 2026-05-30)
+
+**Config:** 160 channels, 10 blocks, 100 simulations  
+**Hardware:** MacBook Pro M5 Pro, 24GB  
+**Seeded from:** Run 3 checkpoint at game 400 (policy head preserved, buffer discarded)  
+**Key fixes:** resign streak uses `abs(mat)`, logger keys corrected  
+**Early results:** Game 2 — white win, 75 moves. Game 3 — white win, 19 moves. Resign firing.
 
 ---
 
