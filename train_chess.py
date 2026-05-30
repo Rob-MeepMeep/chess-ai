@@ -48,7 +48,7 @@ RESIGN_MATERIAL    = 5      # resign if down by more than a rook in material (bo
 # CKPT_LOAD: None = load RUN_NAME's own checkpoint; set to a path to seed weights from another run.
 # BUFFER_LOAD: None = load RUN_NAME's own buffer; set to a path to load from another run.
 RUN_NAME    = "run4"
-CKPT_LOAD   = "checkpoints/hal_chess.pt"   # resume weights from run3; None for fully fresh start
+CKPT_LOAD   = None   # None = load run4's own checkpoint (run4_hal_chess.pt)
 BUFFER_LOAD = None                          # no buffer — start clean so draw-poisoned data is discarded
 
 CKPT_PATH   = f"checkpoints/{RUN_NAME}_hal_chess.pt"
