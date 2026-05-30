@@ -123,6 +123,19 @@ Final moves: `h3g3 c6a7` — black knight retreats to a7, delivering checkmate.
 Final moves: `d1e2 f8g8 f3f2 g8g7 e2d1 g7h7 d1e2 e6f7` — complex endgame, black king walks into a mating net over many moves.
 Full record in `logs/run4/games.csv`.
 
+**★ Checkmate 4 — Game 1372, Black wins, 22 moves (~2026-05-31)**
+Shortest checkmate yet. White king walked e1→d2→e3→f4→e5 across 11 moves.
+Black built a complete cage: knight on f5 covers d4, queen on d7 covers d6, pawn on d5 covers e4, bishop on e6 occupies e6, pawn on g5 covers f4, bishop on g7 delivers check through f6.
+Final move: `f4e5 f8g7#` — king steps into the cage, bishop slides to g7, checkmate.
+Most sophisticated chess HAL has played — multiple pieces coordinating to trap a wandering king.
+Full move record in `logs/run4/games.csv`.
+
+**★ Checkmate 5 — Game 1615, Black wins, 126 moves (~2026-05-31)**
+Long complex game. Full record in `logs/run4/games.csv`.
+
+**★ Checkmate 6 — Game 1698, Black wins, 60 moves (~2026-05-31)**
+Full record in `logs/run4/games.csv`.
+
 Value resigns now outnumber material resigns for the first time (21 vs 18). The value head is the dominant resign signal — the network has genuine positional conviction, not just material counting.
 
 Average game length: 84 → 77 → 69 → 68 → 60 moves. Consistently shortening each window.
