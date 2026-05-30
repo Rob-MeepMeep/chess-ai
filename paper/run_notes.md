@@ -85,8 +85,17 @@ self._window = {"cap_draw": 0, "checkmate": 0, ...}   # singular
 - **Config:** 160ch / 10 blocks / 100 sims / both bugs fixed
 - **Seeded from:** Run 3 checkpoint (weights only, clean buffer)
 - **RUN_NAME:** `run4` → checkpoint at `checkpoints/run4_hal_chess.pt`
-- **Early results:** Resign firing from game 2. Game 40: W, 41 moves, loss 3.70, 56s/game.
 - **This is the first run with a correctly functioning reward signal.**
+
+| Game | Result | Moves | Loss | Steps | s/game |
+|------|--------|-------|------|-------|--------|
+| 10 | D | 150 | 3.7370 | 1940 | 69 |
+| 20 | W | 77 | 3.7135 | 1990 | 68 |
+| 30 | W | 61 | 3.6648 | 2040 | 59 |
+| 40 | W | 41 | 3.6981 | 2090 | 56 |
+| 50 | D | 150 | 3.6606 | 2140 | 60 |
+
+Resign firing from game 2. Loss trending down: 3.737 → 3.661 over first 50 games. ~60s/game settled.
 
 ---
 
