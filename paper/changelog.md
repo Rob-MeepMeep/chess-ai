@@ -96,6 +96,28 @@ A record of significant decisions, config changes, and architectural pivots acro
 - `N_SIMULATIONS` 50 → 100
 - Hardware: MacBook Air M3 16GB → MacBook Pro M5 Pro 24GB
 
+### Run 4 concluded — 2300 games, 12,155 steps (2026-05-31)
+- Value head active: value resigns grew from 10% → 48-58% of games
+- Cap draws essentially eliminated: 13% → 1%
+- Average game length: 84 → 43.7 moves
+- Loss: 3.78 → 3.61 (windowed average)
+- 8 checkmates in 2300 games
+- **Problem 1 — black wins 55-60% persistently:** policy developed bad white habits
+  (king marches to centre) which self-play never punished. Buffer contaminated with
+  systematically biased data. HAL lost 22% vs random as white, 15% as black.
+- **Problem 2 — resign ends games too early:** with RESIGN_CONSECUTIVE=3, network never
+  needed to learn closing technique. Only 8 checkmates in 2300 games — 0% win rate
+  vs random at eval because HAL can't deliver checkmate reliably.
+- **Root cause of both:** resign thresholds were correctly lowered to bootstrap the
+  value head in Run 3/4, but once the value head was active the thresholds should
+  have been walked back. They weren't, allowing bad habits to compound.
+
+### Run 5 — start config (2026-05-31)
+- Seeded from Run 4 weights (12,155 steps), fresh buffer (discards biased data)
+- `RESIGN_MATERIAL` 5 → 7 (rook+bishop worth — triggers on larger imbalances)
+- `RESIGN_CONSECUTIVE` 3 → 5 (games breathe longer, closing technique must develop)
+- Goal: generate more checkmate training data, reduce black bias, improve eval win rate
+
 ---
 
 *Updated throughout the project. For full diff history see git log.*

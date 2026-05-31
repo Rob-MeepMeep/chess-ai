@@ -40,16 +40,15 @@ CHECKPOINT_EVERY = 10       # save checkpoint every N games
 SNAPSHOT_EVERY   = 50      # log MCTS strategy snapshots every N games
 PRINT_EVERY      = 10       # print progress line every N games
 RESIGN_THRESHOLD   = -0.95  # value head score below which a position is hopeless
-                             # -0.95 is conservative — loosen to -0.85 if decisive games remain rare after 500 games
-RESIGN_CONSECUTIVE = 3      # consecutive moves below threshold before resigning
-RESIGN_MATERIAL    = 5      # resign if down by more than a rook in material (bootstraps early training)
+RESIGN_CONSECUTIVE = 5      # raised from 3 — let positions breathe, force more closing technique
+RESIGN_MATERIAL    = 7      # raised from 5 — resign only on larger imbalances (rook+bishop worth)
 
 # Run identity — change RUN_NAME to start a new named run with its own logs and buffer.
 # CKPT_LOAD: None = load RUN_NAME's own checkpoint; set to a path to seed weights from another run.
 # BUFFER_LOAD: None = load RUN_NAME's own buffer; set to a path to load from another run.
-RUN_NAME    = "run4"
-CKPT_LOAD   = None   # None = load run4's own checkpoint (run4_hal_chess.pt)
-BUFFER_LOAD = None                          # no buffer — start clean so draw-poisoned data is discarded
+RUN_NAME    = "run5"
+CKPT_LOAD   = "checkpoints/run4_hal_chess.pt"  # seed from run4 weights; discard biased buffer
+BUFFER_LOAD = None                              # fresh buffer — run4 buffer was biased toward black wins
 
 CKPT_PATH   = f"checkpoints/{RUN_NAME}_hal_chess.pt"
 BUFFER_PATH = f"checkpoints/{RUN_NAME}_replay_buffer.pt"
