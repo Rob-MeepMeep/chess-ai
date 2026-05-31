@@ -1,0 +1,2 @@
+game,white_wins,black_wins,draws,avg_loss,avg_game_length,len_0_20,len_21_40,len_41_60,len_61_80,len_81plus
+100,31,54,15,3.026187,73.0,19,16,10,14,41

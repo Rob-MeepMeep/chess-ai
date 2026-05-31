@@ -142,6 +142,30 @@ Average game length: 84 → 77 → 69 → 68 → 60 moves. Consistently shorteni
 
 **Run interrupted at game 457** (terminal session closed). Resumed cleanly from game 450 checkpoint. CKPT_LOAD set to None to prevent loading wrong weights on future restarts.
 
+**Run 4 concluded at game 2300.** Data archived at `paper/data/run4/`.
+
+---
+
+### Run 5 — MacBook Pro M5 Pro (abandoned at game 100, 2026-05-31)
+- **Config:** 160ch / 10 blocks / 100 sims / RESIGN_MATERIAL=7, RESIGN_CONSECUTIVE=5
+- **Seeded from:** Run 4 weights (13,355 steps), fresh buffer
+- **Result:** Abandoned after 100 games
+
+**Findings:**
+- Black bias confirmed structural — 54B / 31W / 15D in first 100 games (63% black)
+- Bias appeared from game 1 with a completely fresh buffer
+- Source identified: plane 48 in the encoder ("all 1s = white to move") allows the network
+  to develop colour-specific associations. Run 4's 2300 games trained the policy to associate
+  "playing white" with losing positions — that learning is baked into the weights.
+- Positive finding: loss started at 3.03 at game 100 (vs 3.57 in Run 4) — the run4 weights
+  do provide a genuine head start in policy/value quality, just with bias attached.
+- Value resigns active from game 1 (29/100 games) — value head came pre-trained.
+- 1 checkmate in 100 games.
+
+**Decision: start Run 6 from random weights.** Fresh start removes inherited bias.
+Plane 48 (colour indicator) to be removed from encoder — makes network colour-blind,
+matching true AlphaZero convention. RESIGN_MATERIAL=7, RESIGN_CONSECUTIVE=5 retained.
+
 ---
 
 ## Current Code State
@@ -150,12 +174,12 @@ Key config in `train_chess.py`:
 ```python
 N_SIMULATIONS    = 100
 MAX_GAME_MOVES   = 150
-RESIGN_THRESHOLD   = -0.95   # conservative — loosen to -0.85 if value resigns stay rare after 500 games
-RESIGN_CONSECUTIVE = 3
-RESIGN_MATERIAL    = 5       # rook
-RUN_NAME    = "run4"
-CKPT_LOAD   = "checkpoints/hal_chess.pt"   # seeded from run3
-BUFFER_LOAD = None                          # clean buffer
+RESIGN_THRESHOLD   = -0.95
+RESIGN_CONSECUTIVE = 5       # raised from 3 — forces closing technique
+RESIGN_MATERIAL    = 7       # raised from 5 — larger imbalance required
+RUN_NAME    = "run6"
+CKPT_LOAD   = None           # fresh start — no inherited bias
+BUFFER_LOAD = None
 ```
 
 Key additions since Run 1:
