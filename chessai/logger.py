@@ -39,7 +39,7 @@ LENGTH_BUCKETS = [(0, 20), (21, 40), (41, 60), (61, 80), (81, float("inf"))]
 class Logger:
 
     def __init__(self, log_dir: str = "logs/chess",
-                 perf_interval: int = 100,
+                 perf_interval: int = 50,   # NOTE: set back to 100 for long runs (>2000 games)
                  snapshot_interval: int = 500):
         self.log_dir           = log_dir
         self.perf_interval     = perf_interval

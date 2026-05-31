@@ -118,6 +118,7 @@ def _material_balance(board: chess.Board) -> int:
 
 _game_times: list = []   # rolling window for seconds-per-game estimate
 _t_run_start = time.time()
+_tally_w, _tally_b, _tally_d = 0, 0, 0  # W/B/D counts since last tally reset
 
 for game_num in range(start_game + 1, N_GAMES + 1):
     _t_game_start = time.time()
@@ -219,22 +220,36 @@ for game_num in range(start_game + 1, N_GAMES + 1):
     if len(_game_times) > 20:
         _game_times.pop(0)
 
+    # Running W/B/D tally — resets every 50 games so bias is visible early
+    if winner == chess.WHITE:
+        _tally_w += 1
+    elif winner == chess.BLACK:
+        _tally_b += 1
+    else:
+        _tally_d += 1
+
     if game_num % PRINT_EVERY == 0 or game_num <= 5:
         w_str      = "W" if winner == chess.WHITE else "B" if winner == chess.BLACK else "D"
         secs       = sum(_game_times) / len(_game_times)
         games_left = N_GAMES - game_num
         eta_h      = (secs * games_left) / 3600
         elapsed_h  = (time.time() - _t_run_start) / 3600
+        tally_str  = f"W{_tally_w}/B{_tally_b}/D{_tally_d}"
         print(
             f"Game {game_num:>5} | {w_str} | "
             f"moves: {len(moves):>3} | "
             f"loss: {loss:.4f} | "
+            f"[{tally_str}] | "
             f"buffer: {len(replay):>6} | "
             f"steps: {agent.steps:>6} | "
             f"{secs:.0f}s/game | "
             f"elapsed: {elapsed_h:.1f}h | "
             f"ETA: {eta_h:.1f}h"
         )
+
+    # Reset tally every 50 games so it stays readable
+    if game_num % 50 == 0:
+        _tally_w, _tally_b, _tally_d = 0, 0, 0
 
 # ---------------------------------------------------------------------------
 # Final checkpoint and summary
