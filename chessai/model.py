@@ -3,9 +3,9 @@ model.py — Residual neural network for chess.
 
 Architecture (AlphaZero-style, scaled for MacBook Air M3):
 
-  Input: (batch, 55, 8, 8) — encoded board state from encoder.py
+  Input: (batch, 54, 8, 8) — encoded board state from encoder.py
 
-  Input conv:    Conv2d(55→128, 3×3) + BatchNorm + ReLU
+  Input conv:    Conv2d(54→160, 3×3) + BatchNorm + ReLU
   Residual ×8:   two conv layers with a skip connection (see ResidualBlock)
   Policy head:   Conv2d(128→2, 1×1) + BatchNorm + ReLU → flatten → Linear(128, 4096)
   Value head:    Conv2d(128→1, 1×1) + BatchNorm + ReLU → flatten → Linear(64, 256) → Linear(1) → Tanh

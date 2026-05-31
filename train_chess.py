@@ -46,9 +46,9 @@ RESIGN_MATERIAL    = 7      # raised from 5 — resign only on larger imbalances
 # Run identity — change RUN_NAME to start a new named run with its own logs and buffer.
 # CKPT_LOAD: None = load RUN_NAME's own checkpoint; set to a path to seed weights from another run.
 # BUFFER_LOAD: None = load RUN_NAME's own buffer; set to a path to load from another run.
-RUN_NAME    = "run5"
-CKPT_LOAD   = "checkpoints/run4_hal_chess.pt"  # seed from run4 weights; discard biased buffer
-BUFFER_LOAD = None                              # fresh buffer — run4 buffer was biased toward black wins
+RUN_NAME    = "run6"
+CKPT_LOAD   = None   # fresh start — no inherited colour bias from run4/5
+BUFFER_LOAD = None
 
 CKPT_PATH   = f"checkpoints/{RUN_NAME}_hal_chess.pt"
 BUFFER_PATH = f"checkpoints/{RUN_NAME}_replay_buffer.pt"

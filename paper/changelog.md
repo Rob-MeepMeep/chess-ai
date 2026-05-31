@@ -112,11 +112,26 @@ A record of significant decisions, config changes, and architectural pivots acro
   value head in Run 3/4, but once the value head was active the thresholds should
   have been walked back. They weren't, allowing bad habits to compound.
 
-### Run 5 — start config (2026-05-31)
-- Seeded from Run 4 weights (12,155 steps), fresh buffer (discards biased data)
-- `RESIGN_MATERIAL` 5 → 7 (rook+bishop worth — triggers on larger imbalances)
-- `RESIGN_CONSECUTIVE` 3 → 5 (games breathe longer, closing technique must develop)
-- Goal: generate more checkmate training data, reduce black bias, improve eval win rate
+### Run 5 abandoned — black bias confirmed structural (game 100, 2026-05-31)
+- 54B / 31W / 15D in first 100 games with fresh buffer and run4 weights
+- Bias present from game 1 — source: plane 48 ("colour to move") allowed the network
+  to develop colour-specific associations across run4's 2300 games
+- Decision: remove plane 48, start run6 from random weights
+
+### Remove colour plane from encoder (2026-05-31)
+- **Problem:** plane 48 (all 1s = white to move, all 0s = black) let the network
+  learn colour-specific behaviour. Over run4's 2300 games it associated white with
+  losing, causing persistent 55-63% black win rate.
+- **Fix:** removed plane 48 entirely. Encoder: 55 planes → 54 planes.
+  Network is now genuinely colour-blind — identical positions look identical
+  regardless of which colour is to move. Matches true AlphaZero convention.
+- First conv layer input channels: 55 → 54 (picked up automatically via N_PLANES)
+
+### Run 6 — start config (2026-05-31)
+- Fresh random weights, fresh buffer — no inherited bias
+- Encoder: 54 planes (colour plane removed)
+- `RESIGN_MATERIAL` = 7, `RESIGN_CONSECUTIVE` = 5 (retained from Run 5)
+- Goal: balanced W/B outcomes, more checkmate data, working eval win rate
 
 ---
 
