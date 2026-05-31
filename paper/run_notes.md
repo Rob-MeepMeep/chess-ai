@@ -168,6 +168,42 @@ matching true AlphaZero convention. RESIGN_MATERIAL=7, RESIGN_CONSECUTIVE=5 reta
 
 ---
 
+### Run 6 — MacBook Pro M5 Pro (IN PROGRESS, started 2026-05-31)
+- **Config:** 160ch / 10 blocks / 100 sims / 54 planes (colour plane removed)
+- **Fresh random weights, fresh buffer**
+- **RESIGN_MATERIAL=7, RESIGN_CONSECUTIVE=5**
+
+**Balance (200 games):** W92/B87/D21 — essentially balanced. No structural bias.
+Colour plane removal confirmed working: K+Q vs K white and black to move score identically.
+
+**100-game window stats:**
+
+| Window | W | B | D | Avg loss | Avg length |
+|--------|---|---|---|----------|------------|
+| 0–50 | 21 | 27 | 2 | 6.264 | 76.3 |
+| 50–100 | 24 | 18 | 8 | 6.529 | 87.5 |
+| 100–150 | 24 | 18 | 8 | 6.140 | 87.2 |
+| 150–200 | 23 | 24 | 3 | 5.879 | 89.6 |
+
+**Value regression test — game 500 (2,460 steps):**
+
+| Position | Value | Expected |
+|----------|-------|----------|
+| Start | -0.0095 | ~0.0 |
+| K+Q vs K (w wins) | -0.0048 | near +1 |
+| K+Q vs K (b move) | **-0.0048** | near -1 |
+| White missing queen | -0.0097 | < 0 |
+
+Note: K+Q vs K identical for both colours — colour-blindness confirmed empirically.
+Compare run4 game 530 where these were asymmetric (-0.020 vs -0.009).
+
+**Eval vs random — game 500 baseline:**
+- As white: 0W / 18L / 82D
+- As black: 0W / 13L / 87D
+- vs Stockfish depth 1/3/5: 0% all depths
+
+---
+
 ## Current Code State
 
 Key config in `train_chess.py`:

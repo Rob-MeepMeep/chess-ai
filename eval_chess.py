@@ -32,7 +32,7 @@ N_GAMES_STOCKFISH  = 50    # games per Stockfish matchup (slower)
 N_GAMES_PREV       = 50    # games vs previous checkpoint
 N_SIMULATIONS      = 50    # HAL's simulations per move during eval (greedy)
 MAX_GAME_MOVES     = 200   # hard cap
-CKPT_PATH          = "checkpoints/run4_hal_chess.pt"
+CKPT_PATH          = "checkpoints/run6_hal_chess.pt"
 STOCKFISH_PATH     = "stockfish"   # assumes stockfish is on PATH
 
 # ---------------------------------------------------------------------------
