@@ -218,6 +218,31 @@ K+Q positions diverging slightly (-0.0242 vs -0.0251) — value head beginning t
 - As black: 0W / 19L / 81D (slight regression — watch for bias)
 - vs Stockfish depth 1/3/5: 0% all depths
 
+**Value regression test — game 2000 (10,110 steps):**
+
+| Position | Value | Expected |
+|----------|-------|----------|
+| Start | +0.0014 | ~0.0 |
+| K+Q vs K (w wins) | -0.0258 | near +1 |
+| K+Q vs K (b move) | -0.0308 | near -1 |
+| White missing queen | -0.0107 | < 0 |
+
+Start position essentially correct. White missing queen correctly negative.
+K+Q positions diverging with correct ordering (-0.0258 > -0.0308): winning position
+scores higher than losing position for first time. Magnitudes still tiny but
+directionality correct — genuine value head development from scratch.
+
+**Eval vs random — game 2000:**
+- As white: 0W / 9L / 91D (loss rate halved since game 500)
+- As black: 0W / 11L / 89D (black regression at game 1000 corrected)
+- vs Stockfish depth 1: 1 draw / 49 losses (first ever draw vs Stockfish)
+- vs Stockfish depth 3: 1 draw / 49 losses
+- vs Stockfish depth 5: 0% draws
+
+**vs Run 4 at game 2000:** Run4 lost 22% as white / 15% as black. Run6 loses 9% / 11%.
+Run6 significantly outperforming Run4 at same milestone despite starting from scratch.
+Attributed to unbiased encoder, clean training data, better resign thresholds.
+
 ---
 
 ## Current Code State
