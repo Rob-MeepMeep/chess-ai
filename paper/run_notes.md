@@ -202,6 +202,22 @@ Compare run4 game 530 where these were asymmetric (-0.020 vs -0.009).
 - As black: 0W / 13L / 87D
 - vs Stockfish depth 1/3/5: 0% all depths
 
+**Value regression test — game 1000 (5,110 steps):**
+
+| Position | Value | Expected |
+|----------|-------|----------|
+| Start | +0.0060 | ~0.0 |
+| K+Q vs K (w wins) | -0.0242 | near +1 |
+| K+Q vs K (b move) | -0.0251 | near -1 |
+| White missing queen | +0.0069 | < 0 |
+
+K+Q positions diverging slightly (-0.0242 vs -0.0251) — value head beginning to distinguish positions even if values still wrong.
+
+**Eval vs random — game 1000:**
+- As white: 0W / 14L / 86D (improvement — losing less to random)
+- As black: 0W / 19L / 81D (slight regression — watch for bias)
+- vs Stockfish depth 1/3/5: 0% all depths
+
 ---
 
 ## Current Code State
