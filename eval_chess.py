@@ -150,6 +150,11 @@ def evaluate(label: str, white_fn, black_fn, n: int) -> dict:
 # Run all matchups
 # ---------------------------------------------------------------------------
 
+if args.regression_only:
+    print("=" * 60)
+    print("Done.")
+    exit(0)
+
 print("=" * 60)
 print()
 
@@ -187,6 +192,8 @@ except FileNotFoundError:
 parser = argparse.ArgumentParser()
 parser.add_argument("--prev", default=None,
                     help="Path to previous checkpoint for improvement test")
+parser.add_argument("--regression-only", action="store_true",
+                    help="Run value head regression test only — skip all game matchups")
 args, _ = parser.parse_known_args()
 
 if args.prev:
