@@ -148,6 +148,7 @@ print(f"  {positions_from_games:,} positions extracted from game replays")
 # Add canonical endgame positions
 # ---------------------------------------------------------------------------
 
+canonical_batch = []
 canonical_count = 0
 for fen, outcome in CANONICAL_POSITIONS:
     board = chess.Board(fen)
@@ -155,17 +156,18 @@ for fen, outcome in CANONICAL_POSITIONS:
     policy = torch.zeros(4096)
 
     for _ in range(CANONICAL_REPEATS):
-        buf._buffer.append((state, policy, float(outcome)))
+        canonical_batch.append((state, policy, float(outcome)))
         canonical_count += 1
 
-print(f"  {canonical_count:,} canonical positions added ({len(CANONICAL_POSITIONS)} positions × {CANONICAL_REPEATS} repeats)")
+buf.add_permanent(canonical_batch)
+print(f"  {canonical_count:,} canonical positions added to permanent partition ({len(CANONICAL_POSITIONS)} × {CANONICAL_REPEATS})")
 
 # ---------------------------------------------------------------------------
 # Save
 # ---------------------------------------------------------------------------
 
-print(f"\nFinal buffer size: {len(buf):,} / {BUFFER_CAPACITY:,}")
+print(f"\nFinal buffer: {len(buf):,} rolling / {len(buf._permanent):,} permanent ({BUFFER_CAPACITY:,} rolling capacity)")
 buf.save(OUTPUT_PATH)
 print(f"Saved to {OUTPUT_PATH}")
-print(f"\nFor Run 7, set in train_chess.py:")
+print(f"\nFor next run, set in train_chess.py:")
 print(f"  BUFFER_LOAD = \"{OUTPUT_PATH}\"")

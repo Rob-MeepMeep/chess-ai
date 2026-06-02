@@ -27,40 +27,62 @@ class ReplayBuffer:
     """
     Circular buffer of (encoded_state, mcts_policy, outcome) triples.
     Oldest entries are dropped automatically when capacity is reached.
+
+    A second partition — _permanent — holds ground-truth positions (canonical
+    endgames, curated seed data) that are never evicted. A fixed fraction of
+    each training batch is drawn from the permanent set, keeping the value head
+    calibrated on positions that rarely appear in self-play.
     """
 
     def __init__(self, capacity: int = 50_000):
         self._buffer: deque = deque(maxlen=capacity)
+        self._permanent: list = []   # never evicted; sampled alongside rolling buffer
 
     def extend(self, positions: list) -> None:
         """Add a list of (state, policy, outcome) from one completed game."""
         self._buffer.extend(positions)
 
+    def add_permanent(self, positions: list) -> None:
+        """Add positions to the permanent set — never evicted, always in the mix."""
+        self._permanent.extend(positions)
+
     def sample(self, batch_size: int) -> tuple:
         """
         Sample a random batch for training.
+        Up to 12.5% of each batch is drawn from the permanent partition (if populated).
         Returns three stacked tensors: (states, policies, outcomes).
         """
-        batch               = random.sample(self._buffer, batch_size)
+        perm_n = min(len(self._permanent), batch_size // 8) if self._permanent else 0
+        roll_n = batch_size - perm_n
+
+        batch = random.sample(self._buffer, roll_n)
+        if perm_n:
+            batch += random.sample(self._permanent, perm_n)
+
         states, policies, outcomes = zip(*batch)
         return (
-            torch.stack(states),                                   # (B, 55, 8, 8)
-            torch.stack(policies),                                 # (B, 4096)
+            torch.stack(states),                                        # (B, 54, 8, 8)
+            torch.stack(policies),                                      # (B, 4096)
             torch.tensor(outcomes, dtype=torch.float32).unsqueeze(1),  # (B, 1)
         )
 
     def ready(self, batch_size: int) -> bool:
-        """True once the buffer has enough entries to sample a full batch."""
+        """True once the rolling buffer has enough entries to sample a full batch."""
         return len(self._buffer) >= batch_size
 
     def save(self, path: str) -> None:
-        """Persist the buffer to disk so it survives a restart."""
-        torch.save(list(self._buffer), path)
+        """Persist both partitions to disk."""
+        torch.save({'rolling': list(self._buffer), 'permanent': self._permanent}, path)
 
     def load(self, path: str) -> None:
-        """Reload a previously saved buffer."""
-        items = torch.load(path, weights_only=False)
-        self._buffer = deque(items, maxlen=self._buffer.maxlen)
+        """Reload a previously saved buffer. Handles legacy format (plain list)."""
+        data = torch.load(path, weights_only=False)
+        if isinstance(data, dict):
+            self._buffer   = deque(data['rolling'],            maxlen=self._buffer.maxlen)
+            self._permanent = data.get('permanent', [])
+        else:
+            # Legacy format saved before tiered buffer — no permanent partition
+            self._buffer = deque(data, maxlen=self._buffer.maxlen)
 
     def __len__(self) -> int:
         return len(self._buffer)

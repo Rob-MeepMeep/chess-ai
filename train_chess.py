@@ -97,7 +97,9 @@ else:
 _buf_to_load = BUFFER_LOAD or BUFFER_PATH
 if os.path.exists(_buf_to_load):
     replay.load(_buf_to_load)
-    print(f"  Replay buffer loaded: {len(replay):,} positions ({_buf_to_load})")
+    perm_n = len(replay._permanent)
+    perm_str = f" + {perm_n:,} permanent" if perm_n else ""
+    print(f"  Replay buffer loaded: {len(replay):,} rolling{perm_str} ({_buf_to_load})")
 
 print(f"N_SIMULATIONS = {N_SIMULATIONS} | N_GAMES = {N_GAMES:,}\n")
 
