@@ -243,6 +243,40 @@ directionality correct — genuine value head development from scratch.
 Run6 significantly outperforming Run4 at same milestone despite starting from scratch.
 Attributed to unbiased encoder, clean training data, better resign thresholds.
 
+**Run 6 concluded at game 5000 (24,960 steps, 2026-06-02)**
+
+Final training window: loss 3.484, avg game length 47.9, cap draws 2%.
+Value resigns peaked at 20/50 (game 4600 window), settled at 7-14.
+
+**Value regression test — game 5000:**
+All positions near-zero throughout entire run. K+Q vs K never generalised.
+Value head is learning in-distribution patterns (value resigns active) but
+not general material evaluation. Regression test not useful beyond detecting
+draw collapse at this stage of training.
+
+**Eval vs random — game 5000:**
+- As white: 0W / 18L / 82D — regression from game 2000's 9%
+- As black: 0W / 12L / 88D — flat
+- vs Stockfish depth 1/3: 100% losses (game 2000 draws did not persist)
+
+White regression likely caused by policy developing aggressive patterns
+(shorter games, more complex positions early) that random occasionally
+exploits. Value resign growth in training did not translate to eval wins —
+the two measure different things: recognising lost positions vs forcing checkmate.
+
+**Key Run 6 findings for the paper:**
+1. Colour plane removal (54 planes) eliminated the structural white bias
+2. Value head produces in-distribution extreme values but doesn't generalise to OOD endgames
+3. Regression test flatlines while value resigns grow — important gap to document
+4. Eval win rate is gated entirely on checkmate delivery, which requires more training
+5. Loss 6.26 → 3.48 over 5000 games from scratch — genuine learning curve documented
+
+**Run 7 plan:**
+- N_SIMULATIONS = 200 (doubled)
+- Fresh random weights, no inherited bias
+- BUFFER_LOAD = checkpoints/run7_seed_buffer.pt (40,646 curated positions from run6)
+- Canonical endgame positions (K+Q vs K, K+R vs K) seeded with correct outcomes
+
 ---
 
 ## Current Code State

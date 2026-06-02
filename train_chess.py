@@ -31,7 +31,7 @@ from chessai.replay  import ReplayBuffer, GameBuffer
 # ---------------------------------------------------------------------------
 
 N_GAMES          = 10_000
-N_SIMULATIONS    = 100      # reduce for faster iteration; increase on desktop GPU
+N_SIMULATIONS    = 200      # doubled from run6 — better MCTS quality per game
 BATCH_SIZE       = 64
 TRAIN_STEPS      = 5        # gradient updates per game (once buffer is ready)
 MIN_BUFFER       = 500      # don't train until buffer holds this many positions
@@ -46,9 +46,9 @@ RESIGN_MATERIAL    = 7      # raised from 5 — resign only on larger imbalances
 # Run identity — change RUN_NAME to start a new named run with its own logs and buffer.
 # CKPT_LOAD: None = load RUN_NAME's own checkpoint; set to a path to seed weights from another run.
 # BUFFER_LOAD: None = load RUN_NAME's own buffer; set to a path to load from another run.
-RUN_NAME    = "run6"
-CKPT_LOAD   = None   # fresh start — no inherited colour bias from run4/5
-BUFFER_LOAD = None
+RUN_NAME    = "run7"
+CKPT_LOAD   = None                                      # fresh weights — no inherited bias
+BUFFER_LOAD = "checkpoints/run7_seed_buffer.pt"         # curated seed buffer from run6
 
 CKPT_PATH   = f"checkpoints/{RUN_NAME}_hal_chess.pt"
 BUFFER_PATH = f"checkpoints/{RUN_NAME}_replay_buffer.pt"
