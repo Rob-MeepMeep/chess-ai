@@ -133,6 +133,24 @@ A record of significant decisions, config changes, and architectural pivots acro
 - `RESIGN_MATERIAL` = 7, `RESIGN_CONSECUTIVE` = 5 (retained from Run 5)
 - Goal: balanced W/B outcomes, more checkmate data, working eval win rate
 
+### Selective buffer seeding — curate_buffer.py (2026-06-02)
+- **Problem:** Bootstrapping. Early self-play generates noise — both sides random,
+  training signal meaningless for the first ~500 games. The value head learns nothing
+  useful until the buffer fills with decisive games. Every run wastes the first few
+  hundred games re-discovering basic patterns.
+- **Solution:** `curate_buffer.py` — reads run6's game log, filters for quality,
+  replays surviving games to extract positions, adds canonical endgame positions with
+  correct outcomes, saves as a seed buffer for the next run.
+- **Filters:** game_num >= 3000, n_moves 20-100, decisive end_reasons only
+  (material_resign, checkmate). Excludes cap draws and overconfident short games.
+- **Canonical positions:** K+Q vs K, K+R vs K in multiple orientations with
+  ground-truth outcomes ±1. Repeated 200× each so the value head gets direct signal
+  for positions it rarely sees in self-play.
+- **Result (run6 at game 4850):** 808 games × ~46 moves = 37,335 positions +
+  1,600 canonical = 38,935 positions (78% of 50k capacity).
+- **Usage:** Run `venv/bin/python3 curate_buffer.py` after a training run,
+  then set `BUFFER_LOAD = "checkpoints/run7_seed_buffer.pt"` in train_chess.py.
+
 ---
 
 *Updated throughout the project. For full diff history see git log.*
