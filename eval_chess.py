@@ -147,6 +147,17 @@ def evaluate(label: str, white_fn, black_fn, n: int) -> dict:
     return {"white_wins": white_wins, "black_wins": black_wins, "draws": draws, "n": n}
 
 # ---------------------------------------------------------------------------
+# Parse arguments
+# ---------------------------------------------------------------------------
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--prev", default=None,
+                    help="Path to previous checkpoint for improvement test")
+parser.add_argument("--regression-only", action="store_true",
+                    help="Run value head regression test only — skip all game matchups")
+args, _ = parser.parse_known_args()
+
+# ---------------------------------------------------------------------------
 # Run all matchups
 # ---------------------------------------------------------------------------
 
@@ -189,12 +200,6 @@ except FileNotFoundError:
     print("Install with: brew install stockfish\n")
 
 # --- Tier 3: vs previous checkpoint (optional) ---
-parser = argparse.ArgumentParser()
-parser.add_argument("--prev", default=None,
-                    help="Path to previous checkpoint for improvement test")
-parser.add_argument("--regression-only", action="store_true",
-                    help="Run value head regression test only — skip all game matchups")
-args, _ = parser.parse_known_args()
 
 if args.prev:
     print("── Tier 3: HAL vs Previous Checkpoint ────────────────────\n")
