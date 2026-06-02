@@ -121,15 +121,9 @@ for game_data in selected:
     for move_uci in game_data["moves"]:
         state = encode([board] + history)
         turn  = board.turn
-        # Uniform policy over legal moves — we don't have MCTS visit counts,
-        # but a uniform prior is neutral and won't mislead the policy head
-        n_legal = board.legal_moves.count()
-        policy  = torch.zeros(4096)
-        if n_legal > 0:
-            mask = torch.zeros(4096, dtype=torch.bool)
-            for m in board.legal_moves:
-                mask[m.from_square * 64 + m.to_square] = True
-            policy[mask] = 1.0 / n_legal
+        # Zero policy — we don't have MCTS visit counts from the game records.
+        # The policy head will learn from self-play; value signal is what matters here.
+        policy = torch.zeros(4096)
 
         game_positions.append((state, policy, turn))
 
@@ -158,13 +152,7 @@ canonical_count = 0
 for fen, outcome in CANONICAL_POSITIONS:
     board = chess.Board(fen)
     state = encode([board])
-    n_legal = board.legal_moves.count()
     policy = torch.zeros(4096)
-    if n_legal > 0:
-        mask = torch.zeros(4096, dtype=torch.bool)
-        for m in board.legal_moves:
-            mask[m.from_square * 64 + m.to_square] = True
-        policy[mask] = 1.0 / n_legal
 
     for _ in range(CANONICAL_REPEATS):
         buf._buffer.append((state, policy, float(outcome)))
