@@ -89,14 +89,15 @@ if os.path.exists(_ckpt_to_load):
                 start_game = int(rows[-1][0])
     print(f"Loaded weights from {_ckpt_to_load} — starting at game {start_game + 1}")
     print(f"  Trained steps so far: {agent.steps:,}")
-    _buf_to_load = BUFFER_LOAD or BUFFER_PATH
-    if os.path.exists(_buf_to_load):
-        replay.load(_buf_to_load)
-        print(f"  Replay buffer loaded: {len(replay):,} positions ({_buf_to_load})")
-    else:
-        print("  Replay buffer: empty (starting clean)")
 else:
     print("Starting fresh training run.")
+
+# Buffer loading is independent of checkpoint — a seed buffer can be loaded
+# even on a fresh start with no checkpoint
+_buf_to_load = BUFFER_LOAD or BUFFER_PATH
+if os.path.exists(_buf_to_load):
+    replay.load(_buf_to_load)
+    print(f"  Replay buffer loaded: {len(replay):,} positions ({_buf_to_load})")
 
 print(f"N_SIMULATIONS = {N_SIMULATIONS} | N_GAMES = {N_GAMES:,}\n")
 
