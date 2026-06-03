@@ -3,9 +3,10 @@ logger.py — Rich logging for chess training.
 
 Four data streams that answer questions Phase 2 logging couldn't:
 
-  training.csv     — win rate, avg loss, game length histogram — every 100 games
+  games.csv        — one row per game: outcome, end reason, move list — every game
+  training.csv     — win rate, avg loss, game length histogram — every perf_interval games
   openings.csv     — first 12 moves of every game (detects repertoire emergence)
-  snapshots.csv    — MCTS visit distributions at 5 canonical positions — every 500 games
+  snapshots.csv    — MCTS visit distributions at 5 canonical positions — every snapshot_interval games
                      (shows when a preference became confident, not just what it was)
 
 The key signal in openings.csv: if the same 12-move sequence starts appearing
@@ -39,7 +40,7 @@ LENGTH_BUCKETS = [(0, 20), (21, 40), (41, 60), (61, 80), (81, float("inf"))]
 class Logger:
 
     def __init__(self, log_dir: str = "logs/chess",
-                 perf_interval: int = 50,   # NOTE: set back to 100 for long runs (>2000 games)
+                 perf_interval: int = 50,
                  snapshot_interval: int = 500):
         self.log_dir           = log_dir
         self.perf_interval     = perf_interval

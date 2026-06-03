@@ -5,11 +5,11 @@ Each game: use MCTS to select every move, store (position, policy, turn) in
 a GameBuffer. At game end fill in outcomes and commit to the ReplayBuffer.
 Once the buffer is large enough, run a batch of training steps.
 
-Speed guide (MacBook Air M3, MPS, untrained network):
-  N_SIMULATIONS = 200  — ~64s/game, ~178 hours for 10k games  (desktop training)
-  N_SIMULATIONS = 100  — ~32s/game, ~89 hours for 10k games
-  N_SIMULATIONS =  50  — ~16s/game, ~45 hours for 10k games   (recommended for M3)
-  N_SIMULATIONS =  25  — ~8s/game,  ~22 hours for 10k games   (quick test run)
+Speed guide (MacBook Pro M5 Pro, MPS, untrained network):
+  N_SIMULATIONS = 200  — ~90-115s/game, ~250-320 hours for 10k games
+  N_SIMULATIONS = 100  — ~45-60s/game,  ~125-165 hours for 10k games
+  N_SIMULATIONS =  50  — ~20-30s/game,  ~55-85 hours for 10k games
+  N_SIMULATIONS =  25  — ~10-15s/game,  ~28-42 hours for 10k games
 
 To run overnight (prevents sleep, sleeps Mac on completion):
   caffeinate -dims python3 train_chess.py; osascript -e 'tell application "System Events" to sleep'
@@ -92,9 +92,14 @@ if os.path.exists(_ckpt_to_load):
 else:
     print("Starting fresh training run.")
 
-# Buffer loading is independent of checkpoint — a seed buffer can be loaded
-# even on a fresh start with no checkpoint
-_buf_to_load = BUFFER_LOAD or BUFFER_PATH
+# Prefer the run's own accumulated buffer on resume; fall back to seed buffer
+# for a fresh start. BUFFER_LOAD is only used when no accumulated buffer exists yet.
+if os.path.exists(BUFFER_PATH):
+    _buf_to_load = BUFFER_PATH
+    if BUFFER_LOAD and BUFFER_LOAD != BUFFER_PATH:
+        print(f"  Note: BUFFER_LOAD ignored — accumulated buffer found at {BUFFER_PATH}")
+else:
+    _buf_to_load = BUFFER_LOAD or BUFFER_PATH
 if os.path.exists(_buf_to_load):
     replay.load(_buf_to_load)
     perm_n = len(replay._permanent)

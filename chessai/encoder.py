@@ -57,7 +57,7 @@ def _board_to_planes(board: chess.Board, player: chess.Color) -> np.ndarray:
 
 def encode(boards: list) -> torch.Tensor:
     """
-    Encode up to N_HISTORY board positions into a (55, 8, 8) float tensor.
+    Encode up to N_HISTORY board positions into a (54, 8, 8) float tensor.
 
     boards[0] = current position (its .turn determines encoding perspective)
     boards[1..] = earlier positions, most recent first

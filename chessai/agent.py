@@ -92,7 +92,7 @@ class ChessAgent:
         One gradient update on a sampled batch.
 
         batch: (states, policies, outcomes) — stacked tensors from ReplayBuffer.sample()
-          states:   (B, 55, 8, 8)
+          states:   (B, 54, 8, 8)
           policies: (B, 4096)   — MCTS visit-count targets
           outcomes: (B, 1)      — game result from each position's perspective
 

@@ -1,12 +1,12 @@
 """
 model.py — Residual neural network for chess.
 
-Architecture (AlphaZero-style, scaled for MacBook Air M3):
+Architecture (AlphaZero-style, scaled for MacBook Pro M5 Pro):
 
   Input: (batch, 54, 8, 8) — encoded board state from encoder.py
 
   Input conv:    Conv2d(54→160, 3×3) + BatchNorm + ReLU
-  Residual ×8:   two conv layers with a skip connection (see ResidualBlock)
+  Residual ×10:  two conv layers with a skip connection (see ResidualBlock)
   Policy head:   Conv2d(128→2, 1×1) + BatchNorm + ReLU → flatten → Linear(128, 4096)
   Value head:    Conv2d(128→1, 1×1) + BatchNorm + ReLU → flatten → Linear(64, 256) → Linear(1) → Tanh
 
@@ -23,7 +23,7 @@ about 3× smaller — running on a MacBook Pro M5 Pro with 24GB unified memory.
 import torch
 import torch.nn as nn
 
-from chessai.encoder import N_PLANES   # 55
+from chessai.encoder import N_PLANES   # 54
 
 N_CHANNELS = 160
 N_BLOCKS   = 10
@@ -60,7 +60,7 @@ class ChessNet(nn.Module):
     def __init__(self, n_blocks: int = N_BLOCKS, channels: int = N_CHANNELS):
         super().__init__()
 
-        # Project from 55 input planes to the working channel width
+        # Project from 54 input planes to the working channel width
         self.input_conv = nn.Sequential(
             nn.Conv2d(N_PLANES, channels, 3, padding=1, bias=False),
             nn.BatchNorm2d(channels),
@@ -95,7 +95,7 @@ class ChessNet(nn.Module):
 
     def forward(self, x: torch.Tensor):
         """
-        x: (batch, 55, 8, 8)
+        x: (batch, 54, 8, 8)
         Returns: (policy_logits, value)
           policy_logits: (batch, 4096) — raw, not softmaxed
           value:         (batch, 1)    — in [-1, 1]
