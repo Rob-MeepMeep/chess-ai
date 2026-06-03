@@ -1,6 +1,6 @@
 # chess-ai — Project Run Notes
 **Authors:** Rob Kirkland, Ellis Ward  
-**Last updated:** 2026-05-30
+**Last updated:** 2026-06-04
 
 This document is the persistent context record for the chess-ai project. Any agent or collaborator picking up this project should read this alongside `paper/phase3_architecture.md` and `paper/changelog.md` before touching any code.
 
@@ -81,7 +81,7 @@ self._window = {"cap_draw": 0, "checkmate": 0, ...}   # singular
 - **Loss curve:** 6.66 → 4.97 → 3.88 → 3.87 (flatlined). Policy head learned structure; value head collapsed.
 - **Seeding for Run 4:** Kept Run 3 weights (policy head not wasted), discarded buffer (draw-poisoned positions removed).
 
-### Run 4 — MacBook Pro M5 Pro (IN PROGRESS, started 2026-05-30)
+### Run 4 — MacBook Pro M5 Pro (complete, game 2300, 2026-05-30)
 - **Config:** 160ch / 10 blocks / 100 sims / both bugs fixed
 - **Seeded from:** Run 3 checkpoint (weights only, clean buffer)
 - **RUN_NAME:** `run4` → checkpoint at `checkpoints/run4_hal_chess.pt`
@@ -168,7 +168,7 @@ matching true AlphaZero convention. RESIGN_MATERIAL=7, RESIGN_CONSECUTIVE=5 reta
 
 ---
 
-### Run 6 — MacBook Pro M5 Pro (IN PROGRESS, started 2026-05-31)
+### Run 6 — MacBook Pro M5 Pro (complete, game 5000, 2026-06-02)
 - **Config:** 160ch / 10 blocks / 100 sims / 54 planes (colour plane removed)
 - **Fresh random weights, fresh buffer**
 - **RESIGN_MATERIAL=7, RESIGN_CONSECUTIVE=5**
@@ -271,11 +271,95 @@ the two measure different things: recognising lost positions vs forcing checkmat
 4. Eval win rate is gated entirely on checkmate delivery, which requires more training
 5. Loss 6.26 → 3.48 over 5000 games from scratch — genuine learning curve documented
 
-**Run 7 plan:**
-- N_SIMULATIONS = 200 (doubled)
-- Fresh random weights, no inherited bias
-- BUFFER_LOAD = checkpoints/run7_seed_buffer.pt (40,646 curated positions from run6)
-- Canonical endgame positions (K+Q vs K, K+R vs K) seeded with correct outcomes
+---
+
+### Run 7 — MacBook Pro M5 Pro (IN PROGRESS, started 2026-06-02)
+
+- **Config:** 160ch / 10 blocks / 200 sims / 54 planes / RESIGN_MATERIAL=7 / RESIGN_CONSECUTIVE=5
+- **Fresh random weights, no inherited bias**
+- **Seeded buffer:** 40,646 positions from Run 6 (games 3000–5000, decisive only, 20–100 moves)
+  + canonical endgame positions (K+Q vs K, K+R vs K × 200 repeats each)
+- **Key motivation:** Skip the bootstrapping noise phase — value head gets real signal from game 1
+
+**Bugs fixed during this run:**
+
+*Bug 1 — seed buffer silently skipped on fresh start:*
+Buffer load was nested inside the checkpoint existence block. Fresh start → no checkpoint → buffer never loaded. Fixed: buffer loading moved outside checkpoint block, runs independently.
+
+*Bug 2 — accumulated buffer ignored on resume:*
+`BUFFER_LOAD` path always won over `BUFFER_PATH`, so restarts kept reloading the seed buffer instead of the accumulated self-play buffer. Fixed: `BUFFER_PATH` takes priority if it exists; `BUFFER_LOAD` only used on genuine fresh start.
+
+**Code changes during run:**
+- Tiered replay buffer: `_permanent` partition (never evicted, sampled at 12.5% per batch)
+- `curate_buffer.py` routes canonical positions through `add_permanent()`
+- 55→54 plane count corrected across encoder.py, model.py, agent.py
+- Logger: games.csv added to docstring, perf_interval corrected to 50
+- Speed guide updated to M5 Pro with observed timings
+- BUFFER_LOAD now prints warning when ignored on resume
+
+**Training windows (50-game, except * = short due to restart):**
+
+| Window | Games | W | B | D | avg loss | val resigns | cap draws | avg len |
+|--------|-------|---|---|---|----------|-------------|-----------|---------|
+| 50 | 50 | 23 | 21 | 6 | 1.14 | 0 | 6 | 76.3 |
+| 100 | 50 | 20 | 26 | 4 | 1.40 | 1 | 4 | 71.6 |
+| 150 | 50 | 24 | 24 | 2 | 1.71 | 2 | 2 | 79.1 |
+| 200 | 50 | 31 | 17 | 2 | 2.09 | 3 | 2 | 73.8 |
+| 250 | 50 | 20 | 26 | 4 | 2.50 | 3 | 4 | 68.3 |
+| 300 | 50 | 18 | 24 | 8 | 2.89 | 6 | 8 | 82.1 |
+| 350* | 34 | 17 | 15 | 2 | 3.25 | 2 | 2 | 77.6 |
+| 400* | 13 | 9 | 4 | 0 | 3.66 | 0 | 0 | 66.1 |
+| 450 | 50 | 23 | 24 | 3 | 3.84 | 6 | 3 | 77.0 |
+| 500 | 50 | 22 | 23 | 5 | 4.13 | 3 | 5 | 74.8 |
+| 550 | 50 | 21 | 29 | 0 | 4.52 | 8 | 0 | 64.0 |
+| 600* | 30 | 15 | 12 | 3 | 4.76 | 4 | 3 | 65.8 |
+| 650 | 50 | 21 | 21 | 8 | 4.98 | 9 | 8 | 73.4 |
+| 700 | 50 | 22 | 23 | 5 | 5.27 | 5 | 5 | 83.2 |
+| 750 | 50 | 26 | 21 | 3 | 5.27 | 5 | 3 | 71.3 |
+| 800 | 50 | 25 | 21 | 4 | 5.15 | 9 | 4 | 71.5 |
+
+**Loss trajectory:** Rose from 1.14 (game 50) to 5.27 (plateau at games 700–750), then began
+declining: 5.15 at game 800. Rising loss is a buffer transition artefact (seed positions had
+zero policy labels; as self-play replaced them, policy head faced harder targets). Plateau then
+decline is the expected pattern. See key_concepts.md L19.
+
+**Value resign trajectory:** 0→1→2→3→3→6→[2,0]→6→3→8→[4]→9→5→5→9
+Brackets are short-window readings. Trend is clearly upward. Represents growing value head
+confidence — the network recognises hopeless positions and terminates games early.
+
+**W/B balance:** Consistently near 50/50 across all full-length windows. Colour bias eliminated.
+
+**Value head regression — game ~317 (1,745 steps):**
+
+| Position | Value | Expected |
+|----------|-------|----------|
+| Start | +0.15 | ~0.0 |
+| K+Q vs K (w wins) | +0.006 | near +1 |
+| K+Q vs K (b move) | -0.260 | near -1 |
+| White missing queen | +0.162 | < 0 |
+
+**Value head regression — game ~500 (2,510 steps):**
+
+| Position | Value | Expected | Change |
+|----------|-------|----------|--------|
+| Start | -0.09 | ~0.0 | ✓ closer to zero |
+| K+Q vs K (w wins) | -0.060 | near +1 | flat |
+| K+Q vs K (b move) | -0.456 | near -1 | ✓ +76% magnitude |
+| White missing queen | -0.087 | < 0 | ✓ **sign flipped** |
+
+White missing queen sign flipped from +0.162 to -0.087 — value head now correctly rates
+material deficit as bad. K+Q vs K (b move) nearly doubled in magnitude. K+Q vs K (w wins)
+still flat — winning positions harder to learn than losing ones at this stage.
+
+**Next regression: game 1000.**
+
+**Notable game events:**
+- Game 1: First checkmate (W wins, 85 moves) — seed buffer effect, training from game 1
+- Game 6: Second checkmate (W wins, 77 moves)
+- Games 663: Tactical sequence — Qxf2+ (check), White responded Qxd7+ (counter), Black takes queen, material resign. Shows both sides finding tactical responses.
+- Game 685: Bxh6 bishop sacrifice (takes pawn weakened by h7h6 on move 1), later Nxf7+ fork. Piece coordination and weak-square exploitation.
+- Games 671, 689: Value resigns at 72–83 moves in complex positional situations (not simple material collapses).
+- Game 816: Pawn promotion `b2b1q` — Black promotes pawn to queen in endgame, wins by material resign. First observed promotion in Run 7.
 
 ---
 
@@ -283,55 +367,50 @@ the two measure different things: recognising lost positions vs forcing checkmat
 
 Key config in `train_chess.py`:
 ```python
-N_SIMULATIONS    = 100
+N_SIMULATIONS    = 200      # doubled from run6
 MAX_GAME_MOVES   = 150
 RESIGN_THRESHOLD   = -0.95
-RESIGN_CONSECUTIVE = 5       # raised from 3 — forces closing technique
-RESIGN_MATERIAL    = 7       # raised from 5 — larger imbalance required
-RUN_NAME    = "run6"
-CKPT_LOAD   = None           # fresh start — no inherited bias
-BUFFER_LOAD = None
+RESIGN_CONSECUTIVE = 5
+RESIGN_MATERIAL    = 7
+RUN_NAME    = "run7"
+CKPT_LOAD   = None                                # fresh weights
+BUFFER_LOAD = "checkpoints/run7_seed_buffer.pt"  # seed — ignored on resume if run7_replay_buffer.pt exists
 ```
 
 Key additions since Run 1:
 - `chessai/agent.py` — `get_value()` single forward pass for resignation check
-- `chessai/replay.py` — `save()`/`load()` buffer persistence (every 10 games)
-- `chessai/logger.py` — `games.csv` (full per-game log), `end_reasons.csv` (fixed), run-namespaced log dirs
-- `train_chess.py` — RUN_NAME system, CKPT_LOAD/BUFFER_LOAD, elapsed time display, per-game end_reason
+- `chessai/replay.py` — `save()`/`load()` buffer persistence; tiered buffer (permanent + rolling)
+- `chessai/logger.py` — `games.csv` (full per-game log), `end_reasons.csv`, run-namespaced log dirs
+- `curate_buffer.py` — builds seed buffer from prior run data + canonical endgame positions
+- `train_chess.py` — RUN_NAME system, CKPT_LOAD/BUFFER_LOAD, tally tracking, buffer priority logic
 
-**Resume command (on Pro):**
+**Resume command:**
 ```bash
 caffeinate -dims venv/bin/python3 train_chess.py
 ```
 
 ---
 
-## What to Watch in Run 4
+## What to Watch in Run 7
 
-| Signal | Meaning |
-|--------|---------|
-| W/B results appearing | Resign is firing — first real reward signal |
-| Game length dropping below 150 | Resign is shortening games, speeding up training |
-| Loss dropping steadily | Value head receiving real gradient signal |
-| `end_reasons.csv` — material_resign dominant | Expected early. Value resign appearing = value head learning |
-| `end_reasons.csv` — cap_draw still dominant after game 500 | Resign thresholds may need further loosening |
-
-**Value head regression test** (run via `eval_chess.py` at any checkpoint):
-- Start position → expect ~0.0
-- K+Q vs lone K (white to move) → expect near +1
-- K+Q vs lone K (black to move) → expect near -1
-- White missing queen → expect < 0
-
-If K+Q vs K still evaluates near 0 after 500 games of Run 4, something deeper is wrong.
+| Signal | What it means |
+|--------|---------------|
+| Value resigns per 50-game window | Core health signal. Growing = value head developing. Stable = plateau. Zero = investigate. |
+| Loss declining after plateau | Plateau hit ~5.27 at games 700–750. Decline started at game 800. Watch for continued fall. |
+| K+Q vs K regression | Game 1000 target: ≥ ±0.6. If still near zero, value head not generalising to endgames. |
+| Cap draws per window | <10 = healthy. >15 = consider loosening resign thresholds. |
+| W/B tally | Should stay near 50/50 each 50-game window. Sustained skew = investigate encoder. |
+| Checkmates per window | Currently sparse (0–2 per 50 games). Growing checkmate rate = closing technique developing. |
 
 ---
 
 ## Next Milestones
 
-1. **Run 4 game 500** — run value regression test, check end_reasons.csv distribution
-2. **Run 4 game 1000–2000** — run full eval vs random. Target: meaningful win rate (>20%)
-3. **Run 4 game 3000–5000** — if win rate is climbing, this is where tactical play should emerge
-4. **Phase 4** — UCI wrapper → Lichess bot account → ELO rating
+1. **Game 1000** — value head regression test. Target: K+Q vs K ≥ ±0.6. Then decide full eval.
+2. **Full eval vs random** — when regression shows meaningful values. Target: first wins.
+3. **Stage 2 resign** — once K+Q vs K reads ±0.9 consistently, remove material resign entirely. Value head takes sole responsibility — allows network to learn material comebacks and closing technique.
+4. **Run 8 seed buffer** — run `curate_buffer.py` after Run 7 completes. New buffer will use tiered format (canonical positions in permanent partition).
+5. **Phase 4** — UCI wrapper → Lichess bot account → ELO rating.
 
 ---
 
