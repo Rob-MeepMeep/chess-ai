@@ -3,7 +3,7 @@
 **Authors:** Rob Kirkland, Ellis Ward  
 **Project:** chess-ai  
 **Phase:** 3 of 3  
-**Status:** In progress — May 2026
+**Status:** In progress — June 2026
 
 ---
 
@@ -35,7 +35,7 @@ graph TB
     end
 
     subgraph NNG["chessai/model.py — Neural Network"]
-        NET["Residual tower\n8 blocks · 128 filters"]
+        NET["Residual tower\n10 blocks · 160 filters"]
         POL["Policy head — 4096 move logits"]
         VAL["Value head — scalar tanh"]
         NET --> POL
@@ -43,7 +43,7 @@ graph TB
     end
 
     subgraph ENC["Encoding Layer"]
-        ENCODER["chessai/encoder.py\n55 planes × 8×8"]
+        ENCODER["chessai/encoder.py\n54 planes × 8×8"]
         MOVES["chessai/moves.py\nUCI ↔ index 0–4095"]
     end
 
@@ -65,7 +65,7 @@ graph TB
     end
 
     ENV -->|board state| ENCODER
-    ENCODER -->|"tensor (55, 8, 8)"| NET
+    ENCODER -->|"tensor (54, 8, 8)"| NET
     MOVES -->|legal move mask| POL
     POL -->|move priors| SEARCH
     VAL -->|position value| SEARCH
@@ -139,7 +139,7 @@ chess-ai/
 ### chessai/encoder.py — Board Encoding ✅
 
 Converts a chess board (plus up to 3 previous board states for history) into
-a (55, 8, 8) float tensor, always from the perspective of the player to move.
+a (54, 8, 8) float tensor, always from the perspective of the player to move.
 When it's black's turn, the board is mirrored vertically and piece colours
 swapped so the network always sees "my pieces at the bottom."
 
@@ -148,13 +148,19 @@ swapped so the network always sees "my pieces at the bottom."
 | Planes | Content |
 |--------|---------|
 | 0–47   | Piece positions — 4 history frames × 12 planes each (6 for current player's pieces + 6 for opponent's, ordered pawn/knight/bishop/rook/queen/king) |
-| 48     | Colour to move in absolute terms (all 1s = white, all 0s = black) |
-| 49     | Current player — kingside castling right |
-| 50     | Current player — queenside castling right |
-| 51     | Opponent — kingside castling right |
-| 52     | Opponent — queenside castling right |
-| 53     | En passant target square (1 at that square, 0 elsewhere) |
-| 54     | Fifty-move counter, normalised to [0, 1] |
+| 48     | Current player — kingside castling right |
+| 49     | Current player — queenside castling right |
+| 50     | Opponent — kingside castling right |
+| 51     | Opponent — queenside castling right |
+| 52     | En passant target square (1 at that square, 0 elsewhere) |
+| 53     | Fifty-move counter, normalised to [0, 1] |
+
+**Note:** An earlier version included a plane 48 encoding absolute colour to
+move (all 1s = white, all 0s = black). This was removed in Run 6 after it
+caused a persistent black-wins bias: the network learned to correlate the
+colour plane with losing rather than using it for perspective. All 54 planes
+are now perspective-relative — the network has no concept of "white" or
+"black", only "my pieces" and "opponent's pieces."
 
 ---
 
@@ -173,10 +179,10 @@ mask in the Connect Four agent.
 
 ### chessai/model.py — Neural Network
 
-Input: (55, 8, 8) tensor from encoder.py
+Input: (54, 8, 8) tensor from encoder.py
 
 ```
-Input conv:    Conv2d(55 → 160, 3×3, padding 1) + BatchNorm + ReLU
+Input conv:    Conv2d(54 → 160, 3×3, padding 1) + BatchNorm + ReLU
 Residual ×10:  Conv2d(160 → 160, 3×3, padding 1) + BatchNorm + ReLU
                Conv2d(160 → 160, 3×3, padding 1) + BatchNorm
                + skip connection → ReLU
@@ -212,8 +218,8 @@ backpropagate value (flipping sign at each level for the two-player game).
 After N simulations, return normalised visit counts as the move policy.
 More visited = both network and search agree it is good.
 
-**Key parameter:** `c_puct ≈ 1.5` (exploration constant — to be tuned).
-**Simulations per move:** 200–400 during training, 400–800 during evaluation.
+**Key parameter:** `c_puct ≈ 1.5` (exploration constant).
+**Simulations per move:** 200 during training (Run 7), 50 during evaluation.
 
 ---
 
@@ -236,7 +242,18 @@ retrospectively to all positions from that game.
 
 Different from Phase 2's DQN replay buffer which stored individual
 transitions. Here we store complete game trajectories.
-Capacity: ~50,000 positions.
+
+**Two partitions:**
+- **Rolling buffer** (50,000 positions): standard circular buffer — oldest
+  entries evicted as new self-play positions arrive.
+- **Permanent buffer**: ground-truth positions (canonical endgames such as
+  K+Q vs K) that are never evicted. Sampled at ~12.5% of each training batch
+  regardless of buffer age. Ensures the value head keeps canonical signal
+  throughout the full training run, not just until the rolling buffer fills.
+
+The permanent partition was added after observing that canonical positions
+seeded into the rolling buffer would be evicted around game 800 — before
+the value head had reliably learned from them.
 
 ---
 
@@ -248,10 +265,11 @@ Did it get redeployed selectively later?*
 
 | Log | Frequency | Purpose |
 |-----|-----------|---------|
-| Win rate, loss, game length | Every 100 games | Performance curve |
-| Opening sequences (first 12 moves) | Every sampled game | Detect repertoire emergence |
+| Individual game record (outcome, end reason, moves) | Every game | Full game history, move-level analysis |
+| Win rate, loss, game length | Every 50 games | Performance curve |
+| Opening sequences (first 12 moves) | Every game | Detect repertoire emergence |
 | MCTS visit distributions at 5 canonical positions | Every 500 games | Confidence vs exploration signal |
-| Game length histogram (bucketed) | Every 100 games | Bimodal shape = selective exploit |
+| Game length histogram (bucketed) | Every 50 games | Bimodal shape = selective exploit |
 
 The opening sequence log is the key addition over Phase 2 — if the same
 12-move sequence starts appearing in an increasing percentage of games,
@@ -293,17 +311,13 @@ No other changes to the API required.
 | 1 | chessai/encoder.py | ✅ Done |
 | 2 | chessai/moves.py | ✅ Done |
 | 3 | chessai/model.py | ✅ Done |
-| 4 | chessai/mcts.py | — |
-| 5 | chessai/replay.py | — |
-| 6 | chessai/agent.py | — |
-| 7 | chessai/logger.py | — |
-| 8 | train_chess.py | — |
-| 9 | eval_chess.py | — |
-| 10 | main.py (update) | — |
-
-**First milestone:** HAL playing legal chess using MCTS with an untrained
-(random-weight) network. Random play but correct tree search — proof the
-plumbing works before training begins.
+| 4 | chessai/mcts.py | ✅ Done |
+| 5 | chessai/replay.py | ✅ Done |
+| 6 | chessai/agent.py | ✅ Done |
+| 7 | chessai/logger.py | ✅ Done |
+| 8 | train_chess.py | ✅ Done |
+| 9 | eval_chess.py | ✅ Done |
+| 10 | main.py (update) | Pending — awaiting trained model |
 
 ---
 
@@ -383,14 +397,128 @@ learned some structure; value head fully collapsed to ~0.
 
 ---
 
-### Run 4 — MacBook Pro M5 Pro (in progress, 2026-05-30)
+### Run 4 — MacBook Pro M5 Pro (abandoned at game 2300)
 
 **Config:** 160 channels, 10 blocks, 100 simulations  
 **Hardware:** MacBook Pro M5 Pro, 24GB  
+**Games completed:** 2,300  
 **Seeded from:** Run 3 checkpoint at game 400 (policy head preserved, buffer discarded)  
-**Key fixes:** resign streak uses `abs(mat)`, logger keys corrected  
-**Early results:** Game 2 — white win, 75 moves. Game 3 — white win, 19 moves. Resign firing.
+**Key fixes:** resign streak uses `abs(mat)`, logger keys corrected
+
+**Results:**
+- First run with resign actually firing — first win at game 2, 75 moves (material resign)
+- Value head developed: value resigns appeared and grew through the run
+- Loss curve: 6.26 → ~3.5 over 2,300 games (healthy decline)
+- Persistent black-wins bias: 55–60% black win rate throughout, never correcting
+
+**Eval at game 2300:**
+- vs Random: 0% win rate (HAL cannot deliver checkmate yet)
+- Value head regression: partial movement but still far from ±1 on canonical positions
+
+**Root cause identified:** Encoder plane 48 (absolute colour indicator) caused
+the network to learn "white to move = losing" after 2,300 games of self-play
+where white made first-move errors disproportionately. The network conflated
+colour with losing side.
+
+**Why abandoned:** Colour bias structural, not trainable away. Required encoder
+change.
 
 ---
 
-*Architecture document — chess-ai Phase 3. Updated as build progresses.*
+### Run 5 — MacBook Pro M5 Pro (abandoned at game 100)
+
+**Config:** 160 channels, 10 blocks, 100 simulations  
+**Hardware:** MacBook Pro M5 Pro, 24GB  
+**Games completed:** 100  
+**Purpose:** Confirm colour bias was structural before committing to encoder change
+
+**Result:** Black-wins bias reappeared immediately and held at ~60% through 100
+games. Confirmed the bias was not a fluke of Run 4's longer training — it emerges
+from the encoder structure within the first 100 games.
+
+**Why abandoned:** Bias confirmed structural. Plane 48 removed from encoder.
+
+---
+
+### Run 6 — MacBook Pro M5 Pro (complete at game 5000)
+
+**Config:** 160 channels, 10 blocks, 100 simulations, 54-plane encoder (colour-blind)  
+**Hardware:** MacBook Pro M5 Pro, 24GB  
+**Games completed:** 5,000  
+**Training steps:** ~25,000  
+**Key change:** Plane 48 (colour to move) removed from encoder. Fresh random weights.
+
+**Results:**
+- Colour bias eliminated: W/B tally balanced throughout (48–52% range)
+- Loss curve: 6.26 → 3.48 over 5,000 games
+- Average game length: 84 moves (game 1) → 48 moves (game 5000) — resign firing earlier as value head developed
+- Value resigns: grew from 0 to ~20 per 50-game window by game 5000
+- First checkmate appeared at game 658
+
+**Eval at game 5000:**
+- vs Random: 0% win rate (value head cannot yet convert to checkmate)
+- White loss rate vs random: improved to 9% at game 2000, regressed to 18% by game 5000 as policy became more aggressive
+
+**Value head regression at game 5000:**
+- Start position: near zero ✓
+- K+Q vs K (w wins): near zero ✗ (value head not generalising to canonical endgames)
+- K+Q vs K (b move): weak negative signal ✗
+- White missing queen: slightly negative ✗
+
+**Key finding:** The value head develops during self-play but does not generalise to
+canonical endgame positions it has never seen. The bootstrapping problem persists —
+early self-play noise delays value head development regardless of resign thresholds.
+
+**Data archived:** `paper/data/run6/`
+
+---
+
+### Run 7 — MacBook Pro M5 Pro (in progress, 2026-06-02)
+
+**Config:** 160 channels, 10 blocks, 200 simulations, 54-plane encoder  
+**Hardware:** MacBook Pro M5 Pro, 24GB  
+**Key changes from Run 6:**
+- N_SIMULATIONS doubled to 200 (better MCTS quality per game)
+- Seeded replay buffer: 40,646 positions curated from Run 6 (games 3000–5000,
+  decisive only) + canonical endgame positions (K+Q vs K, K+R vs K × 200 repeats)
+- Fresh random weights (no inherited bias)
+
+**Motivation:** Buffer seeding skips the bootstrapping phase — the value head gets
+real signal from gradient step 1 rather than from game ~500.
+
+**Training data (games 1–500):**
+
+| Window | W | B | D | avg loss | val resigns | cap draws |
+|--------|---|---|---|----------|-------------|-----------|
+| 50     | 23 | 21 | 6 | 1.14 | 0 | 6 |
+| 100    | 20 | 26 | 4 | 1.40 | 1 | 4 |
+| 150    | 24 | 24 | 2 | 1.71 | 2 | 2 |
+| 200    | 31 | 17 | 2 | 2.09 | 3 | 2 |
+| 250    | 20 | 26 | 4 | 2.50 | 3 | 4 |
+| 300    | 18 | 24 | 8 | 2.89 | 6 | 8 |
+| 350    | 17 | 15 | 2 | 3.25 | 2 | 2 |
+| 400    | 9  | 4  | 0 | 3.66 | 0 | 0 |
+| 450    | 23 | 24 | 3 | 3.84 | 6 | 3 |
+| 500    | 22 | 23 | 5 | 4.13 | 3 | 5 |
+
+*(Windows 350 and 400 are short — a restart occurred mid-window)*
+
+**Notable:** Loss rose from 1.14 to 4.13 — not divergence, but the buffer
+transition from seeded (zero policy labels) to self-play (real MCTS policies).
+The policy head faces harder targets as seed positions are replaced; loss rises
+to reflect the harder problem. Value resigns growing (0 → 6 per window) confirms
+health — the network is becoming more decisive, not collapsing.
+
+**Value head regression at game 500 (2,510 training steps):**
+- Start position: -0.09 (expect ~0.0) ✓
+- K+Q vs K (w wins): -0.06 (expect near +1) ✗ still flat
+- K+Q vs K (b move): -0.46 (expect near -1) — meaningful movement (was -0.26 at game 317)
+- White missing queen: -0.09 (expect < 0) ✓ **sign corrected** (was +0.16 at game 317)
+
+W/B balance excellent throughout. First checkmating game appeared at game 1.
+
+**Status:** In progress at game 500.
+
+---
+
+*Architecture document — chess-ai Phase 3. Updated June 2026.*
