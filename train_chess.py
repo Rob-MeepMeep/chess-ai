@@ -46,9 +46,9 @@ RESIGN_MATERIAL    = 7      # raised from 5 — resign only on larger imbalances
 # Run identity — change RUN_NAME to start a new named run with its own logs and buffer.
 # CKPT_LOAD: None = load RUN_NAME's own checkpoint; set to a path to seed weights from another run.
 # BUFFER_LOAD: None = load RUN_NAME's own buffer; set to a path to load from another run.
-RUN_NAME    = "run7"
+RUN_NAME    = "run8"
 CKPT_LOAD   = None                                      # fresh weights — no inherited bias
-BUFFER_LOAD = "checkpoints/run7_seed_buffer.pt"         # curated seed buffer from run6
+BUFFER_LOAD = "checkpoints/run8_seed_buffer.pt"         # curated seed buffer from run7
 
 CKPT_PATH   = f"checkpoints/{RUN_NAME}_hal_chess.pt"
 BUFFER_PATH = f"checkpoints/{RUN_NAME}_replay_buffer.pt"
@@ -179,7 +179,8 @@ for game_num in range(start_game + 1, N_GAMES + 1):
             break   # losing side resigns
 
     # --- Determine winner and end reason ---
-    result = board.result()
+    result        = board.result()
+    outcome_scale = 1.0   # overridden to 0.8 for material-imbalanced cap draws
     if resign_streak >= RESIGN_CONSECUTIVE:
         # Side with more material wins; imbalance was already confirmed by resign_streak
         winner     = chess.WHITE if _material_balance(board) > 0 else chess.BLACK
@@ -197,14 +198,24 @@ for game_num in range(start_game + 1, N_GAMES + 1):
         winner     = None
         end_reason = "rule_draw"
     elif len(moves) >= MAX_GAME_MOVES:
-        winner     = None
+        # Cap draw: if one side is clearly ahead on material, treat as a soft win
+        # rather than a draw. Assigning outcome 0.0 to lopsided positions contaminates
+        # the value head — it learns "endgame-looking positions = draw" which directly
+        # contradicts the canonical endgame signal.
+        _cap_mat = _material_balance(board)
+        if abs(_cap_mat) > 3:
+            winner        = chess.WHITE if _cap_mat > 0 else chess.BLACK
+            outcome_scale = 0.8   # strong signal without claiming a win was forced
+        else:
+            winner        = None
+            outcome_scale = 1.0
         end_reason = "cap_draw"
     else:
         winner     = None
         end_reason = "rule_draw"
 
     # Commit game positions with outcomes to replay buffer
-    game_buf.commit(replay, winner)
+    game_buf.commit(replay, winner, scale=outcome_scale)
 
     # --- Training steps ---
     if replay.ready(MIN_BUFFER):

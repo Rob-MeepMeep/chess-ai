@@ -1,13 +1,13 @@
 """
-curate_buffer.py — Build a high-quality seed buffer for Run 7.
+curate_buffer.py — Build a high-quality seed buffer for Run 8.
 
-Reads the run6 game log, filters out low-quality games, replays the
+Reads the run7 game log, filters out low-quality games, replays the
 surviving games move-by-move to extract positions, adds canonical
 endgame positions with correct outcomes, and saves the result as a
-seed buffer file that Run 7 can load on startup.
+seed buffer file that Run 8 can load on startup.
 
 Why: the bootstrapping problem. Early self-play generates noise — both
-sides random, outcomes meaningless. Starting Run 7 with this curated
+sides random, outcomes meaningless. Starting Run 8 with this curated
 buffer means the value head gets real signal from gradient step 1
 instead of from game ~500.
 
@@ -24,10 +24,10 @@ Usage:
   venv/bin/python3 curate_buffer.py
 
 Output:
-  checkpoints/run7_seed_buffer.pt
+  checkpoints/run8_seed_buffer.pt
 
-Then in train_chess.py for Run 7, set:
-  BUFFER_LOAD = "checkpoints/run7_seed_buffer.pt"
+Then in train_chess.py for Run 8, set:
+  BUFFER_LOAD = "checkpoints/run8_seed_buffer.pt"
 """
 
 import csv
@@ -41,11 +41,11 @@ from chessai.replay   import ReplayBuffer
 # Configuration
 # ---------------------------------------------------------------------------
 
-GAMES_CSV      = "logs/run6/games.csv"
-OUTPUT_PATH    = "checkpoints/run7_seed_buffer.pt"
+GAMES_CSV      = "logs/run7/games.csv"
+OUTPUT_PATH    = "checkpoints/run8_seed_buffer.pt"
 
 # Game quality filters
-MIN_GAME       = 3000    # skip early training — network coherent from ~3000
+MIN_GAME       = 800     # skip early training — value head developing from ~800
 MIN_MOVES      = 20      # skip overconfident short games
 MAX_MOVES      = 100     # skip very long games that may be random shuffling
 GOOD_REASONS   = {"material_resign", "checkmate"}  # decisive, trustworthy outcomes

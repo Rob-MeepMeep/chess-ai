@@ -49,10 +49,10 @@ class ReplayBuffer:
     def sample(self, batch_size: int) -> tuple:
         """
         Sample a random batch for training.
-        Up to 12.5% of each batch is drawn from the permanent partition (if populated).
+        Up to 25% of each batch is drawn from the permanent partition (if populated).
         Returns three stacked tensors: (states, policies, outcomes).
         """
-        perm_n = min(len(self._permanent), batch_size // 8) if self._permanent else 0
+        perm_n = min(len(self._permanent), batch_size // 4) if self._permanent else 0
         roll_n = batch_size - perm_n
 
         batch = random.sample(self._buffer, roll_n)
@@ -107,19 +107,23 @@ class GameBuffer:
         self._positions.append((state, policy, turn))
 
     def commit(self, replay: ReplayBuffer,
-               winner: Optional[chess.Color]) -> None:
+               winner: Optional[chess.Color],
+               scale: float = 1.0) -> None:
         """
         Game over. Fill in outcomes and move everything to the replay buffer.
 
         winner: chess.WHITE, chess.BLACK, or None for draw.
-        Each position gets +1 if the player to move won, -1 if they lost, 0 for draw.
+        scale:  multiply decisive outcomes by this factor. Use 0.8 for soft wins
+                (e.g. cap draws where one side is materially ahead but the game
+                wasn't finished — a strong signal without claiming certainty).
+        Each position gets ±scale if decisive, 0 for draw.
         """
         completed = []
         for state, policy, turn in self._positions:
             if winner is None:
                 outcome = 0.0
             else:
-                outcome = 1.0 if turn == winner else -1.0
+                outcome = scale * (1.0 if turn == winner else -1.0)
             completed.append((state, policy, outcome))
 
         replay.extend(completed)
