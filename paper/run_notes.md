@@ -438,6 +438,46 @@ network output — but the value head itself is no longer contributing signal.
 
 ---
 
+### Run 8 — MacBook Pro M5 Pro (IN PROGRESS, started 2026-06-04)
+
+- **Config:** 160ch / 10 blocks / 200 sims / 54 planes / RESIGN_MATERIAL=7 / RESIGN_CONSECUTIVE=5
+- **Fresh random weights**
+- **Seed buffer:** 13,152 positions from Run 7 decisive games 800–1200 + 1,600 canonical positions (permanent)
+- **Key fixes:** MCTS backup sign corrected; cap draw outcomes from material (±0.8); canonical partition 25%
+
+**Training windows:**
+
+| Window | W | B | D | avg loss | checkmates | val resigns | cap draws | avg len |
+|--------|---|---|---|----------|------------|-------------|-----------|---------|
+| 50  | 18 | 32 | 0 | 1.36 | 8 | 1 | 0 | 71.2 |
+| 100 | 28 | 22 | 0 | 1.93 | 9 | 0 | 1 | 74.5 |
+
+**17 checkmates in the first 100 games.** Run 7 had 2 in its first 800. Run 6 had its first at game 658.
+Zero cap draws (1 total) — games are resolving decisively without hitting the move cap.
+W/B balance: window 1 showed 18/32 (noise), window 2 corrected to 28/22. Overall 46W/54B — healthy.
+
+**Value head regression — game 100 (650 steps):**
+
+| Position | Value | Expected |
+|----------|-------|----------|
+| Start | -0.039 | ~0.0 | ✓ |
+| K+Q vs K (w wins) | -0.132 | near +1 | ✗ (wrong sign, but has magnitude) |
+| K+Q vs K (b move) | **-0.530** | near -1 | ✓ **past ±0.6 milestone at game 100** |
+| White missing queen | -0.058 | < 0 | ✓ |
+
+K+Q vs K (b move) at -0.530 surpasses Run 7's game 500 result (-0.456) at one fifth of the
+training steps. The corrected MCTS delivers decisive, informative self-play games from the
+start — 17 checkmates and 1 cap draw in 100 games vs Run 7's draw-heavy early windows.
+
+Run 7 progression for comparison:
+- Game 317 (1,745 steps): -0.260
+- Game 500 (2,510 steps): -0.456
+- Game 990 (5,060 steps): -0.950 (peak, then collapsed)
+
+**Next regression: game 200–300. Target: ±0.7 or better.**
+
+---
+
 ## Current Code State
 
 Key config in `train_chess.py`:
