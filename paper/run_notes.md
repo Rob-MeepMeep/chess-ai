@@ -442,24 +442,51 @@ network output — but the value head itself is no longer contributing signal.
 
 Key config in `train_chess.py`:
 ```python
-N_SIMULATIONS    = 200      # doubled from run6
+N_SIMULATIONS    = 200
 MAX_GAME_MOVES   = 150
 RESIGN_THRESHOLD   = -0.95
 RESIGN_CONSECUTIVE = 5
 RESIGN_MATERIAL    = 7
-RUN_NAME    = "run7"
+RUN_NAME    = "run8"
 CKPT_LOAD   = None                                # fresh weights
-BUFFER_LOAD = "checkpoints/run7_seed_buffer.pt"  # seed — ignored on resume if run7_replay_buffer.pt exists
+BUFFER_LOAD = "checkpoints/run8_seed_buffer.pt"  # curated from run7 decisive games 800–1200
 ```
 
 Key additions since Run 1:
 - `chessai/agent.py` — `get_value()` single forward pass for resignation check
-- `chessai/replay.py` — `save()`/`load()` buffer persistence; tiered buffer (permanent + rolling)
+- `chessai/replay.py` — `save()`/`load()` buffer persistence; tiered buffer (permanent + rolling, 25% canonical)
 - `chessai/logger.py` — `games.csv` (full per-game log), `end_reasons.csv`, run-namespaced log dirs
 - `curate_buffer.py` — builds seed buffer from prior run data + canonical endgame positions
-- `train_chess.py` — RUN_NAME system, CKPT_LOAD/BUFFER_LOAD, tally tracking, buffer priority logic
+- `train_chess.py` — RUN_NAME system, CKPT_LOAD/BUFFER_LOAD, cap draw material outcome, buffer priority logic
+- `chessai/mcts.py` — **backup sign fix** (flip before update — see critical bug below)
 
-**Run 8 start command:**
+**Critical bug fixed before Run 8 — MCTS backup sign:**
+All runs prior to Run 8 had an inverted backup. The value from the neural network
+represents how good a position is for the player to move at the leaf. The backup
+must flip this to the parent's perspective before storing in `node.W`. The old code
+flipped *after* storing — so `node.W` held the value from the *wrong player's*
+perspective. MCTS was maximising the opponent's advantage every simulation.
+
+Effect: the policy head learned to prefer the moves MCTS visited most — which were
+the worst available moves. The value head was unaffected (trained from game outcomes,
+not MCTS Q values). This explains the persistent 0% win rate vs random across all
+runs despite the value head clearly developing.
+
+```python
+# BROKEN (runs 1–7): flip after storing
+for node in reversed(path):
+    node.N += 1
+    node.W += value
+    value = -value       # too late — node.W already has the wrong sign
+
+# FIXED (run 8+): flip before storing
+for node in reversed(path):
+    value = -value       # convert to parent's perspective first
+    node.N += 1
+    node.W += value
+```
+
+**Resume command:**
 ```bash
 caffeinate -dims venv/bin/python3 train_chess.py
 ```
@@ -481,12 +508,12 @@ caffeinate -dims venv/bin/python3 train_chess.py
 
 ## Next Milestones
 
-1. **Run 8 seed buffer** — run `curate_buffer.py` using Run 7 data (games 800–1200, decisive only).
-2. **Fix cap draw outcomes** in `train_chess.py` — if `abs(material) > 3` at 50-move cap, assign ±0.8.
-3. **Increase permanent partition** — `curate_buffer.py` / `replay.py`: raise canonical share from 12.5% to 25% per batch.
-4. **Start Run 8** — fresh weights, Run 7 seed buffer, fixed cap draw labelling.
-5. **Regression every 200 games** — catch value collapse early rather than at game 1000.
-6. **Full eval vs random** — when regression shows K+Q vs K ≥ ±0.6 sustained across 2+ checkpoints.
+1. ~~Run 8 seed buffer~~ — ✓ done (13,152 positions from Run 7 games 800–1200)
+2. ~~Fix cap draw outcomes~~ — ✓ done (±0.8 soft outcome when abs(material) > 3)
+3. ~~Increase permanent partition~~ — ✓ done (25% per batch, was 12.5%)
+4. ~~Start Run 8~~ — ✓ running (fixed MCTS backup, fresh weights, run8 seed buffer)
+5. **Regression every 200 games** — Run 8 health check. Target: K+Q vs K ≥ ±0.6, sustained.
+6. **Full eval vs random** — when regression shows K+Q vs K ≥ ±0.6 across 2+ consecutive checkpoints.
 7. **Stage 2 resign** — once K+Q vs K reads ±0.9 consistently, remove material resign entirely.
 8. **Phase 4** — UCI wrapper → Lichess bot account → ELO rating.
 

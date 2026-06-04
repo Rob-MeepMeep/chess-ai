@@ -461,6 +461,39 @@ A rise in loss can mean the network got worse, or the data got harder.
 Loss must always be read alongside the end-reason distribution and tally
 balance. Loss alone is not a reliable health signal.
 
+### L22 — MCTS perspective: flip before storing, not after
+In two-player MCTS, the neural network evaluates a leaf position and returns
+a value from the perspective of the **player to move at the leaf**. The backup
+propagates this value up the tree toward the root, flipping sign at each level
+because what is good for one player is bad for the other.
+
+The critical detail: the flip must happen **before** storing the value in
+`node.W`, not after. Each node represents an action chosen by the parent
+player. `node.W` must accumulate value from the parent's perspective so that
+when the parent calls `argmax(Q)`, it is maximising its own advantage.
+
+```python
+# WRONG — stores leaf player's value in node.W, parent maximises opponent's advantage
+for node in reversed(path):
+    node.W += value
+    value = -value
+
+# CORRECT — converts to parent's perspective before storing
+for node in reversed(path):
+    value = -value
+    node.W += value
+```
+
+This bug went undetected for seven training runs because the value head is
+trained from game **outcomes** (not MCTS Q values), so it learned correctly
+regardless. The policy head, however, learned to prefer the moves MCTS visited
+most — which were the worst moves. Result: a well-calibrated value head coexisting
+with a policy head that consistently chose bad moves. Win rate against random: 0%
+across all seven runs despite clear value head development.
+
+The lesson: two components trained from different signals can fail independently
+and silently. Regression tests for the value head do not catch policy head failure.
+
 ---
 
-*This document is updated as new concepts are introduced. Last updated: Phase 3 Run 7 in progress.*
+*This document is updated as new concepts are introduced. Last updated: Phase 3 Run 8 in progress.*

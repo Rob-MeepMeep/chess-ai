@@ -473,51 +473,53 @@ early self-play noise delays value head development regardless of resign thresho
 
 ---
 
-### Run 7 — MacBook Pro M5 Pro (in progress, 2026-06-02)
+### Run 7 — MacBook Pro M5 Pro (stopped at game 1200, 2026-06-04)
 
 **Config:** 160 channels, 10 blocks, 200 simulations, 54-plane encoder  
 **Hardware:** MacBook Pro M5 Pro, 24GB  
 **Key changes from Run 6:**
-- N_SIMULATIONS doubled to 200 (better MCTS quality per game)
-- Seeded replay buffer: 40,646 positions curated from Run 6 (games 3000–5000,
-  decisive only) + canonical endgame positions (K+Q vs K, K+R vs K × 200 repeats)
-- Fresh random weights (no inherited bias)
+- N_SIMULATIONS doubled to 200
+- Seeded replay buffer: 40,646 positions from Run 6 (decisive games 3000–5000)
+  + canonical endgame positions in permanent partition (never evicted)
+- Fresh random weights
 
-**Motivation:** Buffer seeding skips the bootstrapping phase — the value head gets
-real signal from gradient step 1 rather than from game ~500.
+**Key results:**
+- Loss: 1.14 → 5.27 (plateau, games 700–750) → 4.59 (game 1200, new low)
+- Value resigns: peaked at 10/window (game 1150). MCTS-driven — see bug note below.
+- Value head regression peak at game ~990: K+Q vs K (b move) = **-0.950** — first time any run reached near-target values
+- Collapse at game ~1000: cap draw spike (11 draws) pushed all regression values to ~-0.03
 
-**Training data (games 1–500):**
+**Critical discovery — MCTS backup sign bug:**
+All runs 1–7 had an inverted backup. `node.W` was storing the value from the leaf
+player's perspective instead of the parent's. MCTS was selecting the worst available
+move every simulation. The value head learned correctly (trained from game outcomes),
+but the policy head learned to prefer losing moves. This explains the persistent
+0% win rate vs random across all runs. See run_notes.md for full analysis and fix.
 
-| Window | W | B | D | avg loss | val resigns | cap draws |
-|--------|---|---|---|----------|-------------|-----------|
-| 50     | 23 | 21 | 6 | 1.14 | 0 | 6 |
-| 100    | 20 | 26 | 4 | 1.40 | 1 | 4 |
-| 150    | 24 | 24 | 2 | 1.71 | 2 | 2 |
-| 200    | 31 | 17 | 2 | 2.09 | 3 | 2 |
-| 250    | 20 | 26 | 4 | 2.50 | 3 | 4 |
-| 300    | 18 | 24 | 8 | 2.89 | 6 | 8 |
-| 350    | 17 | 15 | 2 | 3.25 | 2 | 2 |
-| 400    | 9  | 4  | 0 | 3.66 | 0 | 0 |
-| 450    | 23 | 24 | 3 | 3.84 | 6 | 3 |
-| 500    | 22 | 23 | 5 | 4.13 | 3 | 5 |
+**Why stopped early (game 1200):**
+1. Value head collapsed after cap draw spike — not recovering
+2. MCTS backup bug identified — full restart required with fix
+3. Persistent black bias in recent windows (self-play meta)
 
-*(Windows 350 and 400 are short — a restart occurred mid-window)*
+**Data:** `logs/run7/`
 
-**Notable:** Loss rose from 1.14 to 4.13 — not divergence, but the buffer
-transition from seeded (zero policy labels) to self-play (real MCTS policies).
-The policy head faces harder targets as seed positions are replaced; loss rises
-to reflect the harder problem. Value resigns growing (0 → 6 per window) confirms
-health — the network is becoming more decisive, not collapsing.
+---
 
-**Value head regression at game 500 (2,510 training steps):**
-- Start position: -0.09 (expect ~0.0) ✓
-- K+Q vs K (w wins): -0.06 (expect near +1) ✗ still flat
-- K+Q vs K (b move): -0.46 (expect near -1) — meaningful movement (was -0.26 at game 317)
-- White missing queen: -0.09 (expect < 0) ✓ **sign corrected** (was +0.16 at game 317)
+### Run 8 — MacBook Pro M5 Pro (in progress, 2026-06-04)
 
-W/B balance excellent throughout. First checkmating game appeared at game 1.
+**Config:** 160 channels, 10 blocks, 200 simulations, 54-plane encoder  
+**Hardware:** MacBook Pro M5 Pro, 24GB  
+**Key changes from Run 7:**
+- **MCTS backup sign fixed** — policy head now learns correct move preferences
+- **Cap draw outcome from material** — games hitting 50-move cap with abs(material) > 3 assigned ±0.8 soft outcome instead of 0.0 (prevents value head contamination)
+- **Canonical partition raised 12.5% → 25%** per batch — stronger resistance to cap draw pollution
+- **Seed buffer from Run 7** — 13,152 positions from decisive games 800–1200, 1,600 canonical positions in permanent partition
 
-**Status:** In progress at game 500.
+**Motivation:** Run 7 proved buffer seeding works (value head reached -0.950). The
+backup fix means the policy head will now learn correctly for the first time. The cap
+draw fix means value collapse from game 1000-style spikes should not recur.
+
+**Status:** In progress from game 1.
 
 ---
 
