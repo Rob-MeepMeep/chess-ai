@@ -11,7 +11,13 @@ Three tiers of evaluation:
 
 Usage:
   python3 eval_chess.py                        # evaluate current checkpoint
+  python3 eval_chess.py --regression-only      # value head check only — ~5s, safe during training
+  python3 eval_chess.py --cpu                  # force CPU — keeps MPS free for concurrent training
   python3 eval_chess.py --prev checkpoints/hal_chess_v1.pt   # also run improvement test
+
+Note on game counts: N_GAMES_RANDOM and N_GAMES_STOCKFISH are set conservatively
+so the full suite can run alongside an active training loop without dominating the
+MPS backend. Bump them to 100/50 for the final paper benchmark after training ends.
 """
 
 import argparse
@@ -27,19 +33,40 @@ from chessai.encoder import encode
 # Configuration
 # ---------------------------------------------------------------------------
 
-N_GAMES_RANDOM     = 100   # games per random matchup (fast)
-N_GAMES_STOCKFISH  = 50    # games per Stockfish matchup (slower)
-N_GAMES_PREV       = 50    # games vs previous checkpoint
+N_GAMES_RANDOM     = 25    # trimmed for concurrent use — bump to 100 for final paper benchmark
+N_GAMES_STOCKFISH  = 10    # trimmed for concurrent use — bump to 50 for final paper benchmark
+N_GAMES_PREV       = 25    # games vs previous checkpoint
 N_SIMULATIONS      = 50    # HAL's simulations per move during eval (greedy)
 MAX_GAME_MOVES     = 200   # hard cap
-CKPT_PATH          = "checkpoints/run7_hal_chess.pt"
+CKPT_PATH          = "checkpoints/run8_hal_chess.pt"
 STOCKFISH_PATH     = "stockfish"   # assumes stockfish is on PATH
+
+# ---------------------------------------------------------------------------
+# Arguments — parsed early so --cpu affects device selection
+# ---------------------------------------------------------------------------
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--prev", default=None,
+                    help="Path to previous checkpoint for improvement test")
+parser.add_argument("--regression-only", action="store_true",
+                    help="Run value head regression test only — ~5s, safe during active training")
+parser.add_argument("--cpu", action="store_true",
+                    help="Force CPU device — keeps MPS free when running alongside a training loop")
+args, _ = parser.parse_known_args()
 
 # ---------------------------------------------------------------------------
 # Device
 # ---------------------------------------------------------------------------
 
-device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+if args.cpu:
+    device = torch.device("cpu")
+elif torch.backends.mps.is_available():
+    device = torch.device("mps")
+else:
+    device = torch.device("cpu")
+
+if args.cpu:
+    print("Device: cpu (forced — MPS reserved for training)")
 
 # ---------------------------------------------------------------------------
 # Load HAL
@@ -147,17 +174,6 @@ def evaluate(label: str, white_fn, black_fn, n: int) -> dict:
     return {"white_wins": white_wins, "black_wins": black_wins, "draws": draws, "n": n}
 
 # ---------------------------------------------------------------------------
-# Parse arguments
-# ---------------------------------------------------------------------------
-
-parser = argparse.ArgumentParser()
-parser.add_argument("--prev", default=None,
-                    help="Path to previous checkpoint for improvement test")
-parser.add_argument("--regression-only", action="store_true",
-                    help="Run value head regression test only — skip all game matchups")
-args, _ = parser.parse_known_args()
-
-# ---------------------------------------------------------------------------
 # Run all matchups
 # ---------------------------------------------------------------------------
 
@@ -184,7 +200,7 @@ print("── Tier 2: HAL vs Stockfish ─────────────�
 
 try:
     engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
-    engine.configure({"Threads": 1})   # single thread for fair comparison
+    engine.configure({"Threads": 1, "Hash": 16})   # 1 thread, 16MB hash — prevent unified memory bloat
 
     for depth in [1, 3, 5]:
         sf_move = stockfish_move(engine, depth)
