@@ -141,11 +141,8 @@ class MCTS:
 
                 if sim_board.is_game_over():
                     value = self._terminal_value(sim_board)
-                elif node_id in node_values:
-                    value = node_values[node_id]
                 else:
-                    # Leaf was already expanded by another sim this wave
-                    value = leaf.Q
+                    value = node_values[node_id]
 
                 self._backup(path, value)
 
@@ -209,9 +206,9 @@ class MCTS:
 
     def _backup(self, path: list, value: float) -> None:
         for node in reversed(path):
-            node.N += 1
-            node.W += value
-            value   = -value
+            value = -value   # flip first: value arrives as leaf player's perspective;
+            node.N += 1      # each node stores value from the perspective of the player
+            node.W += value  # who chose this action (the parent), so flip before storing
 
     def _terminal_value(self, board: chess.Board) -> float:
         return 0.0 if board.result() == "1/2-1/2" else -1.0
