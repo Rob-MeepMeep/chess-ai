@@ -273,7 +273,7 @@ the two measure different things: recognising lost positions vs forcing checkmat
 
 ---
 
-### Run 7 — MacBook Pro M5 Pro (IN PROGRESS, started 2026-06-02)
+### Run 7 — MacBook Pro M5 Pro (STOPPED EARLY at game 1200, 2026-06-04)
 
 - **Config:** 160ch / 10 blocks / 200 sims / 54 planes / RESIGN_MATERIAL=7 / RESIGN_CONSECUTIVE=5
 - **Fresh random weights, no inherited bias**
@@ -317,17 +317,30 @@ Buffer load was nested inside the checkpoint existence block. Fresh start → no
 | 700 | 50 | 22 | 23 | 5 | 5.27 | 5 | 5 | 83.2 |
 | 750 | 50 | 26 | 21 | 3 | 5.27 | 5 | 3 | 71.3 |
 | 800 | 50 | 25 | 21 | 4 | 5.15 | 9 | 4 | 71.5 |
+| 850 | 50 | 17 | 26 | 7 | 5.05 | 7 | 7 | 80.0 |
+| 900 | 50 | 28 | 20 | 2 | 4.97 | 7 | 2 | 65.9 |
+| 950 | 50 | 24 | 24 | 2 | 4.93 | 7 | 2 | 70.3 |
+| 1000 | 50 | 15 | 24 | 11 | 4.84 | 6 | 11 | 87.1 |
+| 1050 | 50 | 19 | 24 | 7 | 4.77 | 6 | 7 | 80.3 |
+| 1100 | 50 | 13 | 30 | 7 | 4.74 | 6 | 7 | 85.4 |
+| 1150 | 50 | 18 | 29 | 3 | 4.61 | 10 | 3 | 69.9 |
+| 1200 | 50 | 17 | 26 | 7 | 4.59 | 9 | 7 | 70.1 |
 
-**Loss trajectory:** Rose from 1.14 (game 50) to 5.27 (plateau at games 700–750), then began
-declining: 5.15 at game 800. Rising loss is a buffer transition artefact (seed positions had
-zero policy labels; as self-play replaced them, policy head faced harder targets). Plateau then
-decline is the expected pattern. See key_concepts.md L19.
+**Loss trajectory:** Rose from 1.14 (game 50) to 5.27 (plateau at games 700–750), then declined
+continuously: 5.15 → 5.05 → 4.97 → 4.93 → 4.84 → 4.77 → 4.74 → 4.61 → **4.59** (new low at game 1200).
+Rising loss is a buffer transition artefact (seed positions had zero policy labels; as self-play
+replaced them, policy head faced harder targets). Plateau then decline is the expected pattern.
+See key_concepts.md L19.
 
-**Value resign trajectory:** 0→1→2→3→3→6→[2,0]→6→3→8→[4]→9→5→5→9
-Brackets are short-window readings. Trend is clearly upward. Represents growing value head
-confidence — the network recognises hopeless positions and terminates games early.
+**Value resign trajectory:** 0→1→2→3→3→6→[2,0]→6→3→8→[4]→9→5→5→9→7→7→6→6→**10→9**
+Brackets are short-window readings. Peaked at 10 (game 1150 window), settled at 9. Upward trend
+overall, but MCTS-driven rather than raw-value-driven after the game 1000 collapse (see below).
 
-**W/B balance:** Consistently near 50/50 across all full-length windows. Colour bias eliminated.
+**W/B balance:** Broadly balanced across full run (overall ~48%W/52%B). However a persistent black
+lean emerged from game 1000 onwards — five consecutive windows at 56–70% black. Not structural
+encoder bias (colour plane removed); attributed to self-play meta convergence (black found
+consistent counter-strategies against white's opening patterns). Not accelerating toward collapse
+but not reverting either — one reason for early stop.
 
 **Value head regression — game ~317 (1,745 steps):**
 
@@ -351,7 +364,59 @@ White missing queen sign flipped from +0.162 to -0.087 — value head now correc
 material deficit as bad. K+Q vs K (b move) nearly doubled in magnitude. K+Q vs K (w wins)
 still flat — winning positions harder to learn than losing ones at this stage.
 
-**Next regression: game 1000.**
+**Value head regression — game ~990 (5,060 steps) — PEAK:**
+
+| Position | Value | Expected |
+|----------|-------|----------|
+| Start | -0.028 | ~0.0 | ✓ |
+| K+Q vs K (w wins) | -0.677 | near +1 | ✗ (negative — asymmetry, see note) |
+| K+Q vs K (b move) | **-0.950** | near -1 | ✓ **target exceeded** |
+| White missing queen | +0.031 | < 0 | ✗ (tiny magnitude, noise) |
+
+K+Q vs K (b move) at -0.950 far exceeds the ±0.6 milestone target. The b-move position
+(from the loser's perspective) generalised extremely well. The w-wins position (from the
+winner's perspective) reads -0.677 rather than +1 — asymmetry explained by:
+1. "Lone king = losing" is a simpler, more uniform pattern than "K+Q = winning"
+2. The permanent buffer's canonical FENs differ geometrically from the regression test FENs
+3. Self-play data gives more loser-perspective endgame positions (material resign fires
+   on the loser's behalf, but winning-side late endgame positions are relatively sparse)
+
+**Eval vs random — game ~1000:**
+- As white: 0W / 18L / 82D (draws = cap draws; HAL not delivering checkmate)
+- As black: 0W / 13L / 87D
+- vs Stockfish depth 1/3/5: 100% losses (0 draws)
+- Overall HAL win rate vs random: 0.0%
+
+Expected at this stage. Value head developing but policy not yet delivering wins.
+
+**Value head regression — game ~1000 (5,160 steps) — COLLAPSE:**
+
+| Position | Value | Expected |
+|----------|-------|----------|
+| Start | -0.094 | ~0.0 |
+| K+Q vs K (w wins) | -0.030 | near +1 | ✗ collapsed |
+| K+Q vs K (b move) | -0.034 | near -1 | ✗ **collapsed from -0.950** |
+| White missing queen | -0.077 | < 0 | near zero |
+
+All values collapsed to near-zero in 100 training steps (5,060 → 5,160).
+Root cause: cap draw spike at game 1000 window (11 cap draws, avg length 87.1).
+Cap draws are assigned outcome 0.0 but contain late-game/endgame-like positions —
+training on them pushes the value head toward zero for position types that should
+be decisive. The permanent partition (12.5% of each batch) was insufficient to
+resist this gradient signal.
+
+**Value head regression — game ~1200 (6,060 steps) — CONFIRMED FLAT:**
+
+| Position | Value | Expected |
+|----------|-------|----------|
+| Start | -0.036 | ~0.0 |
+| K+Q vs K (w wins) | -0.017 | near +1 | ✗ |
+| K+Q vs K (b move) | -0.038 | near -1 | ✗ |
+| White missing queen | -0.037 | < 0 | near zero |
+
+Not recovering. Collapse confirmed stable. Value resigns still occurring (9–10/window)
+because MCTS with 200 simulations finds decisive tactical lines independently of raw
+network output — but the value head itself is no longer contributing signal.
 
 **Notable game events:**
 - Game 1: First checkmate (W wins, 85 moves) — seed buffer effect, training from game 1
@@ -360,6 +425,16 @@ still flat — winning positions harder to learn than losing ones at this stage.
 - Game 685: Bxh6 bishop sacrifice (takes pawn weakened by h7h6 on move 1), later Nxf7+ fork. Piece coordination and weak-square exploitation.
 - Games 671, 689: Value resigns at 72–83 moves in complex positional situations (not simple material collapses).
 - Game 816: Pawn promotion `b2b1q` — Black promotes pawn to queen in endgame, wins by material resign. First observed promotion in Run 7.
+
+**Key Run 7 findings:**
+1. Buffer seeding works — value head reached -0.950 by game 990 vs flat throughout all of Run 6
+2. Cap draws contaminate the value head — outcome 0.0 on positions that look like decisive endgames
+   directly contradicts canonical training signal, and overcame the 12.5% permanent partition
+3. Permanent partition at 12.5% too small — insufficient to maintain value signal under cap draw pressure
+4. Value resigns persist even with a collapsed raw value head — 200-sim MCTS finds tactical patterns
+   independently. Value resigns and regression tests measure different things.
+5. Black bias emerged post-game 1000 (self-play meta, not encoder structural issue) — 5 consecutive
+   windows 56–70% black before early stop
 
 ---
 
@@ -384,33 +459,36 @@ Key additions since Run 1:
 - `curate_buffer.py` — builds seed buffer from prior run data + canonical endgame positions
 - `train_chess.py` — RUN_NAME system, CKPT_LOAD/BUFFER_LOAD, tally tracking, buffer priority logic
 
-**Resume command:**
+**Run 8 start command:**
 ```bash
 caffeinate -dims venv/bin/python3 train_chess.py
 ```
 
 ---
 
-## What to Watch in Run 7
+## What to Watch in Run 8
 
 | Signal | What it means |
 |--------|---------------|
 | Value resigns per 50-game window | Core health signal. Growing = value head developing. Stable = plateau. Zero = investigate. |
-| Loss declining after plateau | Plateau hit ~5.27 at games 700–750. Decline started at game 800. Watch for continued fall. |
-| K+Q vs K regression | Game 1000 target: ≥ ±0.6. If still near zero, value head not generalising to endgames. |
-| Cap draws per window | <10 = healthy. >15 = consider loosening resign thresholds. |
-| W/B tally | Should stay near 50/50 each 50-game window. Sustained skew = investigate encoder. |
-| Checkmates per window | Currently sparse (0–2 per 50 games). Growing checkmate rate = closing technique developing. |
+| K+Q vs K regression (every 200 games) | Target ≥ ±0.6 by game 1000. Watch for collapse after draw spikes. |
+| Cap draw outcome mode | New: cap draws in material-imbalanced positions assigned ±0.8, not 0.0. Verify draws are balanced positions. |
+| Cap draws per window | <10 = healthy. A spike >10 is a warning — check if it triggers value collapse. |
+| W/B tally | Should stay near 50/50. Sustained skew = self-play meta issue, not encoder bias. |
+| Loss trajectory | Expect same arc: rise as seed→self-play transitions, plateau, then decline. |
 
 ---
 
 ## Next Milestones
 
-1. **Game 1000** — value head regression test. Target: K+Q vs K ≥ ±0.6. Then decide full eval.
-2. **Full eval vs random** — when regression shows meaningful values. Target: first wins.
-3. **Stage 2 resign** — once K+Q vs K reads ±0.9 consistently, remove material resign entirely. Value head takes sole responsibility — allows network to learn material comebacks and closing technique.
-4. **Run 8 seed buffer** — run `curate_buffer.py` after Run 7 completes. New buffer will use tiered format (canonical positions in permanent partition).
-5. **Phase 4** — UCI wrapper → Lichess bot account → ELO rating.
+1. **Run 8 seed buffer** — run `curate_buffer.py` using Run 7 data (games 800–1200, decisive only).
+2. **Fix cap draw outcomes** in `train_chess.py` — if `abs(material) > 3` at 50-move cap, assign ±0.8.
+3. **Increase permanent partition** — `curate_buffer.py` / `replay.py`: raise canonical share from 12.5% to 25% per batch.
+4. **Start Run 8** — fresh weights, Run 7 seed buffer, fixed cap draw labelling.
+5. **Regression every 200 games** — catch value collapse early rather than at game 1000.
+6. **Full eval vs random** — when regression shows K+Q vs K ≥ ±0.6 sustained across 2+ checkpoints.
+7. **Stage 2 resign** — once K+Q vs K reads ±0.9 consistently, remove material resign entirely.
+8. **Phase 4** — UCI wrapper → Lichess bot account → ELO rating.
 
 ---
 
