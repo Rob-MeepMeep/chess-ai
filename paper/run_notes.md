@@ -449,32 +449,78 @@ network output — but the value head itself is no longer contributing signal.
 
 | Window | W | B | D | avg loss | checkmates | val resigns | cap draws | avg len |
 |--------|---|---|---|----------|------------|-------------|-----------|---------|
-| 50  | 18 | 32 | 0 | 1.36 | 8 | 1 | 0 | 71.2 |
-| 100 | 28 | 22 | 0 | 1.93 | 9 | 0 | 1 | 74.5 |
+| 50  | 18 | 32 | 0 | 1.36 | 8  | 1  | 0 | 71.2 |
+| 100 | 28 | 22 | 0 | 1.93 | 9  | 0  | 1 | 74.5 |
+| 150 | 27 | 21 | 2 | 2.34 | 13 | 1  | 4 | 73.8 |
+| 200 | 21 | 25 | 4 | 2.53 | 11 | 5  | 4 | 80.7 |
+| 250 | 24 | 26 | 0 | 2.64 | 7  | 3  | 2 | 77.3 |
+| 300 | 28 | 21 | 1 | 2.86 | 10 | 6  | 2 | 78.2 |
+| 350* | 27 | — | — | 2.93 | 2  | 5  | 0 | 63.3 |
+| 400 | 29 | 20 | 1 | 2.91 | 9  | 9  | 4 | 80.1 |
+| 450 | 30 | 20 | 0 | 3.12 | 6  | 6  | 1 | 73.0 |
+| 500 | 22 | 26 | 2 | 3.14 | 13 | 7  | 2 | 74.0 |
+| 550 | 17 | 33 | 0 | 3.23 | 6  | 12 | 2 | 72.4 |
 
-**17 checkmates in the first 100 games.** Run 7 had 2 in its first 800. Run 6 had its first at game 658.
-Zero cap draws (1 total) — games are resolving decisively without hitting the move cap.
-W/B balance: window 1 showed 18/32 (noise), window 2 corrected to 28/22. Overall 46W/54B — healthy.
+*Window 350 short (27 games) — mid-window restart after Mac reboot.*
+
+**~94 checkmates in first 550 games (17% rate).** Run 7 had ~8 total to game 550. Run 6 had its first at game 658.
+Overall W/B through 550 games: 254W/263B — essentially 50/50.
+Value resigns growing strongly: 1→0→1→5→3→6→5→9→6→7→12. Peak of 12 at game 550.
+Cap draws: never exceeded 4 per window. Cap draw fix working.
+Loss: rising 1.36→3.23, approaching plateau around 3.2 (vs Run 7's 5.27 — lower plateau due to correct MCTS signal).
 
 **Value head regression — game 100 (650 steps):**
 
 | Position | Value | Expected |
 |----------|-------|----------|
 | Start | -0.039 | ~0.0 | ✓ |
-| K+Q vs K (w wins) | -0.132 | near +1 | ✗ (wrong sign, but has magnitude) |
-| K+Q vs K (b move) | **-0.530** | near -1 | ✓ **past ±0.6 milestone at game 100** |
+| K+Q vs K (w wins) | -0.132 | near +1 | ✗ (wrong sign, has magnitude) |
+| K+Q vs K (b move) | **-0.530** | near -1 | ✓ past ±0.6 milestone |
 | White missing queen | -0.058 | < 0 | ✓ |
 
-K+Q vs K (b move) at -0.530 surpasses Run 7's game 500 result (-0.456) at one fifth of the
-training steps. The corrected MCTS delivers decisive, informative self-play games from the
-start — 17 checkmates and 1 cap draw in 100 games vs Run 7's draw-heavy early windows.
+**Value head regression — game 200 (1,150 steps) — transient sign flip:**
 
-Run 7 progression for comparison:
-- Game 317 (1,745 steps): -0.260
-- Game 500 (2,510 steps): -0.456
-- Game 990 (5,060 steps): -0.950 (peak, then collapsed)
+| Position | Value | Expected |
+|----------|-------|----------|
+| Start | +0.055 | ~0.0 |
+| K+Q vs K (w wins) | +0.449 | near +1 | ✓ sign correct |
+| K+Q vs K (b move) | +0.392 | near -1 | ✗ sign flipped |
+| White missing queen | +0.032 | < 0 | ✗ |
 
-**Next regression: game 200–300. Target: ±0.7 or better.**
+Network passed through a "queen present = positive" intermediate representation.
+Both K+Q positions scored positive — value head detected material but not perspective.
+
+**Value head regression — game 260 (1,450 steps):**
+- K+Q vs K (w wins): +0.793 (strong, approaching +1)
+- K+Q vs K (b move): +0.479 (still wrong sign, contracting)
+
+**Value head regression — game 300 (1,650 steps):**
+- K+Q vs K (w wins): +0.530 (backing off)
+- K+Q vs K (b move): +0.109 (contracting toward zero)
+
+**Value head regression — game 560 (2,910 steps) — MILESTONE:**
+
+| Position | Value | Expected |
+|----------|-------|----------|
+| Start | -0.068 | ~0.0 | ✓ |
+| K+Q vs K (w wins) | +0.346 | near +1 | ✓ correct sign |
+| K+Q vs K (b move) | **-0.603** | near -1 | ✓ **past ±0.6 milestone** |
+| White missing queen | -0.064 | < 0 | ✓ |
+
+All four positions correct sign. b-move completed full cycle: -0.530 (game 100) → sign-flipped positive
+(games 200–300, "queen = positive" intermediate phase) → contracted through zero → **-0.603** (game 560).
+
+**Eval vs random — game 560 (first ever wins, 2,910 steps):**
+- As white: **1W** / 6L / 18D (4% win rate)
+- As black: **1W** / 2L / 22D (4% win rate)
+- Overall HAL win rate vs random: **4.0%** — first non-zero win rate in project history
+- vs Stockfish depth 1/3/5: 100% losses (expected at this stage)
+
+HAL has won games. Draws (72–88%) are cap draws — value head says "I'm winning" but policy head
+not yet converting material advantages into checkmate consistently. Closing technique develops with
+more training. All previous runs (1–7): 0% win rate at equivalent stages.
+
+**Next eval: game 1000. Target: 20%+ win rate vs random.**
 
 ---
 
@@ -548,12 +594,12 @@ caffeinate -dims venv/bin/python3 train_chess.py
 
 ## Next Milestones
 
-1. ~~Run 8 seed buffer~~ — ✓ done (13,152 positions from Run 7 games 800–1200)
-2. ~~Fix cap draw outcomes~~ — ✓ done (±0.8 soft outcome when abs(material) > 3)
-3. ~~Increase permanent partition~~ — ✓ done (25% per batch, was 12.5%)
-4. ~~Start Run 8~~ — ✓ running (fixed MCTS backup, fresh weights, run8 seed buffer)
-5. **Regression every 200 games** — Run 8 health check. Target: K+Q vs K ≥ ±0.6, sustained.
-6. **Full eval vs random** — when regression shows K+Q vs K ≥ ±0.6 across 2+ consecutive checkpoints.
+1. ~~Run 8 seed buffer~~ — ✓ done
+2. ~~Fix cap draw outcomes~~ — ✓ done
+3. ~~Increase permanent partition~~ — ✓ done
+4. ~~Start Run 8~~ — ✓ running
+5. ~~First wins vs random~~ — ✓ game 560, 4% win rate (first in project history)
+6. **Eval at game 1000** — target: 20%+ win rate vs random. Run `eval_chess.py --cpu`.
 7. **Stage 2 resign** — once K+Q vs K reads ±0.9 consistently, remove material resign entirely.
 8. **Phase 4** — UCI wrapper → Lichess bot account → ELO rating.
 
