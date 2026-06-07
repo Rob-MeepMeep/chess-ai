@@ -19,6 +19,7 @@ means confident exploitation. A flat one means still exploring.
 
 import os
 import csv
+import time
 import chess
 import torch
 from collections import defaultdict
@@ -55,17 +56,22 @@ class Logger:
 
         self._end_reason_path = os.path.join(log_dir, "end_reasons.csv")
 
+        # NOTE: steps and timestamp columns were added mid-Run 8 (game ~1000).
+        # Rows written before that point do not have these columns — the header
+        # in existing run8 CSVs will not match. Acceptable for a training log;
+        # use the column name rather than position when reading in pandas.
         self._init_csv(self._perf_path, [
             "game", "white_wins", "black_wins", "draws",
             "avg_loss", "avg_game_length",
             "len_0_20", "len_21_40", "len_41_60", "len_61_80", "len_81plus",
+            "steps", "timestamp",
         ])
         self._init_csv(self._end_reason_path, [
             "game", "checkmates", "material_resigns", "value_resigns",
             "cap_draws", "rule_draws",
         ])
         self._init_csv(self._games_path, [
-            "game", "outcome", "end_reason", "n_moves", "loss", "moves",
+            "game", "outcome", "end_reason", "n_moves", "loss", "steps", "timestamp", "moves",
         ])
         self._init_csv(self._opening_path, ["game", "moves"])
         self._init_csv(self._snapshot_path, [
@@ -82,7 +88,8 @@ class Logger:
 
     def record_game(self, game_num: int, winner,
                     moves: list, loss: float,
-                    end_reason: str = "unknown") -> None:
+                    end_reason: str = "unknown",
+                    steps: int = 0) -> None:
         """
         Call after every completed game.
 
@@ -91,13 +98,16 @@ class Logger:
         loss       : training loss for this game's batch (0.0 if no training step yet)
         end_reason : one of "checkmate", "material_resign", "value_resign",
                      "cap_draw", "rule_draw"
+        steps      : agent.steps at game completion — enables elapsed-time accounting
         """
-        # Full game record — every move, raw stats, written per game
+        ts = time.strftime("%Y-%m-%d %H:%M:%S")
         outcome_str = "W" if winner == chess.WHITE else "B" if winner == chess.BLACK else "D"
         self._append(self._games_path, [
             game_num, outcome_str, end_reason,
-            len(moves), f"{loss:.6f}", " ".join(moves),
+            len(moves), f"{loss:.6f}", steps, ts, " ".join(moves),
         ])
+        # Keep the latest step count so _flush_performance can record it
+        self._window["steps"] = steps
 
         # Opening sequence — first 12 moves for pattern analysis
         opening = " ".join(moves[:12]) if moves else ""
@@ -161,6 +171,7 @@ class Logger:
             # Keys match end_reason strings from train_chess.py exactly
             "checkmate": 0, "material_resign": 0,
             "value_resign": 0, "cap_draw": 0, "rule_draw": 0,
+            "steps": 0,
         }
 
     def _flush_performance(self, game_num: int) -> None:
@@ -185,6 +196,8 @@ class Logger:
             buckets.get("41_60", 0),
             buckets.get("61_80", 0),
             buckets.get("81_81plus", 0),
+            w["steps"],
+            time.strftime("%Y-%m-%d %H:%M:%S"),
         ])
         self._append(self._end_reason_path, [
             game_num,

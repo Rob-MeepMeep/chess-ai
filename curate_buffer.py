@@ -1,13 +1,13 @@
 """
-curate_buffer.py — Build a high-quality seed buffer for Run 8.
+curate_buffer.py — Build a high-quality seed buffer for Run 9.
 
-Reads the run7 game log, filters out low-quality games, replays the
+Reads the run8 game log, filters out low-quality games, replays the
 surviving games move-by-move to extract positions, adds canonical
 endgame positions with correct outcomes, and saves the result as a
-seed buffer file that Run 8 can load on startup.
+seed buffer file that Run 9 can load on startup.
 
 Why: the bootstrapping problem. Early self-play generates noise — both
-sides random, outcomes meaningless. Starting Run 8 with this curated
+sides random, outcomes meaningless. Starting Run 9 with this curated
 buffer means the value head gets real signal from gradient step 1
 instead of from game ~500.
 
@@ -26,11 +26,12 @@ Usage:
 Output:
   checkpoints/run8_seed_buffer.pt
 
-Then in train_chess.py for Run 8, set:
-  BUFFER_LOAD = "checkpoints/run8_seed_buffer.pt"
+Then in train_chess.py for Run 9, set:
+  BUFFER_LOAD = "checkpoints/run9_seed_buffer.pt"
 """
 
 import csv
+import random
 import chess
 import torch
 
@@ -41,18 +42,19 @@ from chessai.replay   import ReplayBuffer
 # Configuration
 # ---------------------------------------------------------------------------
 
-GAMES_CSV      = "logs/run7/games.csv"
-OUTPUT_PATH    = "checkpoints/run8_seed_buffer.pt"
+GAMES_CSV      = "logs/run8/games.csv"
+OUTPUT_PATH    = "checkpoints/run9_seed_buffer.pt"
 
 # Game quality filters
-MIN_GAME       = 800     # skip early training — value head developing from ~800
+MIN_GAME       = 1500    # use late Run 8 only — coherent play from ~1500 onwards
 MIN_MOVES      = 20      # skip overconfident short games
 MAX_MOVES      = 100     # skip very long games that may be random shuffling
 GOOD_REASONS   = {"material_resign", "checkmate"}  # decisive, trustworthy outcomes
 
 # Canonical positions: (FEN, outcome from current player's perspective)
-# Repeated CANONICAL_REPEATS times each so they have weight in the buffer
-CANONICAL_REPEATS = 200
+# Repeated CANONICAL_REPEATS times — reduced from 200 now that diverse K+Q vs K
+# positions supplement these. Diversity provides the signal; repetition is less important.
+CANONICAL_REPEATS = 5
 CANONICAL_POSITIONS = [
     # K+Q vs K — trivially decisive endgames
     ("8/8/8/3K4/8/8/8/3kQ3 w - - 0 1",  1.0),   # white to move, white wins
@@ -67,7 +69,53 @@ CANONICAL_POSITIONS = [
     ("r1bqkb1r/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",  0.7),  # black missing knight
 ]
 
+N_DIVERSE_PAIRS = 128   # generates 256 positions total (128 W-to-move + 128 B-to-move)
+
 BUFFER_CAPACITY = 50_000
+
+
+def generate_diverse_kq_vs_k(num_pairs=128):
+    """
+    Generates a spatially diverse set of valid K+Q vs K positions.
+    Returns a list of (chess.Board, outcome_float) tuples.
+    num_pairs White-to-move positions (+1.0) and num_pairs Black-to-move positions (-1.0).
+    Outcomes are from the current player's perspective — consistent with canonical encoding.
+    """
+    positions = []
+    seen_fens = set()
+
+    while len(positions) < num_pairs * 2:
+        squares = random.sample(list(chess.SQUARES), 3)
+        wk_sq, wq_sq, bk_sq = squares[0], squares[1], squares[2]
+
+        board = chess.Board(None)
+        board.set_piece_at(wk_sq, chess.Piece(chess.KING, chess.WHITE))
+        board.set_piece_at(wq_sq, chess.Piece(chess.QUEEN, chess.WHITE))
+        board.set_piece_at(bk_sq, chess.Piece(chess.KING, chess.BLACK))
+
+        # White to move — current player (White) has the queen and is winning
+        board_w = board.copy()
+        board_w.turn = chess.WHITE
+        if (board_w.is_valid()
+                and not board_w.is_checkmate()
+                and not board_w.is_stalemate()):
+            fen_w = board_w.fen()
+            if fen_w not in seen_fens:
+                positions.append((board_w, 1.0))
+                seen_fens.add(fen_w)
+
+        # Black to move — current player (Black) has no queen and is losing
+        board_b = board.copy()
+        board_b.turn = chess.BLACK
+        if (board_b.is_valid()
+                and not board_b.is_checkmate()
+                and not board_b.is_stalemate()):
+            fen_b = board_b.fen()
+            if fen_b not in seen_fens:
+                positions.append((board_b, -1.0))
+                seen_fens.add(fen_b)
+
+    return positions[:num_pairs * 2]
 
 # ---------------------------------------------------------------------------
 # Load and filter games
@@ -77,13 +125,22 @@ print(f"Reading {GAMES_CSV}...")
 selected = []
 
 with open(GAMES_CSV, newline="") as f:
-    reader = csv.DictReader(f)
-    for row in reader:
-        game_num   = int(row["game"])
-        n_moves    = int(row["n_moves"])
-        end_reason = row["end_reason"]
-        outcome    = row["outcome"]
-        moves      = row["moves"].split()
+    next(f)  # skip header
+    for line in f:
+        parts = line.strip().split(",")
+        if len(parts) < 6:
+            continue
+        game_num   = int(parts[0])
+        outcome    = parts[1]
+        end_reason = parts[2]
+        n_moves    = int(parts[3])
+        # Run 8 games.csv has mixed formats: steps/timestamp columns were added
+        # mid-run (~game 1000). Old rows: 6 cols (moves at index 5).
+        # New rows: 8 cols (steps at 5, timestamp at 6, moves at 7+).
+        if len(parts) >= 8 and parts[5].isdigit():
+            moves = " ".join(parts[7:]).split()
+        else:
+            moves = " ".join(parts[5:]).split()
 
         if game_num < MIN_GAME:
             continue
@@ -149,18 +206,30 @@ print(f"  {positions_from_games:,} positions extracted from game replays")
 # ---------------------------------------------------------------------------
 
 canonical_batch = []
-canonical_count = 0
+
+# Static canonical positions — K+R vs K, opening reference, material imbalance
+static_count = 0
 for fen, outcome in CANONICAL_POSITIONS:
     board = chess.Board(fen)
     state = encode([board])
     policy = torch.zeros(4096)
-
     for _ in range(CANONICAL_REPEATS):
         canonical_batch.append((state, policy, float(outcome)))
-        canonical_count += 1
+        static_count += 1
+
+# Diverse K+Q vs K positions — 256 unique spatial configurations
+# Each position encoded once; diversity replaces repetition as the learning signal.
+diverse_positions = generate_diverse_kq_vs_k(N_DIVERSE_PAIRS)
+diverse_count = 0
+for board, outcome in diverse_positions:
+    state  = encode([board])
+    policy = torch.zeros(4096)
+    canonical_batch.append((state, policy, float(outcome)))
+    diverse_count += 1
 
 buf.add_permanent(canonical_batch)
-print(f"  {canonical_count:,} canonical positions added to permanent partition ({len(CANONICAL_POSITIONS)} × {CANONICAL_REPEATS})")
+print(f"  {static_count:,} static canonical positions ({len(CANONICAL_POSITIONS)} × {CANONICAL_REPEATS})")
+print(f"  {diverse_count:,} diverse K+Q vs K positions ({N_DIVERSE_PAIRS} pairs, 1 each)")
 
 # ---------------------------------------------------------------------------
 # Save

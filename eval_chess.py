@@ -21,7 +21,10 @@ MPS backend. Bump them to 100/50 for the final paper benchmark after training en
 """
 
 import argparse
+import csv
+import os
 import random
+import time
 import chess
 import chess.engine
 import torch
@@ -33,12 +36,14 @@ from chessai.encoder import encode
 # Configuration
 # ---------------------------------------------------------------------------
 
-N_GAMES_RANDOM     = 25    # trimmed for concurrent use — bump to 100 for final paper benchmark
-N_GAMES_STOCKFISH  = 10    # trimmed for concurrent use — bump to 50 for final paper benchmark
+N_GAMES_RANDOM     = 25    # bump to 100 for final paper benchmark
+N_GAMES_STOCKFISH  = 25    # 25 per matchup — enough for meaningful numbers in a proper benchmark
 N_GAMES_PREV       = 25    # games vs previous checkpoint
-N_SIMULATIONS      = 50    # HAL's simulations per move during eval (greedy)
+N_SIMS_RANDOM      = 50    # sims vs random — lower is fine, random doesn't punish weak play
+# Per-depth sim counts — higher depths warrant more search to have any chance
+SIMS_BY_DEPTH      = {1: 200, 3: 500, 5: 500}
 MAX_GAME_MOVES     = 200   # hard cap
-CKPT_PATH          = "checkpoints/run8_hal_chess.pt"
+CKPT_PATH          = "checkpoints/run9_hal_chess.pt"
 STOCKFISH_PATH     = "stockfish"   # assumes stockfish is on PATH
 
 # ---------------------------------------------------------------------------
@@ -72,7 +77,7 @@ if args.cpu:
 # Load HAL
 # ---------------------------------------------------------------------------
 
-hal = ChessAgent(device, n_simulations=N_SIMULATIONS)
+hal = ChessAgent(device, n_simulations=N_SIMS_RANDOM)
 hal.load(CKPT_PATH)
 print(f"Loaded HAL-4000")
 print(f"  Trained steps: {hal.steps:,}")
@@ -90,7 +95,7 @@ REGRESSION_POSITIONS = {
     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1": ("start",              "~0.0"),
     "8/8/8/8/8/6K1/6Q1/7k w - - 0 1":                            ("K+Q vs K (w wins)", "near +1"),
     "8/8/8/8/8/6K1/6Q1/7k b - - 0 1":                            ("K+Q vs K (b move)", "near -1"),
-    "rnbqkbnr/pppppppp/8/8/8/8/PPPP1PPP/RNBQKBNR w KQkq - 0 1": ("white missing queen", "< 0"),
+    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1": ("white missing queen", "< 0"),
 }
 
 print("── Value Head Regression ───────────────────────────────────\n")
@@ -105,9 +110,19 @@ print()
 # ---------------------------------------------------------------------------
 
 def hal_move(board: chess.Board, history: list) -> str:
-    """HAL plays greedily — no noise, argmax on visit counts."""
+    """HAL plays greedily at N_SIMS_RANDOM — fast, sufficient against random."""
     move_uci, _ = hal.choose_move(board, history, greedy=True)
     return move_uci
+
+def hal_move_at(n_sims: int):
+    """Return a move function that runs HAL at the given simulation count."""
+    def _move(board: chess.Board, history: list) -> str:
+        orig = hal.n_simulations
+        hal.n_simulations = n_sims
+        move_uci, _ = hal.choose_move(board, history, greedy=True)
+        hal.n_simulations = orig
+        return move_uci
+    return _move
 
 def random_move(board: chess.Board, history: list) -> str:
     return random.choice([m.uci() for m in board.legal_moves])
@@ -123,16 +138,16 @@ def stockfish_move(engine: chess.engine.SimpleEngine, depth: int):
 # Game runner
 # ---------------------------------------------------------------------------
 
-def play_game(white_fn, black_fn) -> str:
+def play_game(white_fn, black_fn):
     """
-    Play one game. Returns result string: '1-0', '0-1', or '1/2-1/2'.
-    '*' if the move cap was hit (treated as draw in scoring).
+    Play one game. Returns (result, move_list).
+    result is '1-0', '0-1', '1/2-1/2', or '*' (move cap hit).
     """
-    board   = chess.Board()
-    history = []
-    moves   = 0
+    board     = chess.Board()
+    history   = []
+    move_list = []
 
-    while not board.is_game_over() and moves < MAX_GAME_MOVES:
+    while not board.is_game_over() and len(move_list) < MAX_GAME_MOVES:
         if board.turn == chess.WHITE:
             move_uci = white_fn(board, history)
         else:
@@ -140,9 +155,36 @@ def play_game(white_fn, black_fn) -> str:
 
         history = ([board.copy()] + history)[:3]
         board.push_uci(move_uci)
-        moves += 1
+        move_list.append(move_uci)
 
-    return board.result() if board.is_game_over() else "*"
+    result = board.result() if board.is_game_over() else "*"
+    return result, move_list
+
+# ---------------------------------------------------------------------------
+# Eval game log — one row per game, written to logs/run8/eval_games.csv
+# ---------------------------------------------------------------------------
+
+_EVAL_LOG_PATH = os.path.join("logs", "run9", "eval_games.csv")
+_eval_game_num = 0   # sequential across the whole eval run
+
+def _init_eval_log() -> None:
+    os.makedirs(os.path.dirname(_EVAL_LOG_PATH), exist_ok=True)
+    if not os.path.exists(_EVAL_LOG_PATH):
+        with open(_EVAL_LOG_PATH, "w", newline="") as f:
+            csv.writer(f).writerow([
+                "eval_game", "matchup", "result", "n_moves",
+                "hal_steps", "timestamp", "moves",
+            ])
+
+def _log_eval_game(matchup: str, result: str, move_list: list) -> None:
+    global _eval_game_num
+    _eval_game_num += 1
+    with open(_EVAL_LOG_PATH, "a", newline="") as f:
+        csv.writer(f).writerow([
+            _eval_game_num, matchup, result, len(move_list),
+            hal.steps, time.strftime("%Y-%m-%d %H:%M:%S"),
+            " ".join(move_list),
+        ])
 
 # ---------------------------------------------------------------------------
 # Evaluation runner
@@ -153,7 +195,9 @@ def evaluate(label: str, white_fn, black_fn, n: int) -> dict:
     white_wins = black_wins = draws = 0
 
     for i in range(n):
-        result = play_game(white_fn, black_fn)
+        result, move_list = play_game(white_fn, black_fn)
+        _log_eval_game(label, result, move_list)
+
         if result == "1-0":
             white_wins += 1
         elif result == "0-1":
@@ -182,8 +226,9 @@ if args.regression_only:
     print("Done.")
     exit(0)
 
+_init_eval_log()
 print("=" * 60)
-print()
+print(f"Eval games logged to: {_EVAL_LOG_PATH}\n")
 
 # --- Tier 1: vs Random ---
 print("── Tier 1: HAL vs Random ──────────────────────────────────\n")
@@ -203,11 +248,14 @@ try:
     engine.configure({"Threads": 1, "Hash": 16})   # 1 thread, 16MB hash — prevent unified memory bloat
 
     for depth in [1, 3, 5]:
+        n_sims = SIMS_BY_DEPTH.get(depth, 200)
+        hal_sf = hal_move_at(n_sims)
         sf_move = stockfish_move(engine, depth)
+        print(f"  (HAL using {n_sims} simulations at depth {depth})\n")
         evaluate(f"3. HAL (White) vs Stockfish depth {depth}",
-                 hal_move, sf_move, N_GAMES_STOCKFISH)
+                 hal_sf, sf_move, N_GAMES_STOCKFISH)
         evaluate(f"4. Stockfish depth {depth} (White) vs HAL (Black)",
-                 sf_move, hal_move, N_GAMES_STOCKFISH)
+                 sf_move, hal_sf, N_GAMES_STOCKFISH)
 
     engine.quit()
 

@@ -41,14 +41,16 @@ SNAPSHOT_EVERY   = 50      # log MCTS strategy snapshots every N games
 PRINT_EVERY      = 10       # print progress line every N games
 RESIGN_THRESHOLD   = -0.95  # value head score below which a position is hopeless
 RESIGN_CONSECUTIVE = 5      # raised from 3 — let positions breathe, force more closing technique
-RESIGN_MATERIAL    = 7      # raised from 5 — resign only on larger imbalances (rook+bishop worth)
+RESIGN_MATERIAL    = 3      # lowered from 7 for Run 9 — forces HAL to grind out major advantages
+                            # (rook/queen up) rather than resigning early; floods rolling buffer
+                            # with winning-side positions to balance the b-move training signal
 
 # Run identity — change RUN_NAME to start a new named run with its own logs and buffer.
 # CKPT_LOAD: None = load RUN_NAME's own checkpoint; set to a path to seed weights from another run.
 # BUFFER_LOAD: None = load RUN_NAME's own buffer; set to a path to load from another run.
-RUN_NAME    = "run8"
-CKPT_LOAD   = None                                      # fresh weights — no inherited bias
-BUFFER_LOAD = "checkpoints/run8_seed_buffer.pt"         # curated seed buffer from run7
+RUN_NAME    = "run9"
+CKPT_LOAD   = "checkpoints/run8_hal_chess.pt"           # continue from run8 — encoder unchanged, value head has good foundation
+BUFFER_LOAD = "checkpoints/run9_seed_buffer.pt"         # curated seed buffer from run8
 
 CKPT_PATH   = f"checkpoints/{RUN_NAME}_hal_chess.pt"
 BUFFER_PATH = f"checkpoints/{RUN_NAME}_replay_buffer.pt"
@@ -76,10 +78,16 @@ replay = ReplayBuffer()
 logger = Logger(log_dir=LOG_DIR, snapshot_interval=SNAPSHOT_EVERY)
 
 start_game = 0
-_ckpt_to_load = CKPT_LOAD or CKPT_PATH
+# Prefer the run's own checkpoint on resume; fall back to CKPT_LOAD for a fresh start.
+# Mirrors the buffer logic — CKPT_LOAD is only used when no own checkpoint exists yet.
+if os.path.exists(CKPT_PATH):
+    _ckpt_to_load = CKPT_PATH
+    if CKPT_LOAD and CKPT_LOAD != CKPT_PATH:
+        print(f"  Note: CKPT_LOAD ignored — own checkpoint found at {CKPT_PATH}")
+else:
+    _ckpt_to_load = CKPT_LOAD or CKPT_PATH
 if os.path.exists(_ckpt_to_load):
     agent.load(_ckpt_to_load)
-    # Only resume game number if continuing the same run's own checkpoint
     if _ckpt_to_load == CKPT_PATH:
         openings_path = os.path.join(LOG_DIR, "openings.csv")
         if os.path.exists(openings_path):
@@ -166,7 +174,7 @@ for game_num in range(start_game + 1, N_GAMES + 1):
         v            = agent.get_value(board, history)
         mat          = _material_balance(board)
         mat_hopeless = abs(mat) > RESIGN_MATERIAL
-        val_hopeless = abs(v) > abs(RESIGN_THRESHOLD)
+        val_hopeless = abs(v) > 0.95   # RESIGN_THRESHOLD magnitude
         if mat_hopeless or val_hopeless:
             resign_streak += 1
             # Record which condition fired first (material takes priority if both true)
@@ -224,7 +232,7 @@ for game_num in range(start_game + 1, N_GAMES + 1):
             loss  = agent.train(batch)
 
     # --- Logging ---
-    logger.record_game(game_num, winner, moves, loss, end_reason)
+    logger.record_game(game_num, winner, moves, loss, end_reason, steps=agent.steps)
 
     if game_num % SNAPSHOT_EVERY == 0:
         logger.record_snapshot(game_num, agent)
