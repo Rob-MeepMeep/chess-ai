@@ -745,6 +745,62 @@ Run 8 has reached its structural ceiling. The Geometry Trap (sparse winning-side
 
 ---
 
+## Run 9 — COMPLETE (game 1000, 15,135 steps, 2026-06-07)
+
+**Config:** Continue from Run 8 checkpoint (10,160 steps). RESIGN_MATERIAL lowered 7→3. Diverse permanent partition (256 K+Q vs K spatial configurations). Seed buffer from Run 8 games 1500–2010.
+
+### Final Results
+
+| Metric | Game 410 | Game 1000 |
+|--------|----------|-----------|
+| w-wins | +0.9990 | +0.9477 |
+| b-move | −0.9968 | −0.9951 |
+| start | −0.026 | −0.117 |
+| white missing queen | −0.014 | −0.108 |
+| HAL as White vs random | 0% | 8% |
+| HAL as Black vs random | 24% | 12% |
+| Overall vs random | 12% | 10% |
+| vs Stockfish depth 1 | 0% | 0% |
+| Loss range | — | 1.6–1.9 |
+
+### Key findings
+
+**Geometry Trap resolved.** w-wins reached +0.9990 at game 410 — Run 8 never exceeded +0.048 across 2010 games. RESIGN_MATERIAL=3 combined with the diverse permanent partition (256 K+Q vs K configurations) broke the data distribution asymmetry that caused the trap. Both value head signals now near-saturated and stable.
+
+**First White wins vs random.** HAL won 2/25 games as White at game 1000 (was 0/25 at game 410). First confirmed White wins in the project. The w-wins fix translated into play, slowly.
+
+**Black performance regression.** HAL dropped from 24% to 12% wins as Black, and lost 4/25 games to random — something that did not happen at game 410. The policy head is mid-transition: calibrated to the old value landscape (Black-dominant) and not yet converged to the rebalanced one. The start position value drifting to −0.117 (from −0.026) is a related signal — the network is developing a mild Black-favoured prior.
+
+**f2f3 opening bias.** Policy head cycled between 21–70% preference for 1. f2f3 throughout the run (snapshots at games 50–850). Self-play local minimum: f2f3 leads to closed structures that HAL handles better than open tactical play, creating a positive feedback loop. Oscillation rather than monotonic lock-in confirms the policy is still learning, but keeps returning to the same local optimum.
+
+**Loss trajectory.** 1.6–1.9 throughout (well below Run 8's 3.0–3.8), reflecting the continuing from Run 8 weights advantage. Zero cap draws throughout — contamination fix held.
+
+**W/B balance.** 25/25 at the game 800 window. Geometry Trap resolved in self-play balance.
+
+**No Stockfish progress.** 100% losses both colours throughout. First draws vs Stockfish depth 1 remain the next benchmark.
+
+### Decision: close Run 9, start Run 10
+
+Run 9's structural ceiling is the policy head local minimum. Without Dirichlet noise at the MCTS root, the f2f3 cycle will persist and the White/Black rebalancing will not resolve cleanly. The value head is healthy and should be carried forward.
+
+**Run 10 plan:**
+- Continue from Run 9 weights
+- Dirichlet noise at MCTS root (α=0.3, ε=0.25) — primary change
+- Seed from Run 9 games 800–1000 (decisive, both-colour wins)
+- RESIGN_MATERIAL=3 retained
+
+**Run 10 fix — Dirichlet noise at MCTS root:**
+
+Standard AlphaZero adds noise to the root node policy during training to force exploration of minority moves:
+
+```
+p_noisy = (1 - ε) × p_network + ε × Dirichlet(α)
+```
+
+Standard values for chess (AlphaZero paper): **α = 0.3, ε = 0.25**. Applied at root node only, training only (not eval). Change location: `chessai/mcts.py`, in the root node policy initialisation. Breaks opening lock-in by ensuring the agent always samples non-preferred moves during self-play, even when the policy is highly confident.
+
+---
+
 ## Working Style Notes
 
 - Rob Kirkland is the project lead, learning ML/Python through this project. Explain before writing — the *why* matters.
