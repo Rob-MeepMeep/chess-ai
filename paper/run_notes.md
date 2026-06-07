@@ -460,14 +460,32 @@ network output — but the value head itself is no longer contributing signal.
 | 450 | 30 | 20 | 0 | 3.12 | 6  | 6  | 1 | 73.0 |
 | 500 | 22 | 26 | 2 | 3.14 | 13 | 7  | 2 | 74.0 |
 | 550 | 17 | 33 | 0 | 3.23 | 6  | 12 | 2 | 72.4 |
+| 600 | 23 | 26 | 1 | 3.56 | 8  | 9  | 4 | 75.3 |
+| 650 | 32 | 14 | 4 | 3.75 | 7  | 12 | 4 | 81.4 |
+| 700 | 24 | 25 | 1 | 3.84 | 4  | 13 | 3 | 72.6 |
+| 750 | 30 | 18 | 2 | 3.76 | 5  | 4  | 4 | 77.5 |
+| 800* | 5 | 14 | 1 | 3.61 | 4  | 4  | 2 | 68.3 |
+| 850 | 22 | 26 | 2 | 3.61 | 13 | 8  | 3 | 79.2 |
+| 900  | 29 | 19 | 2 | 3.57 | 6  | 8  | 8 | 85.6 |
+| 950  | 28 | 19 | 3 | 3.55 | 9  | 6  | 3 | 80.7 |
+| 1000 | 25 | 23 | 2 | 3.48 | 9  | 7  | 3 | 73.6 |
+| 1050 | 18 | 31 | 1 | 3.42 | 8  | 4  | 2 | 72.5 |
+| 1100 | 22 | 26 | 2 | 3.41 | 15 | 8  | 3 | 71.9 |
+| 1150 | 28 | 22 | 0 | 3.39 | 7  | 3  | 3 | 73.2 |
+| 1200 | 25 | 25 | 0 | 3.36 | 11 | 5  | 1 | 69.2 |
+| 1250 | 29 | 19 | 2 | 3.30 | 7  | 5  | 3 | 77.0 |
+| 1300 | 27 | 20 | 3 | 3.26 | 7  | 7  | 5 | 80.3 |
+| 1350 | 23 | 26 | 1 | 3.28 | 8  | 6  | 3 | 74.9 |
+| 1400 | 32 | 17 | 1 | 3.26 | 9  | 8  | 3 | 74.9 |
 
 *Window 350 short (27 games) — mid-window restart after Mac reboot.*
+*Window 800 short (20 games) — cause unknown; partial window only.*
 
-**~94 checkmates in first 550 games (17% rate).** Run 7 had ~8 total to game 550. Run 6 had its first at game 658.
-Overall W/B through 550 games: 254W/263B — essentially 50/50.
-Value resigns growing strongly: 1→0→1→5→3→6→5→9→6→7→12. Peak of 12 at game 550.
-Cap draws: never exceeded 4 per window. Cap draw fix working.
-Loss: rising 1.36→3.23, approaching plateau around 3.2 (vs Run 7's 5.27 — lower plateau due to correct MCTS signal).
+**~231 checkmates in first 1,400 games (16% rate).** Run 7 had ~8 total to game 550. Run 6 had its first at game 658.
+W/B balance: broadly 50/50 throughout. White wins now slightly dominating checkmates (30W/24B in games 1101–1440) — early run was B-heavy due to Qh4/Qh5 patterns; both sides now more balanced.
+Value resigns: stable 5–8 per window from game 950 onwards.
+Cap draws: never exceeded 8 per window. Fix working throughout.
+Loss: 1.36→3.84 (plateau ~game 700), then declining continuously to **3.26 at game 1400** — new run low. Lower plateau than Run 7 (3.26 vs 5.27) attributed to correct MCTS backup signal.
 
 **Value head regression — game 100 (650 steps):**
 
@@ -520,7 +538,79 @@ HAL has won games. Draws (72–88%) are cap draws — value head says "I'm winni
 not yet converting material advantages into checkmate consistently. Closing technique develops with
 more training. All previous runs (1–7): 0% win rate at equivalent stages.
 
-**Next eval: game 1000. Target: 20%+ win rate vs random.**
+**Value head regression — game 750 (3,900 steps) — buffer transition oscillation:**
+
+| Position | Value | Expected |
+|----------|-------|----------|
+| Start | +0.020 | ~0.0 |
+| K+Q vs K (w wins) | **-0.290** | near +1 | ✗ wrong sign |
+| K+Q vs K (b move) | -0.195 | near -1 | ✓ sign correct, magnitude weak |
+| White missing queen | +0.011 | < 0 | ✗ near zero |
+
+Regression from game 560 (-0.603 b-move). Both canonical positions scored negative — network
+saying "player to move loses" in both cases regardless of who has the queen. Attributed to
+buffer transition (~game 670): seed data fully displaced, pure self-play now dominant. Recent
+self-play had white winning 29W/18B (window 750) — possible white-wins skew in rolling buffer.
+Value resigns also dropped sharply (12 → 4 at window 750), corroborating value head weakening.
+Assessment: known oscillation at buffer transition; not a collapse. Loss still declining.
+
+**Value head regression — game 1000 (5,110 steps):**
+
+| Position | Value | Expected |
+|----------|-------|----------|
+| Start | **+0.268** | ~0.0 | ✗ positive bias |
+| K+Q vs K (w wins) | +0.182 | near +1 | ✓ sign correct, magnitude weak |
+| K+Q vs K (b move) | -0.116 | near -1 | ✓ sign correct, magnitude weak |
+| White missing queen | +0.258 | < 0 | ✗ wrong sign |
+
+All four positions clustered +0.12 to +0.27. Value head not discriminating well.
+Start position at +0.27 (should be ~0) suggests a systematic positive bias — network
+may have learned "current player tends to win" from recent self-play skew rather than
+genuine position evaluation. White missing queen scoring +0.26 (should be negative) is
+concerning. Value resigns have recovered (8 at windows 850 and 900) so MCTS tactical
+sense is intact even as the value head oscillates.
+
+**Eval vs random — game 1000 (5,110 steps):**
+- As white: 2W / 1L / 22D (**8% win rate**)
+- As black: 4W / 2L / 19D (**16% win rate**)
+- Overall HAL win rate vs random: **12.0%** — 3× improvement from game 560
+- vs Stockfish depth 1/3/5: 100% losses (expected)
+
+12% win rate despite a weak value head — improvement is policy-head driven. HAL as Black
+outperforms as White (16% vs 8%), consistent with self-play patterns where Black has
+learned to exploit the Qh4/Qh5 opening traps. Draws (76–88%) remain cap draws; checkmate
+conversion still the main gap. 20% target not met; trajectory is right and loss is still
+declining. Continue training.
+
+**Value head regression — game ~1420 (7,260 steps):**
+
+| Position | Value | Expected |
+|----------|-------|----------|
+| Start | +0.017 | ~0.0 | ✓ |
+| K+Q vs K (w wins) | **-0.812** | near +1 | ✗ sign flipped again |
+| K+Q vs K (b move) | **-0.838** | near -1 | ✓ new Run 8 record |
+| White missing queen | +0.024 | < 0 | ✗ near zero |
+
+Both canonical positions scoring ~-0.82. Value head has learned the endgame is decisive (strong
+magnitude) but is outputting the same negative sign regardless of whose turn it is — detecting
+board structure without separating perspective. Same asymmetry observed in Run 7 (b-move peaked
+at -0.950 while w-wins stayed negative). b-move at -0.838 is the strongest reading in Run 8.
+
+**Eval vs random — game ~1500 (7,310 steps):**
+- As white: 4W / 3L / 18D (**16% win rate**)
+- As black: 5W / 2L / 18D (**20% win rate**)
+- Overall HAL win rate vs random: **18.0%** — new project high, target met as Black
+- vs Stockfish depth 1 (200 sims, 25 games each colour): **100% losses**, 0 draws
+- vs Stockfish depth 3/5: not run — depth 1 result made these redundant at current strength
+
+18% vs random is a consistent improvement (4% → 12% → 18%). HAL as Black hits the 20% target;
+as White still 16%. Draws remain 72% — cap draws dominate, conversion still the main gap.
+
+Stockfish depth 1 result (0%, 0 draws in 50 games) confirms HAL is winning via opponent blunders,
+not generating winning plans against a non-blundering opponent. Gate for running depth 3/5:
+HAL must score at least occasional draws vs depth 1 first.
+
+**Next eval: game 2000. Target: 25%+ win rate vs random, draws vs Stockfish depth 1.**
 
 ---
 
@@ -599,9 +689,59 @@ caffeinate -dims venv/bin/python3 train_chess.py
 3. ~~Increase permanent partition~~ — ✓ done
 4. ~~Start Run 8~~ — ✓ running
 5. ~~First wins vs random~~ — ✓ game 560, 4% win rate (first in project history)
-6. **Eval at game 1000** — target: 20%+ win rate vs random. Run `eval_chess.py --cpu`.
-7. **Stage 2 resign** — once K+Q vs K reads ±0.9 consistently, remove material resign entirely.
-8. **Phase 4** — UCI wrapper → Lichess bot account → ELO rating.
+6. ~~Eval at game 1000~~ — ✓ done. 12% win rate (3× improvement from game 560). 20% target not met; continuing.
+7. ~~Eval at game 1500~~ — ✓ done. 18% win rate vs random (20% as Black). 0% vs Stockfish depth 1. Target met as Black; overall just short at 18%.
+8. ~~Eval at game 2000~~ — ✓ done. 12% win rate vs random (regression from 18%). 0% vs Stockfish depth 1. See final summary below.
+9. ~~Gemini game analysis~~ — ✓ done. Output: `paper/gemini_run8_assessment.md`.
+10. **Stage 2 resign** — once K+Q vs K reads ±0.9 consistently, remove material resign entirely.
+11. **Phase 4** — UCI wrapper → Lichess bot account → ELO rating.
+
+---
+
+## Run 8 — Final Summary
+
+**Status: COMPLETE — stopped at game 2010, 10,160 steps (2026-06-07)**
+
+### Results
+
+| Eval | Game 560 | Game 1000 | Game 1500 | Game 2010 |
+|------|----------|-----------|-----------|-----------|
+| Win rate vs random | 4% | 12% | 18% | 12% |
+| vs Stockfish depth 1 | — | 0% | 0% | 0% |
+| b-move regression | −0.603 | −0.116 | −0.785 | **−0.921** |
+| w-wins regression | — | +0.270 | −0.838 | +0.048 |
+| Loss | — | 3.57 | 3.26 | **3.093** |
+
+### Key findings
+
+**What Run 8 proved:**
+- MCTS backup sign fix was decisive — first wins in project history at game 560 (4%), 12% by game 1000
+- Buffer seeding (25% permanent partition) kept the value head stable through the seed→self-play transition
+- Cap draw ±0.8 outcome worked — no value collapse despite occasional cap draw spikes
+- ~240 checkmates in 2010 games, including Fool's Mate (game 823), Scholar's Mate (game 830), Na5# (game 1886), Bg7# (game 1509)
+- Checkmate pattern evolution confirmed: opening traps (games 1–1000) → earned tactical checkmates (games 1000+)
+
+**The Geometry Trap — diagnosis and revision:**
+The w-wins regression oscillated throughout the run (+0.27 → −0.838 → +0.048) while b-move converged strongly (−0.921). Initially diagnosed as a missing canonical encoding in the encoder. On inspection (2026-06-07), the canonical encoding (`board.mirror() if player == chess.BLACK`) has been in the encoder since Run 6 (commit 05b3e53). The phenomenon is real; the cause was wrong.
+
+Revised diagnosis: **training data distribution asymmetry**. RESIGN_MATERIAL ends games before White can move in true K+Q vs K positions. The buffer is dominated by Black-to-move losing positions (generated right to the resign) with sparse White-to-move winning positions. The permanent partition covers only one spatial K+Q vs K configuration — insufficient for generalisation. See `paper/run9_architecture.md` addendum for full analysis.
+
+**Win rate plateau:**
+Despite loss reaching a new low (3.093) and b-move reaching a new high (−0.921), win rate regressed from 18% to 12% at game 2010. The 84% draw rate confirms HAL consistently reaches winning positions but cannot convert them. The value head's w-wins blindspot (reading near zero for winning positions) prevents MCTS from pressing material advantages. This is the binding constraint — more training under the same conditions would not resolve it.
+
+**External assessment:**
+Gemini analysis of games 1500–1900 (401 games): confirmed play quality jump from "geometric chaotic" (game 1500) to "coherent predatory" (game 1890). Identified f-pawn fixation as a recurring tactical overcorrection and noted HAL compensates for perspective ambiguity by preferring forcing tactical lines. Games 1886 (Na5#) and 1509 (Bg7#) flagged as paper-worthy. Full assessment: `paper/gemini_run8_assessment.md`.
+
+### Decision: start Run 9
+
+Run 8 has reached its structural ceiling. The Geometry Trap (sparse winning-side training signal) cannot be resolved by continued training — it requires changes to the permanent partition and RESIGN_MATERIAL schedule. Architecture unchanged; weights carried forward into Run 9 (encoder identical, strong value head foundation to build on).
+
+**Run 9 changes:**
+- Continue from Run 8 checkpoint (not fresh weights — encoder unchanged, value head has strong b-move foundation)
+- Seed buffer from Run 8 games 1500–2010 (better quality than early Run 8)
+- More diverse permanent partition (multiple K+Q vs K configurations)
+- Investigate reducing RESIGN_MATERIAL schedule to expose true endgame positions
+- See `paper/run9_architecture.md`
 
 ---
 

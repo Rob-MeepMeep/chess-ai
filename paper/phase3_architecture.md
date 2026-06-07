@@ -519,8 +519,37 @@ but the policy head learned to prefer losing moves. This explains the persistent
 backup fix means the policy head will now learn correctly for the first time. The cap
 draw fix means value collapse from game 1000-style spikes should not recur.
 
-**Status:** In progress from game 1.
+**Status:** In progress. Game 1,440+ as of 2026-06-06.
+
+**Results to date:**
+- ~231 checkmates in 1,400 games (16% rate) — Run 6 had its first at game 658
+- Loss: 1.36 → 3.84 (plateau ~game 700) → **3.26 at game 1,400** (new low, continuing to decline)
+- Value resigns: stable 5–8 per 50-game window
+- Cap draws: never exceeded 8 per window — cap draw fix working throughout
+
+**Eval results:**
+| Game | Steps | Win rate vs random | Notes |
+|------|-------|-------------------|-------|
+| 560 | 2,910 | **4%** | First wins in project history |
+| 1,000 | 5,110 | **12%** | 3× improvement |
+| 1,500 | 7,310 | **18%** | New high; 20% as Black |
+| vs Stockfish depth 1 (200 sims, game 1500) | — | **0%** | 0 draws; HAL wins via blunders, not plans |
+
+**Value head regression:**
+- Game 560: b-move -0.603 (milestone passed)
+- Game 1,200: b-move -0.620, w-wins +0.697 (best symmetric result — both correct sign)
+- Game 1,420: b-move -0.838 (run high), w-wins -0.812 (sign oscillation — structural)
+- Persistent asymmetry: b-move (losing side) learns reliably; w-wins (winning side) oscillates.
+  Root cause: colour-blind encoder cannot distinguish "I have the queen" from "opponent has
+  the queen." Fix identified for Run 9: canonical encoding (flip board for current player,
+  so network always sees itself in white's position regardless of actual colour).
+
+**Checkmate evolution:**
+- Games 1–500: shortest 4 moves (Fool's Mate, game 823). Dominant: queen-to-h4/h5 opening traps.
+- Games 501–1100: shortest 6 moves. Traps fading; sustained play emerging.
+- Games 1101–1440: shortest 14 moves. No opening traps. Checkmates earned through play.
+  W/B split reversed: white now wins more checkmates (30/24) as black-favouring traps disappeared.
 
 ---
 
-*Architecture document — chess-ai Phase 3. Updated June 2026.*
+*Architecture document — chess-ai Phase 3. Updated 2026-06-06.*
