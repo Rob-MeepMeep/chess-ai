@@ -52,12 +52,21 @@ class ReplayBuffer:
         Up to 25% of each batch is drawn from the permanent partition (if populated).
         Returns three stacked tensors: (states, policies, outcomes).
         """
-        perm_n = min(len(self._permanent), batch_size // 4) if self._permanent else 0
-        roll_n = batch_size - perm_n
+        perm_ratio = 0.25
+        perm_size = int(batch_size * perm_ratio)
 
-        batch = random.sample(self._buffer, roll_n)
-        if perm_n:
-            batch += random.sample(self._permanent, perm_n)
+        actual_perm_size = min(perm_size, len(self._permanent))
+        roll_size = batch_size - actual_perm_size
+
+        batch = []
+        if actual_perm_size > 0:
+            batch.extend(random.sample(self._permanent, actual_perm_size))
+
+        if roll_size > 0 and len(self._buffer) > 0:
+            actual_roll_size = min(roll_size, len(self._buffer))
+            batch.extend(random.sample(self._buffer, actual_roll_size))
+
+        random.shuffle(batch)
 
         states, policies, outcomes = zip(*batch)
         return (
