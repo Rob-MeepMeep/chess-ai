@@ -1,6 +1,6 @@
 # chess-ai — Project Run Notes
 **Authors:** Rob Kirkland, Ellis Ward  
-**Last updated:** 2026-06-04
+**Last updated:** 2026-06-08
 
 This document is the persistent context record for the chess-ai project. Any agent or collaborator picking up this project should read this alongside `paper/phase3_architecture.md` and `paper/changelog.md` before touching any code.
 
@@ -798,6 +798,156 @@ p_noisy = (1 - ε) × p_network + ε × Dirichlet(α)
 ```
 
 Standard values for chess (AlphaZero paper): **α = 0.3, ε = 0.25**. Applied at root node only, training only (not eval). Change location: `chessai/mcts.py`, in the root node policy initialisation. Breaks opening lock-in by ensuring the agent always samples non-preferred moves during self-play, even when the policy is highly confident.
+
+---
+
+## Run 10 — MacBook Pro M5 Pro (IN PROGRESS, started 2026-06-07)
+
+**Config:** Continue from Run 9 checkpoint (15,135 steps). RESIGN_MATERIAL=3 retained. Temperature scheduling added (TEMP_MOVES=30). Seed buffer from Run 9 games 800–1000.
+
+### Changes from Run 9
+
+**Temperature scheduling (primary change — `chessai/agent.py`):**
+
+Run 9 used stochastic move sampling (τ=1) for every ply throughout training. This allowed MCTS to throw away known winning lines in the endgame via random sampling, creating a "safe harbour" in f2f3 — a closed structure that was more robust to random noise than open tactical play. The policy settled there as a local minimum.
+
+Fix: stochastic sampling for the first 30 plies (opening diversity), then greedy argmax from ply 30 onwards. Endgame lines are now always decisive — the network commits to its best known move once the opening phase ends.
+
+```python
+TEMP_MOVES = 30   # plies — stochastic opening, greedy endgame
+
+ply = len(board.move_stack)
+if greedy or ply >= TEMP_MOVES:
+    move_idx = policy.argmax().item()    # greedy
+else:
+    move_idx = torch.multinomial(policy, num_samples=1).item()  # stochastic
+```
+
+Result: f2f3 opening bias gone by game 450 and did not return. W/B balance stable at 50/50 from game 650.
+
+**Dirichlet noise — confirmed already present (not a new change):**
+
+Planned as the primary Run 10 fix for the f2f3 local minimum. On inspection, found fully implemented in `chessai/mcts.py` with correct AlphaZero parameters (α=0.3, ε=0.25) and already active during all training runs. Same pattern as the canonical encoding discovery in Run 8 — the mechanism was in place; the gap was elsewhere. Temperature scheduling was the actual missing piece.
+
+**Checkpoint resume bug fix (`train_chess.py`):**
+
+On resume, `CKPT_LOAD` always overrode `CKPT_PATH` — causing runs to restart from game 1 with the seed weights rather than continuing from the accumulated checkpoint. Fixed to match the existing buffer logic: `CKPT_PATH` takes priority if it exists; `CKPT_LOAD` used only on a genuine fresh start.
+
+### Bugs fixed mid-run (2026-06-08)
+
+Three further bugs identified and fixed during Run 10 progress review:
+
+---
+
+**Bug 1 — Policy space mismatch: MCTS priors and stored training targets in wrong space (`chessai/mcts.py`, `chessai/moves.py`, `train_chess.py`)**
+
+The encoder mirrors the board for Black (canonical encoding: Black's position is always presented as White-to-move to the network). The network therefore outputs policy logits in *canonical* space — move indices relative to the mirrored board. However, the MCTS tree stores children indexed by *actual* board move indices, and the training loop stored the MCTS visit distribution (actual space) directly in the replay buffer.
+
+This created two mismatches:
+1. MCTS used canonical logits as priors for actual-board children — a systematic off-by-one in piece coordinates for Black positions
+2. The training loss compared canonical network output against actual-board visit counts — the network was being asked to predict move distributions in a coordinate system that didn't match its output space
+
+Fix: added `mirror_policy()` to `chessai/moves.py` — remaps a (4096,) policy tensor by applying `chess.square_mirror()` to both from_sq and to_sq of each move index. The mapping is self-inverse (mirroring twice returns the original). Applied in three places:
+
+```python
+# mcts.py — root expansion
+if board.turn == chess.BLACK:
+    policy_logits = mirror_policy(policy_logits)
+
+# mcts.py — batched leaf expansion (per-leaf, using sim_board.turn)
+if sim_board.turn == chess.BLACK:
+    logits = mirror_policy(logits)
+
+# train_chess.py — before storing policy in game buffer
+if board.turn == chess.BLACK:
+    policy = mirror_policy(policy)
+```
+
+The mirror index table is built once at first call and cached globally.
+
+---
+
+**Bug 2 — Value resign winner determined by material, not by value head (`train_chess.py`)**
+
+The resign logic fires when either `mat_hopeless` (abs(material) > RESIGN_MATERIAL) or `val_hopeless` (abs(v) > 0.95) is True for RESIGN_CONSECUTIVE consecutive moves. When the streak fired, the winner was always determined by material balance — even when `resign_cause == "value"` (i.e., the resign was triggered by the value head, not material).
+
+In tactically decisive but material-balanced positions (e.g. a forced mating attack where White sacrificed material), this could assign the win to the wrong side. Also: if material was exactly balanced, `chess.WHITE if material > 0 else chess.BLACK` would assign the win to Black regardless of what the value head said.
+
+Fix: split the winner determination by resign cause:
+
+```python
+if resign_cause == "material":
+    winner = chess.WHITE if _material_balance(board) > 0 else chess.BLACK
+else:
+    # value resignation: use the sign of the value head's last estimate
+    winner = board.turn if v > 0 else (chess.WHITE if board.turn == chess.BLACK else chess.BLACK)
+```
+
+`v` at the break point is the value estimate from the final position's perspective. `v > 0` means the current player is winning; `v < 0` means they are losing.
+
+---
+
+**Bug 3 — Replay buffer `sample()` crash on undersized rolling buffer (`chessai/replay.py`)**
+
+`random.sample(self._buffer, roll_n)` would raise an error if the rolling buffer contained fewer entries than `roll_n`. This could occur during the first few games of a run before the buffer filled. Fixed by clamping to the available size:
+
+```python
+actual_roll_size = min(roll_size, len(self._buffer))
+batch.extend(random.sample(self._buffer, actual_roll_size))
+```
+
+Also: the permanent ratio is now expressed as an explicit constant (`perm_ratio = 0.25`) rather than implicit in `batch_size // 4`, and the combined batch is shuffled before tensor stacking so permanent and rolling positions are interleaved rather than blocked.
+
+---
+
+### Training progress
+
+**Value head regression — game 100 (23,600 steps):**
+
+| Position | Value | Expected |
+|----------|-------|----------|
+| Start | −0.007 | ~0.0 | ✓ |
+| K+Q vs K (w wins) | +0.9768 | near +1 | ✓ strong |
+| K+Q vs K (b move) | −0.9936 | near -1 | ✓ strong |
+| White missing queen | (not recorded) | < 0 | — |
+
+All four signals healthy from game 100. Value head carried forward cleanly from Run 9.
+
+**Value head regression — game 1670 (23,465 steps) — w-wins collapse:**
+
+| Position | Value | Expected |
+|----------|-------|----------|
+| Start | −0.0097 | ~0.0 | ✓ |
+| K+Q vs K (w wins) | **+0.1883** | near +1 | ✗ collapsed |
+| K+Q vs K (b move) | −0.9973 | near -1 | ✓ |
+| White missing queen | −0.0075 | < 0 | ~ |
+
+w-wins dropped from +0.9768 (game 100) to +0.1883 over 1,570 games. b-move held at −0.9973. Asymmetry is the Geometry Trap pattern — strong losing signal, weak winning signal. Suspected cause: rolling buffer contaminated with +0.8 soft-win labels (cap draws from K+Q vs K positions where HAL couldn't checkmate in 150 moves) outweighing the permanent partition's +1.0 labels. The 25% permanent fraction (8 W-to-move positions per batch of 64) may be insufficient to anchor against 48 rolling positions pulling toward +0.8.
+
+At this point the policy mirroring bug (Bug 1 above) was also identified and fixed. The three bug fixes were committed and training resumed.
+
+**Value head regression — game 1700 (23,600 steps) — recovery:**
+
+| Position | Value | Expected |
+|----------|-------|----------|
+| Start | −0.0227 | ~0.0 | ✓ |
+| K+Q vs K (w wins) | **+0.9946** | near +1 | ✓ fully recovered |
+| K+Q vs K (b move) | −0.9988 | near -1 | ✓ |
+| White missing queen | −0.0282 | < 0 | ✓ |
+
+w-wins recovered from +0.1883 to +0.9946 in just 26 games (135 training steps). Full recovery this fast suggests the game 1670 reading was a temporary dip in an oscillating value head rather than a structural collapse — the permanent partition was maintaining the correct signal; the regression happened to be run at a low point. The policy mirroring fix may have immediately improved gradient coherence.
+
+All four metrics healthy simultaneously for the first time in Run 10.
+
+### What to watch
+
+| Signal | Target |
+|--------|--------|
+| w-wins (next regression ~game 1850–1900) | Hold near +0.99 — confirms recovery is stable, not another oscillation trough |
+| b-move | Stay near −0.99 |
+| f2f3 (opening snapshot) | Should remain absent |
+| W/B balance | Stay near 50/50 |
+| Loss | Predict spike as policy mirroring correction lands on old unmirrored buffer positions — expect elevated then declining over 200–400 games |
 
 ---
 
