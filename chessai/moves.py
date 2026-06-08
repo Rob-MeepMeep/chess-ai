@@ -50,3 +50,32 @@ def legal_move_mask(board: chess.Board) -> torch.Tensor:
     for move in board.legal_moves:
         mask[move_to_index(move)] = True
     return mask
+
+_MIRROR_INDICES = None
+
+def get_mirror_indices(device=None) -> torch.Tensor:
+    global _MIRROR_INDICES
+    if _MIRROR_INDICES is None:
+        indices = []
+        for idx in range(4096):
+            from_sq = idx // 64
+            to_sq   = idx % 64
+            mirrored_from = chess.square_mirror(from_sq)
+            mirrored_to   = chess.square_mirror(to_sq)
+            indices.append(mirrored_from * 64 + mirrored_to)
+        _MIRROR_INDICES = torch.tensor(indices, dtype=torch.long)
+    if device is not None:
+        return _MIRROR_INDICES.to(device)
+    return _MIRROR_INDICES
+
+def mirror_policy(policy: torch.Tensor) -> torch.Tensor:
+    """
+    Mirrors a policy or logit tensor of shape (4096,) or (B, 4096) vertically.
+    Because mirroring is symmetric, this function is its own inverse (unmirrors too).
+    """
+    indices = get_mirror_indices(device=policy.device)
+    if policy.dim() == 1:
+        return policy[indices]
+    elif policy.dim() == 2:
+        return policy[:, indices]
+    return policy

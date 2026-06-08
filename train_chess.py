@@ -23,6 +23,7 @@ import torch
 
 from chessai.agent   import ChessAgent
 from chessai.encoder import encode
+from chessai.moves   import mirror_policy
 from chessai.logger  import Logger
 from chessai.replay  import ReplayBuffer, GameBuffer
 
@@ -155,9 +156,9 @@ for game_num in range(start_game + 1, N_GAMES + 1):
         state = encode([board] + history)
 
         # MCTS selects a move — stochastic during training
-        move_uci, policy = agent.choose_move(
-            board, history, greedy=False
-        )
+        move_uci, policy = agent.choose_move(board, history, greedy=False)
+        if board.turn == chess.BLACK:
+            policy = mirror_policy(policy)
 
         # Store this position in the game buffer
         game_buf.push(state, policy, board.turn)
@@ -190,8 +191,11 @@ for game_num in range(start_game + 1, N_GAMES + 1):
     result        = board.result()
     outcome_scale = 1.0   # overridden to 0.8 for material-imbalanced cap draws
     if resign_streak >= RESIGN_CONSECUTIVE:
-        # Side with more material wins; imbalance was already confirmed by resign_streak
-        winner     = chess.WHITE if _material_balance(board) > 0 else chess.BLACK
+        if resign_cause == "material":
+            winner = chess.WHITE if _material_balance(board) > 0 else chess.BLACK
+        else:
+            # value resignation: winner is whoever the value head says is winning
+            winner = board.turn if v > 0 else (chess.WHITE if board.turn == chess.BLACK else chess.BLACK)
         end_reason = f"{resign_cause}_resign"
     elif result == "1-0":
         winner     = chess.WHITE

@@ -27,7 +27,7 @@ import torch
 import chess
 
 from chessai.encoder import encode
-from chessai.moves  import move_to_index, index_to_move, legal_move_mask
+from chessai.moves  import mirror_policy, move_to_index, index_to_move, legal_move_mask
 
 C_PUCT          = 1.5
 DIRICHLET_ALPHA = 0.3
@@ -121,6 +121,8 @@ class MCTS:
                 for i, (node_id, node, sim_board) in enumerate(
                         zip(node_ids, leaves, boards)):
                     logits = logits_batch[i].clone()
+                    if sim_board.turn == chess.BLACK:
+                        logits = mirror_policy(logits)
                     mask   = legal_move_mask(sim_board).to(self.device)
                     logits[~mask] = float("-inf")
                     priors = torch.softmax(logits, dim=0)
@@ -186,6 +188,8 @@ class MCTS:
         with torch.no_grad():
             policy_logits, _ = self.network(encoded)
         policy_logits = policy_logits.squeeze(0)
+        if board.turn == chess.BLACK:
+            policy_logits = mirror_policy(policy_logits)
         mask = legal_move_mask(board).to(self.device)
         policy_logits[~mask] = float("-inf")
         priors = torch.softmax(policy_logits, dim=0)
