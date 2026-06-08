@@ -43,7 +43,7 @@ N_SIMS_RANDOM      = 50    # sims vs random — lower is fine, random doesn't pu
 # Per-depth sim counts — higher depths warrant more search to have any chance
 SIMS_BY_DEPTH      = {1: 200, 3: 500, 5: 500}
 MAX_GAME_MOVES     = 200   # hard cap
-CKPT_PATH          = "checkpoints/run9_hal_chess.pt"
+CKPT_PATH          = "checkpoints/run10_hal_chess.pt"
 STOCKFISH_PATH     = "stockfish"   # assumes stockfish is on PATH
 
 # ---------------------------------------------------------------------------
@@ -164,7 +164,7 @@ def play_game(white_fn, black_fn):
 # Eval game log — one row per game, written to logs/run8/eval_games.csv
 # ---------------------------------------------------------------------------
 
-_EVAL_LOG_PATH = os.path.join("logs", "run9", "eval_games.csv")
+_EVAL_LOG_PATH = os.path.join("logs", "run10", "eval_games.csv")
 _eval_game_num = 0   # sequential across the whole eval run
 
 def _init_eval_log() -> None:

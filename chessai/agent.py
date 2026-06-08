@@ -29,6 +29,8 @@ from chessai.encoder import encode
 LR           = 1e-4
 WEIGHT_DECAY = 1e-4   # L2 regularisation — prevents overfitting on a deeper network
 GRAD_CLIP    = 1.0
+TEMP_MOVES   = 30     # plies — sample stochastically for the first 30 half-moves (opening),
+                      # then switch to greedy (argmax) so endgame lines are always decisive
 
 
 class ChessAgent:
@@ -56,8 +58,9 @@ class ChessAgent:
         """
         Run MCTS and return (uci_move, policy).
 
-        greedy=False  — sample from the visit-count distribution (training)
-        greedy=True   — take the most-visited move (evaluation)
+        greedy=False  — stochastic sampling for the first TEMP_MOVES plies (opening
+                        diversity), then argmax thereafter (decisive endgame signal).
+        greedy=True   — always argmax (evaluation / no training noise).
 
         Returns the chosen UCI move string and the full policy tensor (4096,)
         so the training loop can store it in the GameBuffer.
@@ -67,10 +70,12 @@ class ChessAgent:
 
         policy = self.mcts.search(board, history, n, add_noise=add_noise)
 
-        if greedy:
+        ply = len(board.move_stack)
+        if greedy or ply >= TEMP_MOVES:
+            # Greedy: take the most-visited move
             move_idx = policy.argmax().item()
         else:
-            # Sample proportional to visit counts
+            # Stochastic: sample proportional to visit counts
             move_idx = torch.multinomial(policy, num_samples=1).item()
 
         move = index_to_move(move_idx, board)

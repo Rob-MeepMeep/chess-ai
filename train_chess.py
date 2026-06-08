@@ -48,9 +48,9 @@ RESIGN_MATERIAL    = 3      # lowered from 7 for Run 9 — forces HAL to grind o
 # Run identity — change RUN_NAME to start a new named run with its own logs and buffer.
 # CKPT_LOAD: None = load RUN_NAME's own checkpoint; set to a path to seed weights from another run.
 # BUFFER_LOAD: None = load RUN_NAME's own buffer; set to a path to load from another run.
-RUN_NAME    = "run9"
-CKPT_LOAD   = "checkpoints/run8_hal_chess.pt"           # continue from run8 — encoder unchanged, value head has good foundation
-BUFFER_LOAD = "checkpoints/run9_seed_buffer.pt"         # curated seed buffer from run8
+RUN_NAME    = "run10"
+CKPT_LOAD   = "checkpoints/run9_hal_chess.pt"           # continue from run9 — value head healthy, w-wins 0.948, b-move 0.995
+BUFFER_LOAD = "checkpoints/run10_seed_buffer.pt"        # curated seed buffer from run9 games 800-1000
 
 CKPT_PATH   = f"checkpoints/{RUN_NAME}_hal_chess.pt"
 BUFFER_PATH = f"checkpoints/{RUN_NAME}_replay_buffer.pt"
