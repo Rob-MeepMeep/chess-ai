@@ -42,7 +42,7 @@ N_GAMES_PREV       = 25    # games vs previous checkpoint
 N_SIMS_RANDOM      = 50    # sims vs random — lower is fine, random doesn't punish weak play
 # Per-depth sim counts — higher depths warrant more search to have any chance
 SIMS_BY_DEPTH      = {1: 200, 3: 500, 5: 500}
-MAX_GAME_MOVES     = 200   # hard cap
+MAX_GAME_MOVES     = 200   # hard cap — 200 plies is enough; if HAL can't convert by then it's a policy problem
 CKPT_PATH          = "checkpoints/run10_hal_chess.pt"
 STOCKFISH_PATH     = "stockfish"   # assumes stockfish is on PATH
 
@@ -120,6 +120,17 @@ def hal_move_at(n_sims: int):
         orig = hal.n_simulations
         hal.n_simulations = n_sims
         move_uci, _ = hal.choose_move(board, history, greedy=True)
+        hal.n_simulations = orig
+        return move_uci
+    return _move
+
+def hal_move_noisy_at(n_sims: int):
+    """HAL at n_sims with Dirichlet noise at root — breaks determinism for diverse Stockfish evals.
+    Still uses greedy (argmax) move selection so quality isn't degraded."""
+    def _move(board: chess.Board, history: list) -> str:
+        orig = hal.n_simulations
+        hal.n_simulations = n_sims
+        move_uci, _ = hal.choose_move(board, history, greedy=True, add_noise=True)
         hal.n_simulations = orig
         return move_uci
     return _move
@@ -249,7 +260,7 @@ try:
 
     for depth in [1, 3, 5]:
         n_sims = SIMS_BY_DEPTH.get(depth, 200)
-        hal_sf = hal_move_at(n_sims)
+        hal_sf = hal_move_noisy_at(n_sims)   # noise breaks determinism; greedy selection preserved
         sf_move = stockfish_move(engine, depth)
         print(f"  (HAL using {n_sims} simulations at depth {depth})\n")
         evaluate(f"3. HAL (White) vs Stockfish depth {depth}",

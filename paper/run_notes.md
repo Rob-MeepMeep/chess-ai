@@ -1,6 +1,6 @@
 # chess-ai — Project Run Notes
 **Authors:** Rob Kirkland, Ellis Ward  
-**Last updated:** 2026-06-08
+**Last updated:** 2026-06-10 (game ~5960 eval)
 
 This document is the persistent context record for the chess-ai project. Any agent or collaborator picking up this project should read this alongside `paper/phase3_architecture.md` and `paper/changelog.md` before touching any code.
 
@@ -948,6 +948,326 @@ All four metrics healthy simultaneously for the first time in Run 10.
 | f2f3 (opening snapshot) | Should remain absent |
 | W/B balance | Stay near 50/50 |
 | Loss | Predict spike as policy mirroring correction lands on old unmirrored buffer positions — expect elevated then declining over 200–400 games |
+
+---
+
+### Training progress (continued)
+
+**Value head regression — game 1800 (23,735 steps):**
+
+| Position | Value | Expected |
+|----------|-------|----------|
+| Start | +0.0071 | ~0.0 | ✓ |
+| K+Q vs K (w wins) | **+0.2749** | near +1 | ✗ trough |
+| K+Q vs K (b move) | −0.9984 | near -1 | ✓ |
+| White missing queen | (not recorded) | < 0 | — |
+
+Second oscillation trough. w-wins collapsed again from +0.9946 (game 1700). b-move rock solid. Pattern confirmed: oscillating w-wins, stable b-move.
+
+**Value head regression — game 1880 (24,300 steps):**
+
+| Position | Value | Expected |
+|----------|-------|----------|
+| Start | +0.0420 | ~0.0 | ~ |
+| K+Q vs K (w wins) | **+0.9893** | near +1 | ✓ recovered |
+| K+Q vs K (b move) | −0.9989 | near -1 | ✓ |
+| White missing queen | (not recorded) | < 0 | — |
+
+Full recovery from game 1800 trough. Oscillation pattern: collapse → recovery in ~80 games.
+
+**Full eval — game 2000 (25,110 steps):**
+
+Value head regression:
+
+| Position | Value | Expected |
+|----------|-------|----------|
+| Start | **+0.1507** | ~0.0 | ✗ elevated |
+| K+Q vs K (w wins) | +0.8758 | near +1 | ~ oscillation dip |
+| K+Q vs K (b move) | −0.9923 | near -1 | ✓ |
+| White missing queen | **+0.1534** | < 0 | ✗ wrong direction |
+
+Systematic positive bias: start and white-missing-queen both reading +0.15. Same value suggests the network has developed a "current player tends to win" prior, likely from White-heavy self-play skew in rolling buffer (~63% White wins in recent window).
+
+Tier 1 vs random:
+
+| | White | Black | Overall |
+|---|---|---|---|
+| HAL wins | 4 (16%) | 7 (28%) | **22%** |
+| HAL losses | 1 (4%) | 0 (0%) | |
+| Draws | 20 (80%) | 18 (72%) | |
+
+22% overall — project high, doubling Run 9's 10%. Policy mirroring fix working. High draw rate (76% combined) indicates HAL reaches winning positions but cannot convert; mostly cap draws at 150 moves. HAL as Black outperforming White (28% vs 16%), correlated with w-wins oscillation dip.
+
+Tier 2 vs Stockfish depth 1 (greedy eval — all games deterministic/identical):
+- HAL as White: 0%, 4/25 losses
+- HAL as Black: 0%, 25/25 losses
+
+Note: eval was using `greedy=True` without noise — Stockfish games were deterministic repeats of the same line. Opening failures: HAL as White walks king to d2 on move 3; HAL as Black places knight on rim (Nh6) on move 1. Fix applied: `hal_move_noisy_at()` added to eval_chess.py for Stockfish games — injects Dirichlet noise at MCTS root while keeping greedy move selection, giving diverse game lines.
+
+**Value head regression — game ~2400 (27,055 steps):**
+
+| Position | Value | Expected |
+|----------|-------|----------|
+| Start | **+0.0300** | ~0.0 | ✓ corrected |
+| K+Q vs K (w wins) | **+0.9808** | near +1 | ✓ peak |
+| K+Q vs K (b move) | −0.9941 | near -1 | ✓ |
+| White missing queen | **−0.0054** | < 0 | ✓ corrected |
+
+All four signals correct simultaneously — cleanest regression reading in Run 10. Positive bias from game 2000 fully self-corrected. w-wins at oscillation peak.
+
+**Full eval — game ~2600 (28,305 steps):**
+
+Value head regression:
+
+| Position | Value | Expected |
+|----------|-------|----------|
+| Start | +0.0103 | ~0.0 | ✓ |
+| K+Q vs K (w wins) | **+0.5203** | near +1 | ✗ deep trough |
+| K+Q vs K (b move) | −0.9990 | near -1 | ✓ |
+| White missing queen | +0.0188 | < 0 | ~ near zero |
+
+Another oscillation trough — deepest yet at +0.52, down from +0.98 at game 2400. b-move holding at −0.999.
+
+Tier 1 vs random:
+
+| | White | Black | Overall |
+|---|---|---|---|
+| HAL wins | 4 (16%) | 3 (12%) | **14%** |
+| HAL losses | 0 (0%) | 1 (4%) | |
+| Draws | 21 (84%) | 21 (84%) | |
+
+14% overall — down from 22% at game 2000. Oscillation effect: Black win rate fell from 28% to 12% correlated with w-wins trough. White win rate held at 16% both evals.
+
+Tier 2 vs Stockfish depth 1 (first eval with noise fix — diverse game lines):
+- HAL as White: **1 draw (4%)**, 24 losses — **first ever draw vs Stockfish in project history**
+- HAL as Black: 0 draws, 25 losses (100%)
+
+The White draw is a genuine milestone. HAL found a defensive line Stockfish depth 1 could not break. Opening failures persist as Black (rim knight on move 1 still observed in some lines). As White the opening weakness (early king walk) is present but less immediately fatal — HAL can sometimes stumble into a fortress position.
+
+w-wins oscillation summary to game ~2600:
+
+| Game | w-wins | Event |
+|------|--------|-------|
+| 100 | +0.977 | Start |
+| 1670 | +0.188 | Collapse + bug fixes |
+| 1700 | +0.995 | Recovery |
+| 1800 | +0.275 | Trough |
+| 1880 | +0.989 | Recovery |
+| 2000 | +0.876 | Dip |
+| 2400 | +0.980 | Peak |
+| ~2600 | +0.520 | Deep trough |
+
+### Eval at game ~3000 (30,240 steps, 2026-06-09)
+
+**Regression:**
+
+| Position | Value | Expected |
+|----------|-------|----------|
+| start | +0.0246 | ~0.0 |
+| K+Q vs K (w wins) | +0.9041 | near +1 |
+| K+Q vs K (b move) | -0.9995 | near -1 |
+| white missing queen | +0.0082 | < 0 |
+
+w-wins partial recovery from ~2600 trough (+0.52 → +0.9041). b-move rock solid. White-missing-queen near-zero (should be negative — persistent calibration gap).
+
+**Tier 1 vs random (25 games each side):**
+
+| Matchup | HAL wins | Opponent wins | Draws |
+|---------|----------|---------------|-------|
+| HAL (White) vs Random | 4 (16%) | 4 (16%) | 17 (68%) |
+| Random (White) vs HAL (Black) | 4 (16%) | 1 (4%) | 20 (80%) |
+| **Overall** | **16%** | | |
+
+Regression from game 2000 peak (22%). As White: 4 wins and 4 losses — losing to random as frequently as winning. Opening lock-in shifted from g4 (game 2000) to a2a3 throughout; passive but different local minimum. High draw rate (68%/80%) driven partly by 400-ply cap — many inconclusive positions ran to the hard limit. Cap reverted to 200 for next eval.
+
+**Tier 2 vs Stockfish depth 1 (HAL as White, 25 games):**
+
+- HAL: **0 wins, 0 draws, 25 losses (100%)**
+- Recurring policy failures: Bg5 sacrifice on move 2 (after d3, HAL plays Bg5, allowing QxBg5 for free) observed in 4+ games. Game 61: Scholar's Mate-style loss in 12 half-moves — HAL played b4, a3, f3, h3, g3 in sequence, boxing own king in; Qxg3 checkmate.
+- Stockfish as Black not run (eval stopped; result already clear).
+
+**Opening note:** a2a3 played in every game vs random as White. Against Stockfish, more variation (d2d3, a2a3, b2b4, g2g3) due to Dirichlet noise — but all remain weak pawn-push openings with no piece development.
+
+w-wins oscillation updated:
+
+| Game | w-wins | Event |
+|------|--------|-------|
+| 100 | +0.977 | Start |
+| 1670 | +0.188 | Collapse + bug fixes |
+| 1700 | +0.995 | Recovery |
+| 1800 | +0.275 | Trough |
+| 1880 | +0.989 | Recovery |
+| 2000 | +0.876 | Dip |
+| 2400 | +0.980 | Peak |
+| ~2600 | +0.520 | Deep trough |
+| ~3000 | +0.904 | Partial recovery |
+
+**Training checks — games 3200–4100 (steps 31,550–35,890):**
+
+Periodic regression-only checks during training showed the bias oscillation in detail:
+
+| Steps | start | w-wins | b-move | white missing queen |
+|-------|-------|--------|--------|---------------------|
+| 32,000 | +0.004 | +0.951 | −0.9999 | −0.031 |
+| 32,800 | +0.070 | +0.977 | −0.9978 | +0.068 |
+| 34,100 | +0.018 | +0.990 | −0.9999 | +0.017 |
+| 35,000 | +0.114 | +0.969 | −0.9983 | +0.130 |
+| 35,890 | +0.009 | +0.984 | −0.9842 | +0.019 |
+
+Start and white-missing-queen spiked together at 35,000 steps (+0.114 / +0.130), then corrected rapidly by 35,890. Identified pattern: positive bias rises when White-heavy game clusters enter the buffer, creating a temporary "current player wins" prior; balanced games wash it out over ~260 games. Amplitude ~0.10–0.13; self-correcting. b-move unaffected throughout.
+
+**Changes during games 3000–5400:**
+- N_SIMULATIONS reduced 200→100 at game ~3190: ~5× actual speedup (22s/game) due to short resign games; ETA to game 10,000 ~35 hours from game ~3190
+- MAX_GAME_MOVES in eval_chess.py reverted 400→200: 400-ply cap caused ~45 min for 24 games; extra plies don't help when conversion failure is a policy problem
+- ReplayBuffer capacity increased 50k→75k at game ~4003: dampens bias oscillation amplitude; buffer hit 75k capacity at game ~4680
+
+---
+
+### Eval at game ~5400 (41,990 steps, 2026-06-10)
+
+**Regression:**
+
+| Position | Value | Expected |
+|----------|-------|----------|
+| Start | +0.0404 | ~0.0 | ~ |
+| K+Q vs K (w wins) | +0.9672 | near +1 | ✓ |
+| K+Q vs K (b move) | −1.0000 | near -1 | ✓ saturated |
+| White missing queen | **−0.0110** | < 0 | ✓ **first correctly negative reading in Run 10** |
+
+**Tier 1 vs random (25 games each side, 50 sims, greedy):**
+
+| Matchup | HAL wins | Opponent wins | Draws |
+|---------|----------|---------------|-------|
+| HAL (White) vs Random | 5 (20%) | 0 (0%) | 20 (80%) |
+| Random (White) vs HAL (Black) | 4 (16%) | 0 (0%) | 21 (84%) |
+| **Overall** | **18%** | | |
+
+HAL is not losing to random (0 losses either colour) — distinguishing it from game ~3000 where HAL lost 4 games as White. Conversion remains the binding constraint: 80%+ draws are cap draws at 200 moves. HAL reaches winning positions but cannot execute the close.
+
+**Tier 2 vs Stockfish depth 1 (200 sims, noisy eval):**
+
+| Matchup | HAL wins | Draws | Losses |
+|---------|----------|-------|--------|
+| HAL (White) vs Stockfish depth 1 | 0 (0%) | 2 (8%) | 23 (92%) |
+| Stockfish depth 1 (White) vs HAL (Black) | 0 (0%) | 1 (4%) | 24 (96%) |
+
+3 draws total vs Stockfish depth 1. All prior evals across all runs were 0 draws. First time HAL has held any position against Stockfish. Depths 3 and 5 not run — gate condition is 80%+ vs random first.
+
+**Scholar's Mate cluster — recurring policy failure:**
+
+6 of 25 games as White vs Stockfish followed an identical 10-move losing line:
+
+```
+a2a3 c7c6 f2f3 d7d5 a1a2 e7e5 h2h3 d8h4 g2g3 h4g3#
+```
+
+HAL plays a1a2 (rook shuffles to a2), then h2h3 allowing Qh4, then g2g3 — Qxg3 is checkmate. The 2 draws both started with b1c3 (Dirichlet noise forced knight development instead). The trap is a direct policy failure; Dirichlet noise during training should erode it as alternative move sequences generate positive experience.
+
+**w-wins oscillation — updated:**
+
+| Game | w-wins | Notes |
+|------|--------|-------|
+| 100 | +0.977 | Run 10 start |
+| 1670 | +0.188 | Collapse + bug fixes |
+| 1700 | +0.995 | Recovery |
+| 1800 | +0.275 | Trough |
+| 1880 | +0.989 | Recovery |
+| 2000 | +0.876 | Dip |
+| 2400 | +0.980 | Peak |
+| ~2600 | +0.520 | Deep trough |
+| ~3000 | +0.904 | Partial recovery |
+| ~4100 | +0.984 | Peak — oscillation tightening |
+| ~5400 | +0.967 | Floor rising — worst reading since game 3000 is +0.951 |
+
+Oscillation amplitude has collapsed since game ~3000: worst readings in the 3000–5400 range all ≥+0.95, compared to troughs of +0.52 and +0.28 earlier in the run. The floor is rising.
+
+---
+
+### Eval at game ~5960 (44,805 steps, 2026-06-10)
+
+**Regression (44,755 steps):**
+
+| Position | Value | Expected |
+|----------|-------|----------|
+| Start | +0.031 | ~0.0 | ~ |
+| K+Q vs K (w wins) | +0.995 | near +1 | ✓ oscillation peak |
+| K+Q vs K (b move) | −0.9999 | near -1 | ✓ saturated |
+| White missing queen | +0.031 | < 0 | ~ near zero |
+
+**Tier 1 vs random (25 games each side, 50 sims, greedy, CPU):**
+
+| Matchup | HAL wins | Opponent wins | Draws |
+|---------|----------|---------------|-------|
+| HAL (White) vs Random | 4 (16%) | 2 (8%) | 19 (76%) |
+| Random (White) vs HAL (Black) | 7 (28%) | 0 (0%) | 18 (72%) |
+| **Overall** | **22%** | | |
+
+22% overall — joint-highest in the project (matches game 2000 peak). Black at 28% is the strongest single-colour reading to date. White regression from game ~5400 (20%, 0 losses) to 16% with 2 losses; both losses came in very long games (136 and 184 moves) where the a2a3 passive opening allowed random to grind out a late win. Zero losses in the previous eval may have been noise; 2/25 is within variance for this policy strength.
+
+Black win lengths: 36, 46, 70, 106, 126, 148, 186 moves — spread across the game length distribution, including a 36-move tactical win. All 25 White games opened with a2a3 (greedy, no noise).
+
+**Tier 2 vs Stockfish depth 1 (200 sims, noisy, CPU):**
+
+| Matchup | Wins | Draws | Losses |
+|---------|------|-------|--------|
+| HAL (White) vs Stockfish depth 1 | 0 (0%) | 0 (0%) | 25 (100%) |
+| Stockfish depth 1 (White) vs HAL (Black) | 0 (0%) | 1 (4%) | 24 (96%) |
+
+Regression from game ~5400 (3 draws total). As White: 17 of 25 losses followed the identical 10-move Scholar's Mate line (up from 6/25 at game ~5400). The trap has strengthened — policy for a2a3/f2f3/a1a2/h2h3/g2g3 is now so dominant that Dirichlet noise rarely overrides it. At game ~5400, noise forced b1c3 in 2 games producing draws; now only 1 game (game 65) showed that escape, and it still lost at 12 moves (rook shuffle a1a2 had already been played). The remaining 7 non-Scholar's-Mate losses used different weak pawn-push lines.
+
+As Black: game 100 reached the 200-move cap — first cap draw as Black vs Stockfish depth 1 in project history. HAL played a coherent defensive line starting with Kf7, f5, bishop development.
+
+**Tier 2 vs Stockfish depth 3 (500 sims, noisy, CPU):**
+
+| Matchup | Wins | Draws | Losses |
+|---------|------|-------|--------|
+| HAL (White) vs Stockfish depth 3 | 0 (0%) | 0 (0%) | 25 (100%) |
+| Stockfish depth 3 (White) vs HAL (Black) | 0 (0%) | — | — |
+
+Depth 3 Black matchup was stopped after 11 of 25 games (all Stockfish wins). Depth 5 not run. Against depth 3, Stockfish avoids the Scholar's Mate setup (plays e7e5 instead of c6/d5) and wins via superior tactical play in all lines.
+
+**Scholar's Mate progression (HAL White vs Stockfish depth 1):**
+
+| Eval | Scholar's Mates / 25 games | Notes |
+|------|---------------------------|-------|
+| Game ~2600 | — | First eval with noise fix (Scholar's Mate pattern first documented) |
+| Game ~3000 | ~4/25 | Bg5 sacrifice failures also noted |
+| Game ~5400 | 6/25 | 2 draws via b1c3 noise escape |
+| Game ~5960 | **17/25** | Regression — trap strengthened, not eroded |
+
+The Scholar's Mate trap is worsening despite Dirichlet noise. Probable mechanism: self-play trains Black to exploit the f2f3/h2h3 weakness (Black win rate rising, 28% at this eval), reinforcing the trap from Black's side. White's policy for these moves isn't being pushed away — Black winning is consistent with the overall positive training signal, not a correction. Fix requires White to encounter the Qh4 threat in self-play frequently enough that the policy directly discourages a1a2 and h2h3 in those positions.
+
+**★ Self-play Scholar's Mate — Game 6030 (45,105 steps, 2026-06-10):**
+
+Black wins in 8 plies — shortest self-play checkmate in Run 10:
+
+```
+1. b1c3  a7a5
+2. f2f3  c7c6
+3. g2g3  e7e5
+4. g3g4  Qh4#
+```
+
+Qh4 checkmate: diagonal h4→g3→f2→e1 fully open (g3 and f2 empty after White's pawn pushes); king trapped by Qd1 on d1, Bf1 on f1, own pawns on d2 and e2. HAL as Black has learned and executed the exact tactical theme that has been defeating it as White. Every position in this game enters the replay buffer with White outcome -1 — directly penalising the f2f3/g2g3/g3g4 sequence at source.
+
+Note: White played b1c3 on move 1, not a2a3. This confirms the a2a3 lock-in is a greedy-eval artifact. In training with temperature sampling, other first moves (including Nc3) are explored — the policy is not as rigidly fixed as eval suggests. As these Scholar's Mate self-play losses accumulate, the f3/g3/g4 sequence should weaken over time.
+
+**w-wins oscillation — updated:**
+
+| Game | w-wins | Notes |
+|------|--------|-------|
+| 100 | +0.977 | Run 10 start |
+| 1670 | +0.188 | Collapse + bug fixes |
+| 1700 | +0.995 | Recovery |
+| 1800 | +0.275 | Trough |
+| 1880 | +0.989 | Recovery |
+| 2000 | +0.876 | Dip |
+| 2400 | +0.980 | Peak |
+| ~2600 | +0.520 | Deep trough |
+| ~3000 | +0.904 | Partial recovery |
+| ~4100 | +0.984 | Peak — oscillation tightening |
+| ~5400 | +0.967 | Floor rising — worst reading since game 3000 is +0.951 |
+| ~5960 | +0.995 | Oscillation peak — amplitude further tightened |
 
 ---
 

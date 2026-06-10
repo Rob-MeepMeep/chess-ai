@@ -54,19 +54,23 @@ class ChessAgent:
 
     def choose_move(self, board: chess.Board, history: list,
                     greedy: bool = False,
-                    n_simulations: int = None) -> tuple:
+                    n_simulations: int = None,
+                    add_noise: bool = None) -> tuple:
         """
         Run MCTS and return (uci_move, policy).
 
         greedy=False  — stochastic sampling for the first TEMP_MOVES plies (opening
                         diversity), then argmax thereafter (decisive endgame signal).
         greedy=True   — always argmax (evaluation / no training noise).
+        add_noise     — override Dirichlet noise at MCTS root. Defaults to not greedy.
+                        Set True with greedy=True for diverse-but-strong eval games.
 
         Returns the chosen UCI move string and the full policy tensor (4096,)
         so the training loop can store it in the GameBuffer.
         """
         n = n_simulations or self.n_simulations
-        add_noise = not greedy   # Dirichlet noise only during training
+        if add_noise is None:
+            add_noise = not greedy
 
         policy = self.mcts.search(board, history, n, add_noise=add_noise)
 

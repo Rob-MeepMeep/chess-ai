@@ -32,7 +32,7 @@ from chessai.replay  import ReplayBuffer, GameBuffer
 # ---------------------------------------------------------------------------
 
 N_GAMES          = 10_000
-N_SIMULATIONS    = 200      # doubled from run6 — better MCTS quality per game
+N_SIMULATIONS    = 100      # halved from 200 — ~2x speedup; quality tradeoff acceptable at current training stage
 BATCH_SIZE       = 64
 TRAIN_STEPS      = 5        # gradient updates per game (once buffer is ready)
 MIN_BUFFER       = 500      # don't train until buffer holds this many positions
@@ -75,7 +75,7 @@ print(f"Device: {device}")
 os.makedirs("checkpoints", exist_ok=True)
 
 agent  = ChessAgent(device, n_simulations=N_SIMULATIONS)
-replay = ReplayBuffer()
+replay = ReplayBuffer(capacity=75_000)
 logger = Logger(log_dir=LOG_DIR, snapshot_interval=SNAPSHOT_EVERY)
 
 start_game = 0
