@@ -1,6 +1,6 @@
 # chess-ai — Project Run Notes
 **Authors:** Rob Kirkland, Ellis Ward  
-**Last updated:** 2026-06-10 (game ~5960 eval)
+**Last updated:** 2026-06-10 (game 7500 eval)
 
 This document is the persistent context record for the chess-ai project. Any agent or collaborator picking up this project should read this alongside `paper/phase3_architecture.md` and `paper/changelog.md` before touching any code.
 
@@ -1236,6 +1236,57 @@ Depth 3 Black matchup was stopped after 11 of 25 games (all Stockfish wins). Dep
 | Game ~5960 | **17/25** | Regression — trap strengthened, not eroded |
 
 The Scholar's Mate trap is worsening despite Dirichlet noise. Probable mechanism: self-play trains Black to exploit the f2f3/h2h3 weakness (Black win rate rising, 28% at this eval), reinforcing the trap from Black's side. White's policy for these moves isn't being pushed away — Black winning is consistent with the overall positive training signal, not a correction. Fix requires White to encounter the Qh4 threat in self-play frequently enough that the policy directly discourages a1a2 and h2h3 in those positions.
+
+---
+
+## Eval at game 7500 (52,455 steps, 2026-06-10)
+
+**Value head regression:**
+
+| Position | Value | Expected | Notes |
+|----------|-------|----------|-------|
+| Start | +0.027 | ~0.0 | ~ slight positive drift |
+| K+Q vs K (w wins) | +0.9902 | near +1 | ✓ stable |
+| K+Q vs K (b move) | −0.9995 | near -1 | ✓ saturated |
+| White missing queen | **−0.2559** | < 0 | ✓ major improvement (was −0.007 at game ~5960) |
+
+Missing queen trajectory: −0.007 (game ~5960) → −0.114 (47k steps) → −0.256 (52k steps). Accelerating — value head is genuinely generalising material reasoning beyond the seeded endgame positions.
+
+**Tier 1 vs random (25 games each side, 50 sims, greedy, CPU):**
+
+| Matchup | HAL wins | Opponent wins | Draws |
+|---------|----------|---------------|-------|
+| HAL (White) vs Random | 5 (20%) | 0 (0%) | 20 (80%) |
+| Random (White) vs HAL (Black) | 5 (20%) | 1 (4%) | 19 (76%) |
+| **Overall** | **20%** | | |
+
+Slight regression from 22% at game ~5960. White improved (4W/2L → 5W/0L, no more losses to random). Black regressed (7W/0L → 5W/1L). The 80% draw rate as White is the notable feature — 20/25 games capped at 200 moves. HAL opens a2a3 (greedy, 66% of all White games in this eval), plays passively, and doesn't generate winning plans vs random. It's not losing, but it's not converting either.
+
+**Tier 2 vs Stockfish depth 1 (200 sims, noisy, CPU):**
+
+| Matchup | Wins | Draws | Losses |
+|---------|------|-------|--------|
+| HAL (White) vs Stockfish depth 1 | 0 (0%) | 0 (0%) | 25 (100%) |
+| Stockfish depth 1 (White) vs HAL (Black) | 0 (0%) | 1 (4%) | 24 (96%) |
+
+**Scholar's Mate trap RESOLVED.** Short losses (≤12 moves) as White: **0/25** — down from 17/25 at game ~5960. The f2f3/g2g3 opening pattern has been dethroned in greedy eval. HAL now predominantly opens a2a3 (passive, but avoids the h5-diagonal exposure). Average game length vs Stockfish depth 1 as White: **82 moves** (was 32 moves at game ~5960). HAL is dying slower, not stronger — still 0 wins/draws — but the tactical hole has closed.
+
+Black draw vs Stockfish depth 1: 1 game reached 200-move cap (same milestone as game ~5960 — HAL defended for the full game).
+
+Tier 2 depths 3 and 5: complete losses as expected.
+
+**Scholar's Mate progression (HAL White vs Stockfish depth 1):**
+
+| Eval | Scholar's Mates / 25 games | Avg game length | Notes |
+|------|---------------------------|-----------------|-------|
+| Game ~3000 | ~4/25 | — | First documentation |
+| Game ~5400 | 6/25 | — | 2 draws via b1c3 noise escape |
+| Game ~5960 | **17/25** | 32 moves | Trap at peak — worsening |
+| **Game 7500** | **0/25** | **82 moves** | **Trap resolved — policy shifted** |
+
+**Summary:** Value head improving faster than policy. The Scholar's Mate failure mode has been replaced by a strategic one — passive a2a3 opening with no winning plan. Overall win rate vs random has plateaued around 20–22% for the last 2,000 training games. The value head improvement needs more games to propagate into policy improvement.
+
+---
 
 **★ Self-play Scholar's Mate — Game 6030 (45,105 steps, 2026-06-10):**
 
