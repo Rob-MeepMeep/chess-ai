@@ -258,7 +258,7 @@ try:
     engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
     engine.configure({"Threads": 1, "Hash": 16})   # 1 thread, 16MB hash — prevent unified memory bloat
 
-    for depth in [1, 3, 5]:
+    for depth in [1]:   # depth 3/5 re-enable when HAL reaches 20% W/D vs depth 1
         n_sims = SIMS_BY_DEPTH.get(depth, 200)
         hal_sf = hal_move_noisy_at(n_sims)   # noise breaks determinism; greedy selection preserved
         sf_move = stockfish_move(engine, depth)
