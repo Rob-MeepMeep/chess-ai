@@ -1,6 +1,6 @@
 # chess-ai — Project Run Notes
 **Authors:** Rob Kirkland, Ellis Ward  
-**Last updated:** 2026-06-10 (game 7500 eval)
+**Last updated:** 2026-06-11 (game ~9050 eval)
 
 This document is the persistent context record for the chess-ai project. Any agent or collaborator picking up this project should read this alongside `paper/phase3_architecture.md` and `paper/changelog.md` before touching any code.
 
@@ -1285,6 +1285,71 @@ Tier 2 depths 3 and 5: complete losses as expected.
 | **Game 7500** | **0/25** | **82 moves** | **Trap resolved — policy shifted** |
 
 **Summary:** Value head improving faster than policy. The Scholar's Mate failure mode has been replaced by a strategic one — passive a2a3 opening with no winning plan. Overall win rate vs random has plateaued around 20–22% for the last 2,000 training games. The value head improvement needs more games to propagate into policy improvement.
+
+---
+
+---
+
+## Eval at game ~9050 (60,270 steps, 2026-06-11)
+
+**Value head regression:**
+
+| Position | Value | Expected | Notes |
+|----------|-------|----------|-------|
+| Start | −0.057 | ~0.0 | ⚠ negative bias — value head reading opening as bad for White |
+| K+Q vs K (w wins) | +0.9890 | near +1 | ✓ stable |
+| K+Q vs K (b move) | −0.9995 | near -1 | ✓ saturated |
+| White missing queen | −0.084 | < 0 | ~ oscillation noise (was +0.023 at 60,090 steps) |
+
+Missing queen trajectory confirmed as unstable oscillation, not durable learning. Start value flipped negative — value head in a negative bias phase, reading White opening positions pessimistically.
+
+**Tier 1 vs random (25 games each side, 50 sims, greedy, CPU):**
+
+| Matchup | HAL wins | Opponent wins | Draws |
+|---------|----------|---------------|-------|
+| HAL (White) vs Random | 3 (12%) | 0 (0%) | 22 (88%) |
+| Random (White) vs HAL (Black) | 4 (16%) | 2 (8%) | 19 (76%) |
+| **Overall** | **14%** | | |
+
+Lowest since game ~2600. All 25 White games opened a2a3 (100% greedy lock-in). 88% cap draws as White — even more passive than game 7500 (80%). Two losses as Black to random.
+
+The negative start value (−0.057) is the primary driver: when the value head reads opening positions as slightly bad for White, the policy becomes overly conservative and stops generating winning plans.
+
+**Tier 2 vs Stockfish depth 1 (200 sims, noisy, CPU):**
+
+| Matchup | Wins | Draws | Losses |
+|---------|------|-------|--------|
+| HAL (White) vs Stockfish depth 1 | 0 (0%) | **1 (4%)** | 24 (96%) |
+| Stockfish depth 1 (White) vs HAL (Black) | 0 (0%) | 0 (0%) | 25 (100%) |
+
+**★ First ever draw as White vs Stockfish depth 1.** Game 59 (174 moves): `f2f3 e7e5 e2e4 g8e7 c2c4 e7c6 d2d3 f8b4`. Dirichlet noise escaped a2a3 to f2f3, but HAL followed up with e4/c4/d3 (centre development) rather than the Scholar's Mate continuation — and held Stockfish for 174 moves. No draws as Black (regression from 1 at game 7500).
+
+Scholar's Mate short losses (≤12 moves): **0/25** — second consecutive eval with trap resolved.
+
+Average game length vs SF1 as White: **56.9 moves** (was 82.2 at game 7500). Three games ended in ≤20 moves — quick tactical losses, not Scholar's Mates.
+
+**Eval comparison:**
+
+| Eval | Steps | vs random | Avg SF1 length (W) | White SF1 draws | Scholar's Mates |
+|------|-------|-----------|-------------------|-----------------|-----------------|
+| ~5960 | 44,805 | 22% | 32m | 0 | 17/25 |
+| 7500 | 52,455 | 20% | 82m | 0 | 0/25 |
+| ~9050 | 60,270 | **14%** | 57m | **1** | 0/25 |
+
+Win rate in trough; first White draw vs Stockfish; Scholar's Mate resolved. 10k final eval ~950 games away.
+
+**Missing queen oscillation — full trajectory:**
+
+| Steps | Games | missing queen | Notes |
+|-------|-------|---------------|-------|
+| 44,805 | ~5960 | −0.007 | Near zero throughout |
+| 50,305 | ~7100 | −0.114 | Apparent improvement |
+| 52,455 | 7,500 | −0.256 | Peak improvement |
+| 55,490 | ~8100 | −0.013 | Reversal |
+| 60,090 | ~9030 | +0.023 | Went positive |
+| 60,270 | ~9050 | −0.084 | Back negative |
+
+Conclusion: not durable learning. The missing queen value oscillates with the training distribution bias. The value head has not stably generalised material reasoning to opening/mid-game positions. Run 11 should expand the permanent buffer to include material-imbalanced mid-game positions (rook down, queen down at move 5–10) to anchor this.
 
 ---
 
