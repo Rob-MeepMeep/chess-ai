@@ -79,6 +79,11 @@ class Logger:
             "move3", "pct3", "move4", "pct4", "move5", "pct5",
         ])
 
+        self._regression_path = os.path.join(log_dir, "regression.csv")
+        self._init_csv(self._regression_path, [
+            "game", "start", "w_wins", "b_move", "missing_queen", "timestamp",
+        ])
+
         # Rolling accumulators for the current 100-game window
         self._reset_window()
 
@@ -159,6 +164,36 @@ class Logger:
                 uci     = chess.Move(from_sq, to_sq).uci()
                 row += [uci, f"{prob*100:.1f}%"]
             self._append(self._snapshot_path, row)
+
+    def record_regression(self, game_num: int, agent) -> None:
+        """
+        Run value head regression and append one row to regression.csv.
+        Called every 200 games — gives a continuous curve instead of manual
+        spot-checks between evals.
+
+        Four positions match eval_chess.py's REGRESSION_POSITIONS exactly so
+        the logged values are directly comparable to manual eval output.
+        """
+        fens = {
+            "start":         "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            "w_wins":        "8/8/8/8/8/6K1/6Q1/7k w - - 0 1",
+            "b_move":        "8/8/8/8/8/6K1/6Q1/7k b - - 0 1",
+            "missing_queen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1",
+        }
+        agent.network.eval()
+        values = {}
+        for key, fen in fens.items():
+            board = chess.Board(fen)
+            values[key] = agent.get_value(board, [])
+
+        self._append(self._regression_path, [
+            game_num,
+            f"{values['start']:+.4f}",
+            f"{values['w_wins']:+.4f}",
+            f"{values['b_move']:+.4f}",
+            f"{values['missing_queen']:+.4f}",
+            time.strftime("%Y-%m-%d %H:%M:%S"),
+        ])
 
     # ------------------------------------------------------------------
     # Internal

@@ -37,9 +37,10 @@ BATCH_SIZE       = 64
 TRAIN_STEPS      = 5        # gradient updates per game (once buffer is ready)
 MIN_BUFFER       = 500      # don't train until buffer holds this many positions
 MAX_GAME_MOVES   = 150      # hard cap — bumped from 100; resign logic should terminate most games first
-CHECKPOINT_EVERY = 10       # save checkpoint every N games
-SNAPSHOT_EVERY   = 50      # log MCTS strategy snapshots every N games
-PRINT_EVERY      = 10       # print progress line every N games
+CHECKPOINT_EVERY  = 10      # save checkpoint every N games
+SNAPSHOT_EVERY    = 50      # log MCTS strategy snapshots every N games
+PRINT_EVERY       = 10      # print progress line every N games
+REGRESSION_EVERY  = 200     # log value head regression to regression.csv
 RESIGN_THRESHOLD   = -0.95  # value head score below which a position is hopeless
 RESIGN_CONSECUTIVE = 5      # raised from 3 — let positions breathe, force more closing technique
 RESIGN_MATERIAL    = 3      # lowered from 7 for Run 9 — forces HAL to grind out major advantages
@@ -49,9 +50,9 @@ RESIGN_MATERIAL    = 3      # lowered from 7 for Run 9 — forces HAL to grind o
 # Run identity — change RUN_NAME to start a new named run with its own logs and buffer.
 # CKPT_LOAD: None = load RUN_NAME's own checkpoint; set to a path to seed weights from another run.
 # BUFFER_LOAD: None = load RUN_NAME's own buffer; set to a path to load from another run.
-RUN_NAME    = "run10"
-CKPT_LOAD   = "checkpoints/run9_hal_chess.pt"           # continue from run9 — value head healthy, w-wins 0.948, b-move 0.995
-BUFFER_LOAD = "checkpoints/run10_seed_buffer.pt"        # curated seed buffer from run9 games 800-1000
+RUN_NAME    = "run11"
+CKPT_LOAD   = "checkpoints/run10_hal_chess.pt"          # continue from run10 — 26% vs random, w-wins 0.989, b-move 0.995
+BUFFER_LOAD = "checkpoints/run11_seed_buffer.pt"        # curated seed buffer: run10 games 2000+, 193 agent-reviewed mid-game positions
 
 CKPT_PATH   = f"checkpoints/{RUN_NAME}_hal_chess.pt"
 BUFFER_PATH = f"checkpoints/{RUN_NAME}_replay_buffer.pt"
@@ -240,6 +241,9 @@ for game_num in range(start_game + 1, N_GAMES + 1):
 
     if game_num % SNAPSHOT_EVERY == 0:
         logger.record_snapshot(game_num, agent)
+
+    if game_num % REGRESSION_EVERY == 0:
+        logger.record_regression(game_num, agent)
 
     # --- Checkpoint ---
     if game_num % CHECKPOINT_EVERY == 0:
