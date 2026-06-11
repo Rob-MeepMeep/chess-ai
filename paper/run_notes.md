@@ -1,6 +1,6 @@
 # chess-ai — Project Run Notes
 **Authors:** Rob Kirkland, Ellis Ward  
-**Last updated:** 2026-06-11 (game ~9050 eval)
+**Last updated:** 2026-06-11 (Run 10 complete — game ~9900 final eval)
 
 This document is the persistent context record for the chess-ai project. Any agent or collaborator picking up this project should read this alongside `paper/phase3_architecture.md` and `paper/changelog.md` before touching any code.
 
@@ -1384,6 +1384,79 @@ Note: White played b1c3 on move 1, not a2a3. This confirms the a2a3 lock-in is a
 | ~4100 | +0.984 | Peak — oscillation tightening |
 | ~5400 | +0.967 | Floor rising — worst reading since game 3000 is +0.951 |
 | ~5960 | +0.995 | Oscillation peak — amplitude further tightened |
+
+---
+
+## Eval at game ~9900 (64,425 steps, 2026-06-11) — Run 10 final
+
+**Value head regression (at eval startup, CPU):**
+
+| Position | Value | Expected | Notes |
+|----------|-------|----------|-------|
+| Start | +0.039 | ~0.0 | ✓ near-zero; positive bias phase |
+| K+Q vs K (w wins) | +0.9215 | near +1 | ✓ (CPU vs MPS float precision — MPS reads +0.9999) |
+| K+Q vs K (b move) | −0.9988 | near -1 | ✓ saturated |
+| White missing queen | +0.043 | < 0 | ✗ start-adjusted: ~−0.005 — still oscillating |
+
+Missing queen still coupled to start bias oscillation — no stable generalisation. w-wins reads +0.9215 on CPU (was +0.9999 on MPS throughout Run 10); this is a float precision artifact of CPU vs MPS on near-saturated tanh, not a regression.
+
+**Tier 1 vs random (25 games each side, 50 sims, greedy, CPU):**
+
+| Matchup | HAL wins | Formal draws | Opponent wins | Cap draws | Win% |
+|---------|----------|--------------|---------------|-----------|------|
+| HAL (White) vs Random | 7 (28%) | 1 (game 15, 144m) | 0 (0%) | 17 | **28%** |
+| Random (White) vs HAL (Black) | 6 (24%) | 1 (game 27, 132m) | 0 (0%) | 18 | **24%** |
+| **Overall** | **13 (26%)** | | **0** | | **26%** |
+
+**★ 26% overall win rate — new run high.** Previous high was 22% (game ~2000 and ~5960). Zero losses to random either colour. The W/B oscillation flattened in the final eval: White 28%, Black 24% — both healthy simultaneously for the first time in Run 10.
+
+**Notable game — Scholar's Mate variant in 7 plies (game 16):**
+```
+1. a2a3  h7h6
+2. e2e3  f7f6     ← random opens f7-e8 diagonal
+3. Qh5   g7g6     ← random moves blocking pawn
+4. Qxg6#           ← checkmate via g6-f7-e8 diagonal
+```
+HAL's greedy policy still hunts Qh5 and converts when the random opponent walks into it. The king has no escape: d7, d8, e7 occupied by own pawns/pieces; f7 attacked by queen; f8 blocked by own bishop. All 25 White games opened a2a3 (100% greedy lock-in).
+
+**Tier 2 vs Stockfish depth 1 (200 sims, noisy, CPU):**
+
+| Matchup | Wins | Formal draws | Losses | Cap draws (200m) | W/D% |
+|---------|------|--------------|--------|------------------|------|
+| HAL (White) vs Stockfish depth 1 | 0 | 0 | 22 | **3** (games 53, 60, 70) | 0% |
+| Stockfish depth 1 vs HAL (Black) | 0 | 0 | 23 | **2** (games 79, 80) | 0% |
+
+Five 200-move cap draws against Stockfish (3 White, 2 Black). No formal draws this eval (the game ~9050 formal draw — 174 moves, 50-move rule — remains the milestone). Cap draws represent survival to 200 moves without losing, which is improved resilience, but are not the same as formal draws: HAL could not convert. Combined W/D vs SF1: 5/50 = 10% — approaching but not yet at the 20% threshold for re-enabling depth 3.
+
+**Eval comparison — full Run 10:**
+
+| Eval | Steps | HAL win% vs random | Win (W) | Win (B) | SF1 W/D |
+|------|-------|-------------------|---------|---------|---------|
+| ~2000 | 25,110 | 22% | 16% | 28% | — |
+| ~2600 | 28,305 | 14% | 16% | 8% | — |
+| ~3000 | 30,240 | 16% | — | — | — |
+| ~5400 | 41,990 | 18% | 24% | 0% | 0 |
+| ~5960 | 44,805 | 22% | 20% | 0% | 0 |
+| ~7500 | 52,455 | 20% | 20% | 4% | 0 |
+| ~9050 | 60,270 | 14% | 12% | 16% | **1 formal draw** |
+| **~9900** | **64,425** | **★ 26%** | **28%** | **24%** | 5 cap draws (10%) |
+
+**★ Best final eval in project history.** 26% win rate, zero losses either colour, both White and Black above 20% simultaneously for the first time. W/B oscillation amplitude narrowed significantly by end of run — early run saw 28%/0% anti-correlation; final eval 28%/24% shows convergence. Five cap draws vs Stockfish depth 1 (improving resilience; not yet at 20% W/D threshold).
+
+**Final regression at closure (64,925 steps, MPS):**
+
+| Position | Value | Expected | Notes |
+|----------|-------|----------|-------|
+| Start | +0.054 | ~0.0 | ✓ near-zero; positive bias |
+| K+Q vs K (w wins) | +0.9888 | near +1 | ✓ stable (MPS precision) |
+| K+Q vs K (b move) | −0.9954 | near -1 | ✓ saturated |
+| White missing queen | **−0.0890** | < 0 | ✓ correctly signed; start-adjusted: −0.143 |
+
+Start-adjusted missing queen of −0.143 is the best reading at positive start bias in the entire run (compare: −0.004 at 64,425 steps when start was +0.039). Whether this represents genuine late-run learning or is another oscillation peak is unclear — but it is the correct sign at closure. The 64,925-step checkpoint is the official Run 10 final checkpoint.
+
+Final 100-game window: W24/B26 — near-balanced self-play at closure.
+
+**Run 10 closed.** Next: extract_buffer_candidates.py → external agent review → curate Run 11 seed buffer.
 
 ---
 

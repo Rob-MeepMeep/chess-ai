@@ -1,0 +1,3002 @@
+[
+  {
+    "game_num": 2031,
+    "ply": 17,
+    "fen": "r1bqk2r/p1p1pp1p/3p2pb/1p6/1P2N2P/3P4/1RP1PPP1/2BQKBNR b Kkq - 0 9",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 0
+  },
+  {
+    "game_num": 2048,
+    "ply": 11,
+    "fen": "r1bBk1nr/1ppp1pp1/p1nbp3/2P4p/8/3P4/PP1KPPPP/RN1Q1BNR b kq - 0 6",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 1
+  },
+  {
+    "game_num": 2062,
+    "ply": 22,
+    "fen": "rn1qnb1r/p1p1pk2/7p/1B1p2p1/1P2pP2/P1P1K2N/R2P2PP/1NBb2R1 w - - 0 12",
+    "material_balance": -9,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 2
+  },
+  {
+    "game_num": 2070,
+    "ply": 23,
+    "fen": "3qk1nr/p2ppp1p/Rr5P/1p6/4P3/3P4/2nK1PP1/1NBQ1BNR b k - 0 12",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 3
+  },
+  {
+    "game_num": 2108,
+    "ply": 14,
+    "fen": "rnbq1bnr/1pp1pkp1/3p3p/p1P5/8/N2P1p2/PP3PPP/R1B1KBNR w KQ - 0 8",
+    "material_balance": -10,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 4
+  },
+  {
+    "game_num": 2133,
+    "ply": 23,
+    "fen": "2bNk1n1/r1p1pp1r/p2p3b/1p4pp/1P5P/3P4/2P1PPP1/RNBQKB1R b Q - 0 12",
+    "material_balance": 11,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 5
+  },
+  {
+    "game_num": 2169,
+    "ply": 23,
+    "fen": "r1bq1bn1/1p2kppN/p3p3/2pp3p/1P5P/N3P3/PP1PKPPR/1RBQ1B2 b - - 0 12",
+    "material_balance": 8,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 6
+  },
+  {
+    "game_num": 2192,
+    "ply": 18,
+    "fen": "r2qk1nr/pp2Bpbp/n2p2p1/1p6/3P3P/P3P2b/2P2PP1/RN1QKBN1 w Q - 0 10",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 7
+  },
+  {
+    "game_num": 2213,
+    "ply": 15,
+    "fen": "r1bBkbn1/1p1p1ppr/2p4p/p3p3/1n1P4/2P3PP/PP2PP2/RN1QKBNR b KQq - 0 8",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 8
+  },
+  {
+    "game_num": 2223,
+    "ply": 22,
+    "fen": "rnbq2nr/pp1k2p1/2p5/2b2pNp/Pp3P1P/3pP3/3P2P1/RNBQK2R w KQ - 0 12",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 9
+  },
+  {
+    "game_num": 2249,
+    "ply": 19,
+    "fen": "r1bB1bnr/p2p1pp1/2pk3p/1p2p3/1PPP4/7P/4PPP1/RN1QKBNR b KQ - 0 10",
+    "material_balance": 11,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 10
+  },
+  {
+    "game_num": 2267,
+    "ply": 27,
+    "fen": "rn1qk1n1/4ppb1/1PPpb1pB/7p/p6P/N2P2PR/2P1PP2/R2QKBN1 b Qq - 0 14",
+    "material_balance": 7,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 11
+  },
+  {
+    "game_num": 2280,
+    "ply": 9,
+    "fen": "r1bBkbnr/pp1p1pp1/n7/7p/1p1P4/8/P1P1PPPP/RN1QKBNR b KQkq - 0 5",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 12
+  },
+  {
+    "game_num": 2388,
+    "ply": 18,
+    "fen": "r1bq1b1r/p1pknpp1/3pp2p/8/1Ppn1P1P/P7/4P1P1/RN1QKBNR w KQ - 0 10",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 13
+  },
+  {
+    "game_num": 2412,
+    "ply": 13,
+    "fen": "r1bqkbr1/ppppppp1/7p/8/1P1P2P1/8/1BP1PPP1/RN1QKBNR b KQq - 0 7",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 14
+  },
+  {
+    "game_num": 2429,
+    "ply": 21,
+    "fen": "R1bqkb1r/1pppp1p1/2n4p/4Pp2/1p5P/3P1NP1/2P1KP2/1NBQ1B1R b - - 0 11",
+    "material_balance": 6,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 15
+  },
+  {
+    "game_num": 2459,
+    "ply": 22,
+    "fen": "1nb1qbnr/2pppkp1/8/1p3pPp/1P3P2/5N1P/2PPPK1R/rNBQ1B2 w - - 0 12",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 16
+  },
+  {
+    "game_num": 2494,
+    "ply": 10,
+    "fen": "rnbqkb1r/pppppp2/7n/8/8/1P1P2pP/P1P1PPP1/RNB1KBNR w KQkq - 0 6",
+    "material_balance": -8,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 17
+  },
+  {
+    "game_num": 2507,
+    "ply": 20,
+    "fen": "rn1q1bnr/2pkp1p1/p2p1pp1/1p1P4/6PP/2P1P3/PP2K1P1/RNB2BNR w - - 0 11",
+    "material_balance": -6,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 18
+  },
+  {
+    "game_num": 2520,
+    "ply": 25,
+    "fen": "rnbq1b1r/p2k4/3ppQ1p/1pp3P1/8/PP1P1P2/2PKPNPR/RNB2B2 b - - 0 13",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 19
+  },
+  {
+    "game_num": 2534,
+    "ply": 12,
+    "fen": "rnbqkb1r/p1ppp1p1/2Q2p2/1p5p/3P4/7P/PPP1PPPn/RNB1KBN1 w Qkq - 0 7",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 20
+  },
+  {
+    "game_num": 2541,
+    "ply": 21,
+    "fen": "rn2kb2/p3pnpr/1pPp1p2/7p/6bP/P2P4/2P1PPP1/RNBQKBR1 b Qq - 0 11",
+    "material_balance": 7,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 21
+  },
+  {
+    "game_num": 2573,
+    "ply": 19,
+    "fen": "r1bq1bn1/2pkp1pQ/3p1p2/pp5p/1P1P3P/5P2/2P1PKPR/RNB2BN1 b - - 0 10",
+    "material_balance": 7,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 22
+  },
+  {
+    "game_num": 2582,
+    "ply": 21,
+    "fen": "rnbqk3/p1pppp2/7r/1P4Pp/1P2n2P/4PN2/1BPP2P1/RN1QKB1R b KQq - 0 11",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 23
+  },
+  {
+    "game_num": 2597,
+    "ply": 26,
+    "fen": "2bq2nr/2pkp2p/r1np2p1/2p3b1/Pp1P3R/4P3/R4PP1/1N1QKBN1 w - - 0 14",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 24
+  },
+  {
+    "game_num": 2622,
+    "ply": 21,
+    "fen": "rnbq4/pppkn3/4p2P/P2p1p1p/1b3P2/4P3/2PPN1P1/RNBQ1BKR b - - 0 11",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 25
+  },
+  {
+    "game_num": 2635,
+    "ply": 19,
+    "fen": "Q1bqkb1r/1p4pp/3pp2n/2p5/1pN2p2/2P2PPB/P2PP2P/R1B1K1NR b KQk - 0 10",
+    "material_balance": 7,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 26
+  },
+  {
+    "game_num": 2636,
+    "ply": 15,
+    "fen": "rnbQ1bn1/ppp1pppr/4k2p/8/5P1P/PP6/2P3P1/RNB1KBNR b KQ - 0 8",
+    "material_balance": 8,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 27
+  },
+  {
+    "game_num": 2650,
+    "ply": 23,
+    "fen": "rnb2bnr/pp1B3p/3p2k1/1Pp1p1P1/8/P1B5/2PPPK1P/RN1Q2NR b - - 0 12",
+    "material_balance": 10,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 28
+  },
+  {
+    "game_num": 2657,
+    "ply": 17,
+    "fen": "r2qk1nr/ppp2pp1/P7/3pp2p/6B1/b4PP1/1BPPP2P/RN1QK1NR b KQkq - 0 9",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 29
+  },
+  {
+    "game_num": 2692,
+    "ply": 15,
+    "fen": "rnbB1bnr/p1pp1p1p/4k3/1P2p3/4P3/3P3P/PP1K1PP1/RN1Q1BNR b - - 0 8",
+    "material_balance": 11,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 30
+  },
+  {
+    "game_num": 2730,
+    "ply": 16,
+    "fen": "rnbqk1nr/ppp3p1/2p4p/3p1p2/1P6/b7/P1PPPPPP/1RBQKBR1 w kq - 0 9",
+    "material_balance": -6,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 31
+  },
+  {
+    "game_num": 2747,
+    "ply": 27,
+    "fen": "rn3bnr/2p2pp1/1pkp4/p6p/P3KpPP/R1P5/1P1P3R/1NBQ1BN1 b - - 0 14",
+    "material_balance": 10,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 32
+  },
+  {
+    "game_num": 2800,
+    "ply": 24,
+    "fen": "r1bq1b1r/1p1n1k1p/p1p2n2/2Pp2p1/P3p3/1P1p3P/4NPP1/RN1QKB1R w KQ - 0 13",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 33
+  },
+  {
+    "game_num": 2811,
+    "ply": 20,
+    "fen": "rnb1qbnr/3pk1p1/2p1p3/2P3pp/p1P5/3P4/P3PPPP/RN1QKB1R w KQ - 0 11",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 34
+  },
+  {
+    "game_num": 2853,
+    "ply": 20,
+    "fen": "rn2kbnr/1p2p1p1/pq1p1p1p/3P4/2P1P3/1p5b/P5PP/RNBQKB1R w kq - 0 11",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 35
+  },
+  {
+    "game_num": 2868,
+    "ply": 28,
+    "fen": "r1b1kb2/2p1pnpr/5p2/1Nn2P1p/p3p1PP/P1P5/1P2K2R/R1Bq1BN1 w q - 0 15",
+    "material_balance": -10,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 36
+  },
+  {
+    "game_num": 2878,
+    "ply": 13,
+    "fen": "rnbBkbnr/p4p1p/1p1p2p1/2P1p3/1p6/3P4/P2KPPPP/RN1Q1BNR b kq - 0 7",
+    "material_balance": 8,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 37
+  },
+  {
+    "game_num": 2895,
+    "ply": 19,
+    "fen": "r1bBk2r/pp1p2pp/n2b4/2p1pp2/2P1P3/3P2N1/PP3PPP/RN1QKB1R b KQq - 0 10",
+    "material_balance": 12,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 38
+  },
+  {
+    "game_num": 2914,
+    "ply": 21,
+    "fen": "R1bqkb1r/1ppppNpp/1n6/1N6/1P6/3P4/2P1PnPP/2BQKB1R b Kk - 0 11",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 39
+  },
+  {
+    "game_num": 2921,
+    "ply": 8,
+    "fen": "rn1qkbnr/1pp1pppp/3p4/p7/8/2P1P2P/PP1P1P2/RNBbKBNR w KQkq - 0 5",
+    "material_balance": -10,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 40
+  },
+  {
+    "game_num": 2931,
+    "ply": 8,
+    "fen": "rnbBkbnr/p4pp1/1ppp4/7p/8/3P4/PPP1PPPP/RN1QKBNR w KQkq - 0 5",
+    "material_balance": 10,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 41
+  },
+  {
+    "game_num": 2960,
+    "ply": 13,
+    "fen": "rnbN1bnr/2ppk3/p3p3/1p4pp/8/2N1P3/PPPPKPPP/R1BQ1B1R b - - 0 7",
+    "material_balance": 10,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 42
+  },
+  {
+    "game_num": 2966,
+    "ply": 12,
+    "fen": "rn1q1b1r/pppknBpp/3p4/4p3/4P3/2P4P/PP1P1P2/RNBbK1NR w KQ - 0 7",
+    "material_balance": -9,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 43
+  },
+  {
+    "game_num": 2989,
+    "ply": 17,
+    "fen": "r1b1kbnR/pp1pppp1/n7/2P3P1/3P4/q4P2/2P1P3/RNBQKBN1 b Qq - 0 9",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 44
+  },
+  {
+    "game_num": 3019,
+    "ply": 17,
+    "fen": "r1bB1bnr/pp1p1k1p/n1p3p1/4p3/1P5P/4PP2/P1P3P1/RN1QKBNR b KQ - 0 9",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 45
+  },
+  {
+    "game_num": 3021,
+    "ply": 20,
+    "fen": "r2qkbr1/p3pp1p/2n3pn/2p5/5Pb1/4P3/PPP2KPP/RN1Q2NR w q - 0 11",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 46
+  },
+  {
+    "game_num": 3033,
+    "ply": 24,
+    "fen": "1nbqk2r/3pb3/rp3pp1/p1pNp2p/P1P1P2P/1P1P4/3Q1PPn/R1B1KBN1 w k - 0 13",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 47
+  },
+  {
+    "game_num": 3034,
+    "ply": 22,
+    "fen": "rn1q1b1r/pp1k2pp/2p3n1/4Pp2/P3p2P/2P5/1P2P1PR/RNB1KBN1 w Q - 0 12",
+    "material_balance": -6,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 48
+  },
+  {
+    "game_num": 3071,
+    "ply": 28,
+    "fen": "rn1qk3/pp2npbr/3pp1p1/1PP3p1/P1P1P3/7b/3NBP1P/R1Q1K2R w KQq - 0 15",
+    "material_balance": -6,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 49
+  },
+  {
+    "game_num": 3126,
+    "ply": 26,
+    "fen": "r2q1b2/p1p1pkpr/2n2n1p/3pP2P/2b3p1/p4P2/RPPPK2R/1NBQ2N1 w - - 0 14",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 50
+  },
+  {
+    "game_num": 3160,
+    "ply": 23,
+    "fen": "r1bBk1n1/2p3b1/p1npp1p1/5p1r/1pPPP2P/1P3P2/P5P1/RNQ1KBNR b KQq - 0 12",
+    "material_balance": 10,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 51
+  },
+  {
+    "game_num": 3175,
+    "ply": 18,
+    "fen": "rnbq1bn1/p1p1pk2/5p2/1pPp2p1/1P1P2P1/5P1r/P2NP2P/R2QK1NR w KQ - 0 10",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 52
+  },
+  {
+    "game_num": 3186,
+    "ply": 28,
+    "fen": "rnbqk2r/1p4p1/8/p1p4p/5pnP/bPp1pP1R/2P1N1P1/RN1QKB2 w Qkq - 0 15",
+    "material_balance": -6,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 53
+  },
+  {
+    "game_num": 3219,
+    "ply": 9,
+    "fen": "rnbBkbnr/p1p2pp1/8/1p1p3p/1P6/3P4/P1P1PPPP/RN1QKBNR b KQkq - 0 5",
+    "material_balance": 10,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 54
+  },
+  {
+    "game_num": 3258,
+    "ply": 18,
+    "fen": "r1bq1bnr/p1p1kpp1/3p3p/1p2P3/7P/3P4/PP1K1PP1/nN1Q1BNR w - - 0 10",
+    "material_balance": -8,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 55
+  },
+  {
+    "game_num": 3270,
+    "ply": 22,
+    "fen": "rnbq1b1r/2p1p1pp/3pk2n/pp2P3/7P/3P1p2/PPP1QPPR/RN2KB2 w Q - 0 12",
+    "material_balance": -6,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 56
+  },
+  {
+    "game_num": 3282,
+    "ply": 28,
+    "fen": "r1bq2nr/2pk4/2np2p1/1pp1p1bp/4Pp1P/PP1P4/3KBPP1/RNB3NR w - - 0 15",
+    "material_balance": -10,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 57
+  },
+  {
+    "game_num": 3305,
+    "ply": 19,
+    "fen": "r2qkbr1/ppp2ppp/4p3/1P1p4/5PB1/R5P1/2PPP3/1NBQK1NR b Kq - 0 10",
+    "material_balance": 7,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 58
+  },
+  {
+    "game_num": 3399,
+    "ply": 23,
+    "fen": "r1bqk1nR/p1pp4/1pn1pp2/1P6/3b2P1/P2PPP2/2P1K1P1/RNBQ1BN1 b q - 0 12",
+    "material_balance": 7,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 59
+  },
+  {
+    "game_num": 3416,
+    "ply": 23,
+    "fen": "r1bq3r/p1ppkp2/2n1p1p1/1pPP2Pp/P7/8/1P2PNPP/RNBQKBR1 b Q - 0 12",
+    "material_balance": 6,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 60
+  },
+  {
+    "game_num": 3448,
+    "ply": 17,
+    "fen": "rnb1kbr1/1ppp1pp1/p3p3/7p/6B1/P2P1PP1/1PP1PK2/RNB2QNR b q - 0 9",
+    "material_balance": 11,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 61
+  },
+  {
+    "game_num": 3457,
+    "ply": 12,
+    "fen": "rn1qkbr1/ppp1pp1p/7n/3p4/2P3bP/3BP3/PP1P1PP1/RNB1K1NR w KQq - 0 7",
+    "material_balance": -8,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 62
+  },
+  {
+    "game_num": 3461,
+    "ply": 9,
+    "fen": "1rbBkbnr/pppp2pp/8/5p2/1n2P3/3P4/PPP2PPP/RN1QKBNR b KQk - 0 5",
+    "material_balance": 10,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 63
+  },
+  {
+    "game_num": 3471,
+    "ply": 17,
+    "fen": "rnbqkbnB/p3pp2/6pp/1ppp4/3P3P/1P5R/P1P1PPP1/RN1QKBN1 b Qq - 0 9",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 64
+  },
+  {
+    "game_num": 3475,
+    "ply": 13,
+    "fen": "rnb1kbn1/pp2pppr/2pp3p/8/1P3P2/8/1BPPP1PP/RN1QKBNR b KQq - 0 7",
+    "material_balance": 8,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 65
+  },
+  {
+    "game_num": 3476,
+    "ply": 22,
+    "fen": "rn1qkb2/ppp2p1r/2b4p/2Pp2p1/1P1p2P1/5P2/P2PP2P/RNB1KBNR w KQq - 0 12",
+    "material_balance": -6,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 66
+  },
+  {
+    "game_num": 3505,
+    "ply": 17,
+    "fen": "rnb2bnr/pp1p1p1p/2p1k3/1P2p3/P2P4/3KP3/2P1BPPP/RN1Q2NR b - - 0 9",
+    "material_balance": 7,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 67
+  },
+  {
+    "game_num": 3602,
+    "ply": 24,
+    "fen": "rn1q2nr/ppp3bp/3p1pk1/1N2p1p1/P1P1P1b1/6PP/1P1P1P1R/R1B1KBN1 w Q - 0 13",
+    "material_balance": -9,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 68
+  },
+  {
+    "game_num": 3693,
+    "ply": 8,
+    "fen": "rnq1kbnr/ppp1pppp/8/3pP3/8/3P3P/PPP2PP1/RNBbKBNR w KQkq - 0 5",
+    "material_balance": -9,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 69
+  },
+  {
+    "game_num": 3727,
+    "ply": 26,
+    "fen": "1rb1kb1r/pp1n1pp1/5q2/2p1p3/6n1/1PpP1P2/P1PKP2P/R2Q1BNR w k - 0 14",
+    "material_balance": -6,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 70
+  },
+  {
+    "game_num": 3791,
+    "ply": 21,
+    "fen": "r1bQ1bnr/p2np2p/4Ppk1/3p4/2p3pP/P7/1P1PBPP1/RNB1K1NR b KQ - 0 11",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 71
+  },
+  {
+    "game_num": 3800,
+    "ply": 23,
+    "fen": "rn1q2nr/p1pkppb1/3P4/1p3P2/1P5p/P2P3P/2P2KP1/RNBQ1BNR b - - 0 12",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 72
+  },
+  {
+    "game_num": 3801,
+    "ply": 16,
+    "fen": "rn1qkbnr/4p1pp/p1p2p2/1p1p4/P3PP2/2PP2P1/1P1K3P/RNBb1BNR w kq - 0 9",
+    "material_balance": -9,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 73
+  },
+  {
+    "game_num": 3875,
+    "ply": 13,
+    "fen": "rnbqkb1r/1ppBpp2/p6p/8/8/1P1P2P1/P1P1PP1P/RNBQK1NR b KQkq - 0 7",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 74
+  },
+  {
+    "game_num": 3897,
+    "ply": 22,
+    "fen": "1n1qkb1r/rb1ppp2/5p1p/pp6/4pN2/2P5/PP1K1PPP/R2Q1B1R w k - 0 12",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 75
+  },
+  {
+    "game_num": 4051,
+    "ply": 27,
+    "fen": "rnbqk2r/2ppb3/p3pP2/1p5p/2PPP1P1/PP2P3/4Q2R/RNB1KBN1 b Qkq - 0 14",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 76
+  },
+  {
+    "game_num": 4063,
+    "ply": 28,
+    "fen": "rnbq1bn1/2p2k2/p3p3/1p4P1/1QPP4/5p1r/PP5R/RN1K1B2 w - - 0 15",
+    "material_balance": -6,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 77
+  },
+  {
+    "game_num": 4066,
+    "ply": 28,
+    "fen": "rnbq1br1/pp1k2p1/2p5/2P1ppp1/P7/1PNP3P/4P2R/R1B1KB2 w Q - 0 15",
+    "material_balance": -10,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 78
+  },
+  {
+    "game_num": 4086,
+    "ply": 17,
+    "fen": "rnb1kb1B/1p2pp1p/4q3/p1p5/1PPpP3/5P1P/P2P2P1/RN1QKBNR b KQq - 0 9",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 79
+  },
+  {
+    "game_num": 4096,
+    "ply": 28,
+    "fen": "rn1q2n1/1b1pk1pr/p1pb3p/7P/P1P2p2/5P2/1P1PBNPR/RNB1K3 w Q - 0 15",
+    "material_balance": -8,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 80
+  },
+  {
+    "game_num": 4115,
+    "ply": 13,
+    "fen": "r1bqkbnR/pppnpp2/8/3P4/P5p1/5P2/1P1PP1P1/RNBQKBN1 b Qq - 0 7",
+    "material_balance": 6,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 81
+  },
+  {
+    "game_num": 4163,
+    "ply": 19,
+    "fen": "rnb2bnr/2pk2p1/pp1pp3/P4P1p/7P/2PP4/1P2BPP1/RN1QK1NR b KQ - 0 10",
+    "material_balance": 7,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 82
+  },
+  {
+    "game_num": 4165,
+    "ply": 16,
+    "fen": "rnbqkbr1/p3pppp/1pp5/8/1P5P/8/P1PNP1P1/R1BnKBNR w KQq - 0 9",
+    "material_balance": -10,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 83
+  },
+  {
+    "game_num": 4167,
+    "ply": 21,
+    "fen": "r1bqkb1r/3pp1p1/p6p/1pp1p3/PPPB1PP1/8/3PK1P1/RN1Q1BNR b kq - 0 11",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 84
+  },
+  {
+    "game_num": 4226,
+    "ply": 19,
+    "fen": "r1bq1bnr/p1pppk2/1p3P1p/8/3P4/P2QPP2/1PP3PR/RNB1KBN1 b Q - 0 10",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 85
+  },
+  {
+    "game_num": 4233,
+    "ply": 18,
+    "fen": "rn1q1bnr/p1p1pk1p/1p1p1pp1/4B3/4P2P/1P1P4/P1PK1P2/RN1b1BNR w - - 0 10",
+    "material_balance": -10,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 86
+  },
+  {
+    "game_num": 4253,
+    "ply": 26,
+    "fen": "rnq2bn1/3k2pr/1p1p1p2/P1p1p2p/2PPP1bP/1P2BP2/6PR/RN2KBN1 w Q - 0 14",
+    "material_balance": -8,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 87
+  },
+  {
+    "game_num": 4256,
+    "ply": 28,
+    "fen": "r1bq1b1r/p1pp1k2/5p1n/1p1Pp3/4P2p/PnPK1P1P/1P4PR/RNB2BN1 w - - 0 15",
+    "material_balance": -8,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 88
+  },
+  {
+    "game_num": 4271,
+    "ply": 22,
+    "fen": "rnbq1knr/4b2p/1p3pp1/1pppp3/2P1P3/6PP/PP1PBP2/RNB1K1NR w - - 0 12",
+    "material_balance": -9,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 89
+  },
+  {
+    "game_num": 4274,
+    "ply": 21,
+    "fen": "rnb2bnr/p2kppp1/8/N2p3p/4P3/2PP4/1P2NPPP/1RBQKB1R b K - 0 11",
+    "material_balance": 10,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 90
+  },
+  {
+    "game_num": 4295,
+    "ply": 27,
+    "fen": "rn1qk2r/1b1pP1p1/2p1n2p/p3P2P/1p2P3/PP3P1R/2P2K2/RNBQ1BN1 b kq - 0 14",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 91
+  },
+  {
+    "game_num": 4350,
+    "ply": 10,
+    "fen": "r1bqkbnr/1ppp2pp/p1np4/4p3/8/8/PPPPPPPP/R1BQKB1R w KQkq - 0 6",
+    "material_balance": -6,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 92
+  },
+  {
+    "game_num": 4358,
+    "ply": 20,
+    "fen": "rnbq2nr/2pkb1p1/p7/1p2P2p/5p1P/1P3P1N/P1P1PKP1/RNB2B1R w - - 0 11",
+    "material_balance": -7,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 93
+  },
+  {
+    "game_num": 4368,
+    "ply": 25,
+    "fen": "r2q1b1r/p2Pp3/b3kn1p/1p4p1/1PPP1pP1/P4P1P/3KB3/RNBQ2NR b - - 0 13",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 94
+  },
+  {
+    "game_num": 4396,
+    "ply": 21,
+    "fen": "r3kbnr/1b1p2pp/p1p1p3/2p2p1P/1P6/1P2P3/R1PPKPP1/1NBQ1B1R b kq - 0 11",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 95
+  },
+  {
+    "game_num": 4409,
+    "ply": 8,
+    "fen": "rnbBkb1r/pppp1pp1/7p/4pn2/1P6/3P4/P1P1PPPP/RN1QKBNR w KQkq - 0 5",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 96
+  },
+  {
+    "game_num": 4422,
+    "ply": 25,
+    "fen": "rnbB2nr/p2k4/1pp1p3/4P2p/Pb6/2pP1P2/2K3PP/RN1Q1BNR b - - 0 13",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 97
+  },
+  {
+    "game_num": 4436,
+    "ply": 28,
+    "fen": "4kb1r/1b1ppnpp/r5q1/p1P5/7p/2PP1n2/P3PP1R/RNBQK3 w Qk - 0 15",
+    "material_balance": -6,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 98
+  },
+  {
+    "game_num": 4440,
+    "ply": 23,
+    "fen": "rnb2bn1/p1p1pk2/1p3p1r/3p1Pp1/1P1K1P1p/P7/2PPP1BP/RNBQ2NR b - - 0 12",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 99
+  },
+  {
+    "game_num": 4456,
+    "ply": 23,
+    "fen": "rnbB1k2/3p2pr/p3pn2/1p3p1p/8/NPbP2PB/P3PP1P/R3QKNR b - - 0 12",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 100
+  },
+  {
+    "game_num": 4474,
+    "ply": 26,
+    "fen": "1n1qk2r/2pbpn1p/6pb/r1P5/5pP1/7P/PP2PP2/RNBK1BNR w k - 0 14",
+    "material_balance": -7,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 101
+  },
+  {
+    "game_num": 4597,
+    "ply": 11,
+    "fen": "rnb1k1nr/pppp1ppp/8/4p3/3b2P1/2P2NP1/PP1QP2P/RNB1KB1R b KQkq - 0 6",
+    "material_balance": 8,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 102
+  },
+  {
+    "game_num": 4600,
+    "ply": 23,
+    "fen": "rnb1k3/p2pppbr/7p/4P1p1/1P4P1/P3nP1B/2P1PK1P/R1BQ2NR b q - 0 12",
+    "material_balance": 8,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 103
+  },
+  {
+    "game_num": 4609,
+    "ply": 25,
+    "fen": "rnBq2nr/3p2p1/ppp1p1k1/4Pp1p/P6P/2P1K1PR/1P1P4/RNBQ2N1 b - - 0 13",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 104
+  },
+  {
+    "game_num": 4610,
+    "ply": 14,
+    "fen": "rnbqk1n1/1pppb1p1/7r/p3pp2/3P2p1/PP2P3/2P1KPPP/RNB2BNR w q - 0 8",
+    "material_balance": -9,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 105
+  },
+  {
+    "game_num": 4617,
+    "ply": 21,
+    "fen": "rn1qk1nr/p3B2p/3p1pp1/2p5/1P1p2P1/1P5N/2PQP2P/RN2KB1R b KQkq - 0 11",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 106
+  },
+  {
+    "game_num": 4635,
+    "ply": 18,
+    "fen": "rnbq1b1r/p3pkp1/7n/1p1p1p1p/1P3P2/3P3P/P1P1P1P1/R2QKBNR w KQ - 0 10",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 107
+  },
+  {
+    "game_num": 4655,
+    "ply": 15,
+    "fen": "rnb1kbnr/pp2pp2/2p4p/6P1/4p1P1/1PP2P2/P2Q4/RNB1KBNR b KQkq - 0 8",
+    "material_balance": 8,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 108
+  },
+  {
+    "game_num": 4699,
+    "ply": 28,
+    "fen": "1nb1k1nr/4bp1p/r1p2Pp1/1P1pp3/p1PPP3/7q/1P2B1PP/RNB1K1NR w KQk - 0 15",
+    "material_balance": -8,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 109
+  },
+  {
+    "game_num": 4727,
+    "ply": 24,
+    "fen": "1r1qkb1r/1p1np2p/p1p2n2/6N1/1P2p3/P1P5/3P1K1P/RNBb1B1R w k - 0 13",
+    "material_balance": -10,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 110
+  },
+  {
+    "game_num": 4730,
+    "ply": 22,
+    "fen": "rn1qkbnr/p1p3pp/1p1p1p2/4p2P/PPP1P3/3b4/3P1PP1/RNB1K1NR w KQ - 0 12",
+    "material_balance": -12,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 111
+  },
+  {
+    "game_num": 4814,
+    "ply": 27,
+    "fen": "rnb2b1r/1p2n1pp/p1pN1pk1/2P5/P2P4/4pP1P/3BP1P1/1RQ1KBNR b K - 0 14",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 112
+  },
+  {
+    "game_num": 4839,
+    "ply": 23,
+    "fen": "rnbNk1nr/2ppp3/p5pb/3P1p1p/5P1P/2p5/PP2PKP1/RNBQ1B1R b k - 0 12",
+    "material_balance": 8,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 113
+  },
+  {
+    "game_num": 4842,
+    "ply": 16,
+    "fen": "rn1qkbnr/p1p1p2p/1p3p2/3p2P1/4P2P/2PP4/PP1B2P1/RN1bKBNR w KQkq - 0 9",
+    "material_balance": -8,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 114
+  },
+  {
+    "game_num": 4908,
+    "ply": 21,
+    "fen": "1r2kbnr/ppn1pppp/3p4/2p5/3P2P1/PPN2K1B/4P2P/R1BQ2NR b k - 0 11",
+    "material_balance": 10,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 115
+  },
+  {
+    "game_num": 4983,
+    "ply": 8,
+    "fen": "rn1qkbnr/ppp1pp1p/3p2p1/8/P3P3/2N5/1PPP1PPP/R1BbKBNR w KQkq - 0 5",
+    "material_balance": -9,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 116
+  },
+  {
+    "game_num": 5018,
+    "ply": 10,
+    "fen": "rnbq1bnr/pppppk1p/8/6p1/P1P5/3P4/1P2PPPP/RNB1KBNR w KQ - 0 6",
+    "material_balance": -8,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 117
+  },
+  {
+    "game_num": 5050,
+    "ply": 27,
+    "fen": "r3kbnr/p1q1p2p/1pn2B2/1P6/2p1P1B1/2PP2P1/P6P/RN1Q1KNR b kq - 0 14",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 118
+  },
+  {
+    "game_num": 5054,
+    "ply": 12,
+    "fen": "rnbqk2r/p3pp1p/1p1p2pn/2p5/4P2P/1P3P2/P1PP2P1/RNB1KBNR w KQkq - 0 7",
+    "material_balance": -6,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 119
+  },
+  {
+    "game_num": 5111,
+    "ply": 26,
+    "fen": "2bqkb1r/2pppp2/5P1p/3Q2p1/1n6/r6P/P2pBPP1/R3K1NR w KQk - 0 14",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 120
+  },
+  {
+    "game_num": 5116,
+    "ply": 11,
+    "fen": "r1b1kbnr/pppp1ppp/2n5/8/3p3P/2P2P2/PP1KP3/RNBQ1BNR b kq - 0 6",
+    "material_balance": 7,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 121
+  },
+  {
+    "game_num": 5163,
+    "ply": 24,
+    "fen": "rnb2bnr/4pkpp/p2p4/q1P5/P7/pP1KpPP1/2P4P/1NB1QBNR w - - 0 13",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 122
+  },
+  {
+    "game_num": 5224,
+    "ply": 14,
+    "fen": "2rqkb1r/pp1npppp/2pp3n/8/P4P2/3BP3/1PPP1KPP/RNBb2NR w k - 0 8",
+    "material_balance": -9,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 123
+  },
+  {
+    "game_num": 5244,
+    "ply": 20,
+    "fen": "rnbq3r/p1ppkp2/4p1p1/1P5p/1b1P4/2P2P1P/3KP1P1/RNBn1BNR w - - 0 11",
+    "material_balance": -9,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 124
+  },
+  {
+    "game_num": 5251,
+    "ply": 20,
+    "fen": "rnb2bnr/ppp1pk1p/5p2/8/P3P1P1/1q6/RP1PNPP1/1NB1KB1R w K - 0 11",
+    "material_balance": -8,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 125
+  },
+  {
+    "game_num": 5263,
+    "ply": 26,
+    "fen": "r1b3nr/pp1kb1p1/n6p/1q2pp2/1P2P1P1/P1P2P1P/8/RNB1KBNR w - - 0 14",
+    "material_balance": -8,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 126
+  },
+  {
+    "game_num": 5307,
+    "ply": 8,
+    "fen": "rnbNkbnr/2ppp1p1/pp3p2/7p/8/8/PPPPPPPP/RNBQKB1R w KQkq - 0 5",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 127
+  },
+  {
+    "game_num": 5395,
+    "ply": 19,
+    "fen": "rnbB1b1r/3p1ppp/2p1k3/p7/1p1pP1P1/1PP2P2/P6P/RN1QKBNR b KQ - 0 10",
+    "material_balance": 11,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 128
+  },
+  {
+    "game_num": 5400,
+    "ply": 20,
+    "fen": "rnkq1bnr/p1p1pp2/8/2Pp2B1/P5p1/3P4/1P2P1PP/RN2KBNR w KQ - 0 11",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 129
+  },
+  {
+    "game_num": 5426,
+    "ply": 22,
+    "fen": "rn2kb1r/pp2n1p1/3p1p1p/2p1p2P/8/2PqP3/P2P1PbN/RNBQK2R w kq - 0 12",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 130
+  },
+  {
+    "game_num": 5444,
+    "ply": 15,
+    "fen": "rnbqk2r/ppppp2p/5pp1/4P3/1P1P2P1/8/P1PBP1BP/RN1QK1NR b KQkq - 0 8",
+    "material_balance": 6,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 131
+  },
+  {
+    "game_num": 5450,
+    "ply": 10,
+    "fen": "rnbqkb1r/ppp1pppp/3p4/8/5P2/1PNP2P1/P1P1P2P/R1BnKBNR w KQkq - 0 6",
+    "material_balance": -9,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 132
+  },
+  {
+    "game_num": 5455,
+    "ply": 25,
+    "fen": "rnBqkbr1/2p3p1/1p3p2/3pP2p/3Q3P/PP3NP1/2P5/RNB1K2R b KQq - 0 13",
+    "material_balance": 6,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 133
+  },
+  {
+    "game_num": 5489,
+    "ply": 18,
+    "fen": "rn1qk1nr/2pbbp2/8/p3P1pp/1p4PP/PP3P2/2P1P3/RNB1KBNR w KQkq - 0 10",
+    "material_balance": -7,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 134
+  },
+  {
+    "game_num": 5536,
+    "ply": 15,
+    "fen": "rn2Bbnr/p3pkpp/1p3p2/3p1b2/P3P1P1/1P5P/2PP1P2/RNBQK1NR b KQ - 0 8",
+    "material_balance": 10,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 135
+  },
+  {
+    "game_num": 5552,
+    "ply": 28,
+    "fen": "rnbqkbn1/3p4/P1p1pp2/6p1/1pp3Pr/4P3/3PKP2/RNBQ1B1R w - - 0 15",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 136
+  },
+  {
+    "game_num": 5556,
+    "ply": 21,
+    "fen": "rnb2bnr/p1p1kp1p/1p1p4/6p1/3Pp3/PP2P2R/2PQBP2/RNB2KN1 b - - 0 11",
+    "material_balance": 7,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 137
+  },
+  {
+    "game_num": 5622,
+    "ply": 21,
+    "fen": "r1b1kbnr/p1p5/1pp1pp1p/6p1/3KP1P1/P4P2/2P4P/RNBQ1BNR b q - 0 11",
+    "material_balance": 10,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 138
+  },
+  {
+    "game_num": 5629,
+    "ply": 25,
+    "fen": "rB3bnr/p2ppkp1/1q6/1P3p2/7p/P2P1P2/4P1PP/RNKQ1BNR b - - 0 13",
+    "material_balance": 7,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 139
+  },
+  {
+    "game_num": 5630,
+    "ply": 11,
+    "fen": "rnb1kbnr/p1pp2pp/4p3/1p3p2/2P5/P4PP1/1P1PP3/RNBQKBNR b KQkq - 0 6",
+    "material_balance": 8,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 140
+  },
+  {
+    "game_num": 5643,
+    "ply": 10,
+    "fen": "rn1qkbnr/pp2pppp/8/3p4/2PPP3/8/P1P2PPP/RNBbKBNR w KQkq - 0 6",
+    "material_balance": -8,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 141
+  },
+  {
+    "game_num": 5671,
+    "ply": 10,
+    "fen": "rnbq1k1r/pppppp1p/5np1/6b1/P1P5/3P4/1P2PPPP/RNB1KBNR w KQ - 0 6",
+    "material_balance": -9,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 142
+  },
+  {
+    "game_num": 5800,
+    "ply": 25,
+    "fen": "rn1k1b1r/p6p/Bp2pp2/2pP1np1/P5b1/1RN4P/1P1P1PP1/2BQK1NR b K - 0 13",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 143
+  },
+  {
+    "game_num": 5825,
+    "ply": 28,
+    "fen": "rn3bnr/p1p1qk1p/1p6/3pP3/1P2ppb1/P1P5/1R1K2PP/1NB2BNR w - - 0 15",
+    "material_balance": -10,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 144
+  },
+  {
+    "game_num": 5847,
+    "ply": 23,
+    "fen": "r2qkb1r/3nn1p1/p3Pp1p/1pPp3P/6B1/P5P1/2PPP2R/RNBQK1N1 b Qkq - 0 12",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 145
+  },
+  {
+    "game_num": 5867,
+    "ply": 19,
+    "fen": "rnb2k1r/1p1pPppp/1qp5/4p3/p4P2/P6P/RPPPP1B1/1NBQK1NR b K - 0 10",
+    "material_balance": 6,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 146
+  },
+  {
+    "game_num": 5938,
+    "ply": 24,
+    "fen": "2b1qbnr/2p1pkpp/2np1p2/1P3P2/r3P2P/P7/1P1PB1P1/RNB1K1NR w KQ - 0 13",
+    "material_balance": -7,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 147
+  },
+  {
+    "game_num": 5994,
+    "ply": 21,
+    "fen": "rnbq1k1r/2ppp2p/p6Q/1P3p2/2P1P1p1/1P1P3N/2K2PPP/RNB2B1R b - - 0 11",
+    "material_balance": 7,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 148
+  },
+  {
+    "game_num": 6072,
+    "ply": 21,
+    "fen": "rnb1kb2/1p2p1pr/pP1pNn2/2p1Pp2/5P1p/1P6/2PPK1PP/RNBQ1B1R b q - 0 11",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 149
+  },
+  {
+    "game_num": 6134,
+    "ply": 22,
+    "fen": "rn1q2nr/p1k1bppp/3pp3/1Pp5/P7/N6B/R2PPP1P/2BK2NR w - - 0 12",
+    "material_balance": -7,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 150
+  },
+  {
+    "game_num": 6137,
+    "ply": 11,
+    "fen": "Rnbqk1nr/1p1ppp1p/2p3pb/8/1P3P2/2N5/2PPP1PP/2BQKBNR b Kk - 0 6",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 151
+  },
+  {
+    "game_num": 6139,
+    "ply": 26,
+    "fen": "1r1qkbr1/1pp1pp1p/p6n/3pn1P1/P1BP1N2/4P1P1/1PP4P/RNBbK1R1 w Q - 0 14",
+    "material_balance": -8,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 152
+  },
+  {
+    "game_num": 6145,
+    "ply": 26,
+    "fen": "rnb1kbnr/3p4/1pp3p1/4p3/1pPPP2p/8/PB3KPP/RN1q1BNR w kq - 0 14",
+    "material_balance": -10,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 153
+  },
+  {
+    "game_num": 6208,
+    "ply": 19,
+    "fen": "r1bqkbr1/pp1ppppp/8/2P3P1/7P/1pP2N2/P3PKP1/RNBQ1B1R b q - 0 10",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 154
+  },
+  {
+    "game_num": 6248,
+    "ply": 26,
+    "fen": "rnbq3r/1p1k1pb1/p1p1p2p/6pP/4P3/P1P3P1/RP1P2BR/1NBnK1N1 w - - 0 14",
+    "material_balance": -9,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 155
+  },
+  {
+    "game_num": 6290,
+    "ply": 25,
+    "fen": "rnb1kbn1/1p1pp3/2p2p2/1P4Pr/p1P1P2P/8/P2P2P1/RNBQK1NR b Qq - 0 13",
+    "material_balance": 8,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 156
+  },
+  {
+    "game_num": 6329,
+    "ply": 26,
+    "fen": "rnbq1knr/4p2p/ppp1B2b/8/6pP/1P1P1pPR/P1PN4/R1B2KN1 w - - 0 14",
+    "material_balance": -10,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 157
+  },
+  {
+    "game_num": 6377,
+    "ply": 13,
+    "fen": "1nbNkbnr/2ppp2p/rp4p1/5p2/p6P/P7/1PPPPPP1/RNBQKBR1 b Qk - 0 7",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 158
+  },
+  {
+    "game_num": 6433,
+    "ply": 11,
+    "fen": "rnb2bnr/ppppN1pp/4k3/4pp2/1P6/P7/R1PPPPPP/2BQKBNR b K - 0 6",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 159
+  },
+  {
+    "game_num": 6435,
+    "ply": 25,
+    "fen": "rnb2k1r/p2p1p1p/1pp3pn/4p3/P1P1P3/2KP1P2/6PP/R2Q1BNR b - - 0 13",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 160
+  },
+  {
+    "game_num": 6467,
+    "ply": 13,
+    "fen": "r1b1kb1r/pp1ppp1p/n1p3pn/8/2P1P2P/2NK1P2/PP1P2P1/R1BQ1BNR b kq - 0 7",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 161
+  },
+  {
+    "game_num": 6476,
+    "ply": 25,
+    "fen": "rn2kb1r/p1p1pn2/1p3pp1/8/2P1p3/2Q3P1/PP1P1P2/RNB2KNR b kq - 0 13",
+    "material_balance": 8,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 162
+  },
+  {
+    "game_num": 6487,
+    "ply": 19,
+    "fen": "rn2kbnr/1bp1Np1p/p2pp3/8/pP2P1p1/6P1/2PPKP1P/R1BQ1BNR b kq - 0 10",
+    "material_balance": 8,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 163
+  },
+  {
+    "game_num": 6534,
+    "ply": 27,
+    "fen": "rn2k1n1/2q1pp1r/2pp2p1/1p3P1p/p2P1P1P/1PB3P1/P4KB1/RN2Q1NR b q - 0 14",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 164
+  },
+  {
+    "game_num": 6545,
+    "ply": 24,
+    "fen": "r1bqkb1r/7p/n3pn2/p1pp2p1/pP1P4/2P1P3/R2NNPPP/2B1KB1R w Kkq - 0 13",
+    "material_balance": -9,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 165
+  },
+  {
+    "game_num": 6572,
+    "ply": 17,
+    "fen": "rnbqk1nB/2p2p2/p2pp2p/6p1/Pp2PP2/1PP5/3P2PP/RN1QKBNR b KQq - 0 9",
+    "material_balance": 8,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 166
+  },
+  {
+    "game_num": 6574,
+    "ply": 24,
+    "fen": "3q1bnr/4pkpp/2n2p2/1p6/1P1Pp3/2P2P1P/7P/rNBQK1NR w K - 0 13",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 167
+  },
+  {
+    "game_num": 6610,
+    "ply": 28,
+    "fen": "1n1qkbn1/r1ppp2r/8/1pP1Pp1p/p6P/P1N3PB/RP1PQ3/2B1K1Nb w - - 0 15",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 168
+  },
+  {
+    "game_num": 6618,
+    "ply": 23,
+    "fen": "rnbq1bnN/3kp1p1/p1p5/1P1p1p1p/1P3P1P/7R/P2PPKP1/RNBQ1B2 b - - 0 12",
+    "material_balance": 6,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 169
+  },
+  {
+    "game_num": 6665,
+    "ply": 18,
+    "fen": "rn1q1bnr/p1p1pkpp/8/3p4/3P4/PPp2b2/1B2P2P/RN1QK1NR w KQ - 0 10",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 170
+  },
+  {
+    "game_num": 6688,
+    "ply": 25,
+    "fen": "rn1qkbn1/2p4R/1p3p2/pb1p4/6P1/P7/2PPPK2/RNBQ1BN1 b q - 0 13",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 171
+  },
+  {
+    "game_num": 6799,
+    "ply": 28,
+    "fen": "rn1q1knr/p1pb1pbp/4p3/1P1p4/3P3P/P1B1PpPR/2P2P2/R2QK1N1 w Q - 0 15",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 172
+  },
+  {
+    "game_num": 6800,
+    "ply": 22,
+    "fen": "r1kq1bnr/p3p1pp/1pn2p2/8/1PpPpP2/7P/P1P2KP1/RNBbN2R w - - 0 12",
+    "material_balance": -13,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 173
+  },
+  {
+    "game_num": 6825,
+    "ply": 25,
+    "fen": "rnB1kb1r/p1p1p1pn/3p3p/1p6/1P1Q1P1P/2P2K2/P2PP3/RNB3NR b - - 0 13",
+    "material_balance": 12,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 174
+  },
+  {
+    "game_num": 6874,
+    "ply": 21,
+    "fen": "r1bqkb1r/1pppp3/p7/5P1p/5P2/P2P4/R1PPQ3/1NB1KBNR b Kkq - 0 11",
+    "material_balance": 6,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 175
+  },
+  {
+    "game_num": 6908,
+    "ply": 17,
+    "fen": "rnbNkb2/pp1pp1p1/7r/2p4p/3Pp3/5PPP/PPP2n2/RNBQKB1R b KQq - 0 9",
+    "material_balance": 8,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 176
+  },
+  {
+    "game_num": 6936,
+    "ply": 19,
+    "fen": "rnb1k1nr/p1p1qp1p/1p1pB2B/8/1P5P/N2P2P1/PP2PP2/R2QK1NR b KQkq - 0 10",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 177
+  },
+  {
+    "game_num": 6964,
+    "ply": 22,
+    "fen": "rnb1k3/pp1pp1br/2q2n1p/P1p5/2P1p2P/8/1P1PKPP1/RNBQ1BN1 w q - 0 12",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 178
+  },
+  {
+    "game_num": 6998,
+    "ply": 27,
+    "fen": "rnbBkb1r/p1pp3p/6pR/1p1Pp3/4P1P1/1PP2P2/P7/RN1QKBN1 b Q - 0 14",
+    "material_balance": 12,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 179
+  },
+  {
+    "game_num": 7028,
+    "ply": 12,
+    "fen": "r2qkbnr/p1p1pp1p/np6/3P2p1/2P4P/P7/1P1P1P2/RNBbKBNR w KQkq - 0 7",
+    "material_balance": -9,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 180
+  },
+  {
+    "game_num": 7054,
+    "ply": 22,
+    "fen": "1nb1k1nr/1rppq2p/p7/1p3pb1/1P6/2P5/PB1PPKPP/R3QB1R w k - 0 12",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 181
+  },
+  {
+    "game_num": 7074,
+    "ply": 23,
+    "fen": "r1bqkbnR/1p2p3/n1p5/pP1p1pP1/8/P1P5/1B1PPKP1/RN1Q1BN1 b q - 0 12",
+    "material_balance": 6,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 182
+  },
+  {
+    "game_num": 7222,
+    "ply": 20,
+    "fen": "rnbqkb1r/3pp1p1/p1p4p/1p3P2/1P3P1P/P4N2/R1PPP3/1NBnKB1R w Kkq - 0 11",
+    "material_balance": -8,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 183
+  },
+  {
+    "game_num": 7232,
+    "ply": 24,
+    "fen": "rnbqkbn1/2p3p1/3p1p2/p2Pp3/1Pp1P3/5PPp/P4K2/RN1Q1BN1 w q - 0 13",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 184
+  },
+  {
+    "game_num": 7239,
+    "ply": 14,
+    "fen": "rnbq1bnr/p3pkpp/3p4/1p1p4/1P6/3P3p/P1P1PP1R/RN1QKBN1 w Q - 0 8",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 185
+  },
+  {
+    "game_num": 7276,
+    "ply": 23,
+    "fen": "1nb1kbn1/r2pB1p1/2p5/pp2P3/8/5P1r/PPP1P2P/RN1QKB1R b KQ - 0 12",
+    "material_balance": 8,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 186
+  },
+  {
+    "game_num": 7288,
+    "ply": 25,
+    "fen": "rnb2b1r/p3p2p/2p1k1p1/3P4/4p1nP/B7/P1QPB1P1/RN3KNR b - - 0 13",
+    "material_balance": 8,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 187
+  },
+  {
+    "game_num": 7308,
+    "ply": 28,
+    "fen": "1n1q1bn1/1p2pk1r/r4p2/p2p2p1/8/PPBP4/R3PP2/1N1QKBNb w - - 0 15",
+    "material_balance": -6,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 188
+  },
+  {
+    "game_num": 7316,
+    "ply": 17,
+    "fen": "rnbBnb1r/p1p2kp1/1p1pp2p/4p3/3P4/1P3P2/P1P1PKPP/RN1Q1B1R b - - 0 9",
+    "material_balance": 6,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 189
+  },
+  {
+    "game_num": 7328,
+    "ply": 14,
+    "fen": "rnbqkbnr/2pppp2/1p6/6p1/1pP5/5N1p/P2PPP1P/RNBQK2R w KQkq - 0 8",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 190
+  },
+  {
+    "game_num": 7330,
+    "ply": 25,
+    "fen": "rnbN1b1r/4p1pp/p3k2n/1ppp4/P4Pp1/4P3/1PPPQ2P/RNB1KB1R b KQ - 0 13",
+    "material_balance": 8,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 191
+  },
+  {
+    "game_num": 7356,
+    "ply": 24,
+    "fen": "1nbqkbnr/2ppp3/r7/p4p2/3PPPp1/PPp3p1/2K3PP/RNB2BNR w k - 0 13",
+    "material_balance": -10,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 192
+  },
+  {
+    "game_num": 7389,
+    "ply": 25,
+    "fen": "rnb1kbnr/2p4p/4pp2/5Pp1/ppP1P1PP/P7/3QK3/RNB2BNR b - - 0 13",
+    "material_balance": 8,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 193
+  },
+  {
+    "game_num": 7424,
+    "ply": 25,
+    "fen": "rnb1kb1R/p1pq1p2/4pp2/3p2p1/1p6/PPP2N2/3PP1P1/RNBQKB2 b Qq - 0 13",
+    "material_balance": 6,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 194
+  },
+  {
+    "game_num": 7439,
+    "ply": 19,
+    "fen": "rnb1kbn1/pp3pp1/3pp2r/8/3Q1N1p/4PP2/PPP3PP/R1B1KB1R b KQq - 0 10",
+    "material_balance": 6,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 195
+  },
+  {
+    "game_num": 7460,
+    "ply": 26,
+    "fen": "rn1q1bnr/4pkpp/1pQ2p2/8/1p2P1P1/P6P/3p1K2/RNBb2NR w - - 0 14",
+    "material_balance": -6,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 196
+  },
+  {
+    "game_num": 7483,
+    "ply": 23,
+    "fen": "1n1qkbnN/r3p1pp/p4p2/1pp5/P3P2P/2p2P1R/1PPP2P1/RNBQK3 b Q - 0 12",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 197
+  },
+  {
+    "game_num": 7492,
+    "ply": 20,
+    "fen": "rnb1kbn1/1p1pp1p1/pq3p1r/2p1P3/2PN1PpP/1P6/P2P1KP1/RNB2B1R w q - 0 11",
+    "material_balance": -9,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 198
+  },
+  {
+    "game_num": 7532,
+    "ply": 14,
+    "fen": "rnbqkb1r/p1ppp1pp/8/1p3P2/4PP2/P2B3P/1PPP4/RNBnK1NR w KQkq - 0 8",
+    "material_balance": -8,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 199
+  },
+  {
+    "game_num": 7567,
+    "ply": 20,
+    "fen": "r2q1bnr/p1p1kpp1/1p6/7p/3p4/P1P1PP1P/1PnP4/RNBK1BNR w - - 0 11",
+    "material_balance": -6,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 200
+  },
+  {
+    "game_num": 7621,
+    "ply": 10,
+    "fen": "rn1qkbnr/p1p1pp1p/1p1p4/6p1/7P/P1N1P3/1PPP1P2/R1BbKBNR w KQkq - 0 6",
+    "material_balance": -10,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 201
+  },
+  {
+    "game_num": 7647,
+    "ply": 16,
+    "fen": "r1bqkbnr/2ppp1p1/p7/1p4p1/1n4pP/P3P3/2PP1P2/RNBQKBR1 w Qkq - 0 9",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 202
+  },
+  {
+    "game_num": 7709,
+    "ply": 22,
+    "fen": "r1bqk1n1/p1pn2br/1p2pp2/4p3/PPP2PpP/3P4/4P1P1/RNB1KB1R w KQq - 0 12",
+    "material_balance": -11,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 203
+  },
+  {
+    "game_num": 7713,
+    "ply": 25,
+    "fen": "2b1kbnr/1p1p2pp/1rn1pp2/p1P4P/P5PR/4RP2/2PPP3/1NBQKBN1 b k - 0 13",
+    "material_balance": 10,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 204
+  },
+  {
+    "game_num": 7779,
+    "ply": 24,
+    "fen": "r1bq1br1/1pp1pkpp/n7/3p1B2/p3PP2/P4KP1/RPPP3P/1NBn2NR w - - 0 13",
+    "material_balance": -8,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 205
+  },
+  {
+    "game_num": 7783,
+    "ply": 23,
+    "fen": "r1bB1bnr/1p1pk3/p1n5/1PP2p1p/6p1/P7/R1P1P1PP/1N1QKBNR b K - 0 12",
+    "material_balance": 10,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 206
+  },
+  {
+    "game_num": 7811,
+    "ply": 24,
+    "fen": "rnbq1b1r/2p2k1p/pp3n2/6p1/1Ppp1P2/7P/P3P1PR/RNB1KBN1 w - - 0 13",
+    "material_balance": -10,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 207
+  },
+  {
+    "game_num": 7816,
+    "ply": 19,
+    "fen": "3qkb1r/pp1npppp/2B2n2/2p5/7P/P3pP1R/1PPPK1P1/RNB1Q1N1 b k - 0 10",
+    "material_balance": 7,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 208
+  },
+  {
+    "game_num": 7817,
+    "ply": 21,
+    "fen": "r2q1b1r/p3ppp1/1p2kR2/3p4/1n4P1/3P4/P1PKPP2/RNBQ1BN1 b - - 0 11",
+    "material_balance": 6,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 209
+  },
+  {
+    "game_num": 7830,
+    "ply": 28,
+    "fen": "rnbqk3/2pp2p1/pp2pr2/5p1p/1P1n1P1P/P3K1PB/1BP1P3/RN4NR w q - 0 15",
+    "material_balance": -7,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 210
+  },
+  {
+    "game_num": 7901,
+    "ply": 28,
+    "fen": "r2q1bnr/1b4pp/p1pk1p2/P1p5/2B1Pp1P/7R/2PP2P1/RNB1K1N1 w Q - 0 15",
+    "material_balance": -7,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 211
+  },
+  {
+    "game_num": 7907,
+    "ply": 28,
+    "fen": "1nb1qb1r/3kp1p1/r6p/Rp1p1p2/4nP1P/2p5/2PP2PR/2BQKBN1 w - - 0 15",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 212
+  },
+  {
+    "game_num": 7916,
+    "ply": 24,
+    "fen": "rnb1kbn1/1pq3pr/3p2p1/1pp4p/3P1p2/P1B1P3/2P1N1PP/RN1QK2R w KQq - 0 13",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 213
+  },
+  {
+    "game_num": 7950,
+    "ply": 17,
+    "fen": "rnbqkN2/1p1p1p1r/p1p4n/7p/2PPP3/1P3P2/P5PP/RNBQKB1R b KQq - 0 9",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 214
+  },
+  {
+    "game_num": 7977,
+    "ply": 25,
+    "fen": "r1bq2nr/pppk3p/3P4/3Q1p2/1n2NBp1/N4PP1/PPP1P1BP/R2K3R b - - 0 13",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 215
+  },
+  {
+    "game_num": 8006,
+    "ply": 25,
+    "fen": "rn1qkbn1/p2p4/bpp1p3/5p2/PP3Pp1/2P1P1P1/R2P3R/1NBQKBN1 b q - 0 13",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 216
+  },
+  {
+    "game_num": 8021,
+    "ply": 21,
+    "fen": "r1bq3r/ppppkp1p/2n3p1/3p4/P2PPP2/N4P2/1P2K2P/R1BQ1BNR b - - 0 11",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 217
+  },
+  {
+    "game_num": 8132,
+    "ply": 21,
+    "fen": "rnb1kbnr/p6p/1p1p4/2pP2P1/P4p2/3K1N1P/1PP3P1/RNBQ1B1R b kq - 0 11",
+    "material_balance": 10,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 218
+  },
+  {
+    "game_num": 8212,
+    "ply": 23,
+    "fen": "rn1qkb1r/p1ppp3/bP6/5pP1/3P2Pp/1P6/R1P1PKP1/1NBQ1BNR b kq - 0 12",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 219
+  },
+  {
+    "game_num": 8230,
+    "ply": 28,
+    "fen": "rnb1qk1r/1ppp3p/p5p1/4P3/P4p1P/1PP2P1N/3KP1P1/RN1n1B1R w - - 0 15",
+    "material_balance": -8,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 220
+  },
+  {
+    "game_num": 8235,
+    "ply": 26,
+    "fen": "rnb3nr/p5b1/1p4kp/P1p1P1P1/1P4P1/7P/2P1K3/RNBq1BNR w - - 0 14",
+    "material_balance": -6,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 221
+  },
+  {
+    "game_num": 8257,
+    "ply": 27,
+    "fen": "1nbq1b1r/2P1p1pp/7n/3p1P1k/Qp6/R6P/3P2P1/1NB1KBNR b K - 0 14",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 222
+  },
+  {
+    "game_num": 8289,
+    "ply": 19,
+    "fen": "1nbBk1nr/rpp3p1/3p4/p3P2p/1b2P2K/5P2/PPP3PP/RN1Q1BNR b k - 0 10",
+    "material_balance": 11,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 223
+  },
+  {
+    "game_num": 8292,
+    "ply": 18,
+    "fen": "rnbqk1nr/1p5p/p1pp1pp1/4p3/6PP/PP3P2/2P1PK1R/RNB1bBN1 w kq - 0 10",
+    "material_balance": -10,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 224
+  },
+  {
+    "game_num": 8326,
+    "ply": 26,
+    "fen": "1n2k2r/rp4pp/1qpbb2n/p3p3/P2Pp1pP/1P6/2P1KP2/R1BQ1BNR w k - 0 14",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 225
+  },
+  {
+    "game_num": 8327,
+    "ply": 22,
+    "fen": "rnbq1bn1/3kp1pr/2p5/pp1p2p1/3P1B2/PPPp1P1P/8/RN1QK1NR w KQ - 0 12",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 226
+  },
+  {
+    "game_num": 8331,
+    "ply": 9,
+    "fen": "rnb1kbnr/2ppBppp/pp2p3/8/3P4/1P6/P1P1PPPP/RN1QKBNR b KQkq - 0 5",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 227
+  },
+  {
+    "game_num": 8334,
+    "ply": 24,
+    "fen": "r1b1k1nr/2ppq3/np4p1/p7/PP1b1p2/2P4P/1R1PP1P1/1NB1KBNR w Kkq - 0 13",
+    "material_balance": -8,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 228
+  },
+  {
+    "game_num": 8352,
+    "ply": 18,
+    "fen": "rnb3nr/1ppp1kpp/p4q2/5p2/P2Pp2P/bPP4N/4PPP1/1NBQKB1R w K - 0 10",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 229
+  },
+  {
+    "game_num": 8383,
+    "ply": 11,
+    "fen": "rnbqkbnB/1ppp3p/5p2/8/p4p2/NP6/P1PPP1PP/R2QKBNR b KQq - 0 6",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 230
+  },
+  {
+    "game_num": 8391,
+    "ply": 8,
+    "fen": "rnb1kbnB/pp1qpp1p/3p4/2p3p1/P7/1P6/2PPPPPP/RN1QKBNR w KQq - 0 5",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 231
+  },
+  {
+    "game_num": 8403,
+    "ply": 21,
+    "fen": "r4bnr/2pbpkpp/p4p2/1p6/1nBP2P1/P4P1P/8/RNBQK1NR b KQ - 0 11",
+    "material_balance": 7,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 232
+  },
+  {
+    "game_num": 8421,
+    "ply": 28,
+    "fen": "1n3knr/2pq3p/5p2/8/1pPPP1p1/1P3P1P/r5P1/RNb1K1NR w - - 0 15",
+    "material_balance": -10,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 233
+  },
+  {
+    "game_num": 8440,
+    "ply": 20,
+    "fen": "rnbqkbn1/pppp4/6p1/PP6/4pp2/8/2PPPPP1/RNBQKBNr w q - 0 11",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 234
+  },
+  {
+    "game_num": 8450,
+    "ply": 22,
+    "fen": "rn3bnr/6pp/p1k2p2/1pp1p2P/3qp3/PP3P1b/N1PPK1P1/R1BQ1BN1 w - - 0 12",
+    "material_balance": -6,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 235
+  },
+  {
+    "game_num": 8492,
+    "ply": 26,
+    "fen": "rnbq3r/p1p1k1b1/3p1n1p/1p3p2/P2PpPp1/2P1PNP1/1P5P/RNB2K1R w - - 0 14",
+    "material_balance": -12,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 236
+  },
+  {
+    "game_num": 8512,
+    "ply": 14,
+    "fen": "rnbqk1nr/p1ppp3/1p3p1b/6P1/8/NP1P3p/P1P1PP2/R1BQKBN1 w Qkq - 0 8",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 237
+  },
+  {
+    "game_num": 8546,
+    "ply": 28,
+    "fen": "2rqkb1r/1p2p2p/p1pp2pn/6PN/nP1PPp2/P1PB4/7P/RNBb1K1R w k - 0 15",
+    "material_balance": -10,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 238
+  },
+  {
+    "game_num": 8623,
+    "ply": 18,
+    "fen": "r1bqk1nr/6bp/nppp1p2/p4P2/4p3/P3P1P1/1PPP3P/RNB1KBNR w KQkq - 0 10",
+    "material_balance": -8,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 239
+  },
+  {
+    "game_num": 8631,
+    "ply": 18,
+    "fen": "rn3bnr/pb1p1ppp/1p1k4/2p3q1/6PN/N1P1P3/PP1P1P1P/R1B1KB1R w KQ - 0 10",
+    "material_balance": -8,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 240
+  },
+  {
+    "game_num": 8650,
+    "ply": 15,
+    "fen": "r1bBkbnr/2pn3p/4p3/pp1p1p2/P2PP3/1P3P2/R1P3PP/1N1QKBNR b Kkq - 0 8",
+    "material_balance": 10,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 241
+  },
+  {
+    "game_num": 8666,
+    "ply": 15,
+    "fen": "rnb1k1nr/p1p1b1pp/1p1p4/B3pp2/1P1P1PP1/6P1/P1P1P3/RN1QKBNR b KQkq - 0 8",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 242
+  },
+  {
+    "game_num": 8684,
+    "ply": 25,
+    "fen": "rnbBk1nr/p4pbp/1ppp2p1/P3p3/4P2P/1PPP1P2/4B1PR/RN1QK1N1 b Q - 0 13",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 243
+  },
+  {
+    "game_num": 8714,
+    "ply": 19,
+    "fen": "r1b1kbnr/1p1n1p2/p3p2p/2p3p1/2PQP1PP/5P2/P7/RNB1KBNR b KQkq - 0 10",
+    "material_balance": 8,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 244
+  },
+  {
+    "game_num": 8720,
+    "ply": 19,
+    "fen": "rnbBkbn1/5ppr/2pp4/p3pP2/1p1P3p/1P4PP/P1P1P3/RN1QKBNR b KQq - 0 10",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 245
+  },
+  {
+    "game_num": 8748,
+    "ply": 21,
+    "fen": "1nbqk2r/r1p4p/5nP1/pp1p4/4P2P/RP3PP1/2P5/1NBQKBNR b Kk - 0 11",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 246
+  },
+  {
+    "game_num": 8754,
+    "ply": 18,
+    "fen": "rnbqkbr1/p1p1p1p1/1p1p4/P4p1p/3P4/4P2P/RPP1K3/1NBn1BNR w q - 0 10",
+    "material_balance": -11,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 247
+  },
+  {
+    "game_num": 8789,
+    "ply": 26,
+    "fen": "rnbq1bnr/p2k2p1/7p/3p1p2/P2pN3/R1P2P1P/4P1P1/2B1KBNR w K - 0 14",
+    "material_balance": -9,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 248
+  },
+  {
+    "game_num": 8811,
+    "ply": 22,
+    "fen": "rn1q1knr/2pp2pp/b2b4/p3P3/2p3P1/P3pP2/1P2K2P/RNB2BNR w - - 0 12",
+    "material_balance": -10,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 249
+  },
+  {
+    "game_num": 8871,
+    "ply": 24,
+    "fen": "r2q1bnr/ppp2k1p/2np1pp1/1B2p3/4P1P1/NPPP4/P6P/R1Bb1KNR w - - 0 13",
+    "material_balance": -10,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 250
+  },
+  {
+    "game_num": 8907,
+    "ply": 28,
+    "fen": "rnb2bn1/2q1pk1r/2p2p1p/Pp1p2p1/4P1PP/2pB1P2/3PK3/R1BQ2NR w - - 0 15",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 251
+  },
+  {
+    "game_num": 8910,
+    "ply": 17,
+    "fen": "rnbqk1nr/6pp/p1pp1P2/1pP5/5P2/2P1K3/P3P1PP/RNBQ1BNR b kq - 0 9",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 252
+  },
+  {
+    "game_num": 8929,
+    "ply": 25,
+    "fen": "1nbqkb1R/r2pp3/8/Ppp2P2/6n1/2P5/P2PK1P1/RNBQ1BN1 b - - 0 13",
+    "material_balance": 7,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 253
+  },
+  {
+    "game_num": 8971,
+    "ply": 14,
+    "fen": "1nbqkbnr/rp4pp/p1ppp3/8/3PP1p1/PP5N/R1P2PPP/1NB1KB1R w Kk - 0 8",
+    "material_balance": -9,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 254
+  },
+  {
+    "game_num": 9002,
+    "ply": 19,
+    "fen": "rn2kbnr/3b2pp/2pp4/Qp3pP1/3p4/PP4PB/2P1P2P/RNBK2NR b kq - 0 10",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 255
+  },
+  {
+    "game_num": 9052,
+    "ply": 18,
+    "fen": "1nbqk1nr/2ppp2p/5ppb/1p3P2/4P3/1P6/1BPPK1PP/rN1Q1BNR w k - 0 10",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 256
+  },
+  {
+    "game_num": 9065,
+    "ply": 25,
+    "fen": "rnbN1bn1/p3p2r/1p1k1p2/P1pp1P1p/RP4p1/8/2PPPKPP/1NBQ1BR1 b - - 0 13",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 257
+  },
+  {
+    "game_num": 9069,
+    "ply": 28,
+    "fen": "r1b1k1nr/p2pb3/np3p1p/2p5/2PP2P1/PP3P1B/4Q2P/RN2K1qR w kq - 0 15",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 258
+  },
+  {
+    "game_num": 9077,
+    "ply": 26,
+    "fen": "r1bqkb1r/2p1n2p/6n1/p2p1p1Q/2p5/P2P4/1P3P1P/RN1K2NR w kq - 0 14",
+    "material_balance": -7,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 259
+  },
+  {
+    "game_num": 9089,
+    "ply": 14,
+    "fen": "rnbq2nr/1pppk1pp/p4p2/4b3/3P4/1P6/P1P1PPPP/RNB1KBNR w KQ - 0 8",
+    "material_balance": -8,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 260
+  },
+  {
+    "game_num": 9100,
+    "ply": 21,
+    "fen": "rnbqkb1R/p2pp2p/8/2p2P2/1p3p2/P4N1P/1PPPP3/RNBQKB2 b Qq - 0 11",
+    "material_balance": 8,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 261
+  },
+  {
+    "game_num": 9157,
+    "ply": 17,
+    "fen": "rn1qk1nr/ppp1p3/3p1p1p/4P1p1/2P1P1B1/1P6/P2P2P1/RNBQ1KNR b kq - 0 9",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 262
+  },
+  {
+    "game_num": 9160,
+    "ply": 15,
+    "fen": "rnb1kbnr/3pp1p1/5p1p/p3P3/1pP3PP/5N2/PP2PP2/RN1QKB1R b KQkq - 0 8",
+    "material_balance": 7,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 263
+  },
+  {
+    "game_num": 9163,
+    "ply": 22,
+    "fen": "r2qk1nr/2p1b1p1/p1n1bp1p/1p1B4/4N3/P7/RPPP1PPP/2B1K1NR w Kk - 0 12",
+    "material_balance": -8,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 264
+  },
+  {
+    "game_num": 9174,
+    "ply": 24,
+    "fen": "1nbqk1nr/1r4p1/2pb1p1P/1p2p3/Pp6/R1P2P2/4P2P/1NB1KBNR w Kk - 0 13",
+    "material_balance": -9,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 265
+  },
+  {
+    "game_num": 9202,
+    "ply": 17,
+    "fen": "1nrqkbnB/ppp1p3/4b2p/3pP3/8/1P1P4/P1P1BPPP/RN1QK1NR b KQ - 0 9",
+    "material_balance": 7,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 266
+  },
+  {
+    "game_num": 9230,
+    "ply": 21,
+    "fen": "r1b1kbnr/p2pp2p/2n2pp1/1pP5/1P4P1/P1P1K2P/4BP2/RNBQ2NR b kq - 0 11",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 267
+  },
+  {
+    "game_num": 9245,
+    "ply": 9,
+    "fen": "rnbBkbnr/2p2ppp/1p2p3/p2p4/6P1/2PP4/PP2PP1P/RN1QKBNR b KQkq - 0 5",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 268
+  },
+  {
+    "game_num": 9271,
+    "ply": 12,
+    "fen": "rnb1k1nr/pppp2pp/3b1p2/1P2p3/3P4/P3P3/R1P2P1P/1NBQKBNq w kq - 0 7",
+    "material_balance": -6,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 269
+  },
+  {
+    "game_num": 9322,
+    "ply": 20,
+    "fen": "1nq1kbnr/3pp1p1/7p/2p2p2/1p2PP1P/r1P5/3P2P1/RNB1KBNR w KQk - 0 11",
+    "material_balance": -7,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 270
+  },
+  {
+    "game_num": 9357,
+    "ply": 15,
+    "fen": "r1bqkbnR/p1ppp3/np6/1P6/P4Pp1/8/2PPP1P1/RNBQKBN1 b Qq - 0 8",
+    "material_balance": 6,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 271
+  },
+  {
+    "game_num": 9382,
+    "ply": 9,
+    "fen": "rnbBkbnr/pppp1pp1/4p3/7p/3P4/P7/1PP1PPPP/RN1QKBNR b KQkq - 0 5",
+    "material_balance": 9,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 272
+  },
+  {
+    "game_num": 9387,
+    "ply": 22,
+    "fen": "rnbq1bnr/2pkp3/pp3p2/3p4/1P1PPp2/P4p1P/1RP5/1N1QKBNR w K - 0 12",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 273
+  },
+  {
+    "game_num": 9397,
+    "ply": 13,
+    "fen": "rnbBkb1r/3ppnpp/5p2/pp6/4P3/1P1P3P/P1P2PP1/RN1QKBNR b KQkq - 0 7",
+    "material_balance": 10,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 274
+  },
+  {
+    "game_num": 9421,
+    "ply": 22,
+    "fen": "rnb1k1n1/1pqpp3/2p3Pr/2P4p/8/1p1P1P2/PP2K1PP/RNb2BNR w q - 0 12",
+    "material_balance": -10,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 275
+  },
+  {
+    "game_num": 9435,
+    "ply": 23,
+    "fen": "3qk1nr/r1p1p1b1/p1Pp1ppp/7P/3PP1P1/8/PP1NK1P1/R1BQ1BNR b k - 0 12",
+    "material_balance": 7,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 276
+  },
+  {
+    "game_num": 9445,
+    "ply": 12,
+    "fen": "rn1qkbnr/p1p1pp1p/1p6/6PR/2p5/4Pb2/PPPP1PP1/RNBQK3 w Qkq - 0 7",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 277
+  },
+  {
+    "game_num": 9446,
+    "ply": 22,
+    "fen": "1nbq1bnr/r1pk4/3p3p/pp3p2/2PP1P2/PP2P2P/3K2P1/RNB2BNR w - - 0 12",
+    "material_balance": -7,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 278
+  },
+  {
+    "game_num": 9459,
+    "ply": 22,
+    "fen": "rn1q1br1/p3pk1p/2p2n2/1p1p4/PP1PpPb1/4K1P1/2P4P/RNB2BNR w - - 0 12",
+    "material_balance": -9,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 279
+  },
+  {
+    "game_num": 9485,
+    "ply": 18,
+    "fen": "rnbq1bn1/pp2kp1r/8/2p1p3/2P1P1pP/P7/1P3PPR/RNB1KBN1 w Q - 0 10",
+    "material_balance": -8,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 280
+  },
+  {
+    "game_num": 9528,
+    "ply": 21,
+    "fen": "rnb2bnr/pp1pkp1p/4p3/2P3p1/6P1/1P2P3/P1PBP1BP/RN1QK1NR b KQ - 0 11",
+    "material_balance": 10,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 281
+  },
+  {
+    "game_num": 9534,
+    "ply": 27,
+    "fen": "rnbqk3/2ppbpp1/8/p2PB1P1/2p1N3/1P6/P4P1R/R2QKBN1 b Qq - 0 14",
+    "material_balance": 7,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 282
+  },
+  {
+    "game_num": 9580,
+    "ply": 24,
+    "fen": "2bqkb1r/1rppn1pp/p3p3/1pn5/2PP1Pp1/4P1KP/PP2N1P1/RNB2B1R w k - 0 13",
+    "material_balance": -9,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 283
+  },
+  {
+    "game_num": 9598,
+    "ply": 13,
+    "fen": "rnbBkbn1/p2pp2r/1p5p/5p2/5Pp1/NP6/P1PPP1PP/R2QKBNR b KQq - 0 7",
+    "material_balance": 10,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 284
+  },
+  {
+    "game_num": 9627,
+    "ply": 28,
+    "fen": "rn1q2nr/2pbp1kp/1p2p3/Pp6/3Pp1pb/2PB4/5PPP/R1BQK1NR w KQ - 0 15",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 285
+  },
+  {
+    "game_num": 9666,
+    "ply": 11,
+    "fen": "rnb1kbnr/3pppp1/1p5p/p7/3P4/2N5/PP1KPPPP/R2Q1BNR b kq - 0 6",
+    "material_balance": 6,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 286
+  },
+  {
+    "game_num": 9709,
+    "ply": 22,
+    "fen": "rnb2bnr/2p1k3/pp3p1p/4p1p1/4K3/P4P1P/1PP3P1/RNBq1BNR w - - 0 12",
+    "material_balance": -10,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 287
+  },
+  {
+    "game_num": 9763,
+    "ply": 12,
+    "fen": "rnbqkb1r/pppppp2/6p1/1B5p/8/P4P1P/1PPP2P1/RNBnK1NR w KQkq - 0 7",
+    "material_balance": -10,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 288
+  },
+  {
+    "game_num": 9796,
+    "ply": 16,
+    "fen": "rn1q1bnr/p1pkpp1p/1p6/6p1/P2P2P1/3b1p1P/1PP5/1NBQKBNR w K - 0 9",
+    "material_balance": -7,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 289
+  },
+  {
+    "game_num": 9800,
+    "ply": 11,
+    "fen": "1nbNkbnr/3pp1p1/rpp4p/P7/8/8/P1PPPPPP/RNBQKB1R b KQk - 0 6",
+    "material_balance": 11,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 290
+  },
+  {
+    "game_num": 9806,
+    "ply": 25,
+    "fen": "1nb1k1nr/3p1p2/rp1bPP1p/2p5/p1P1P3/1P6/P2PK1P1/RNBQ1BNR b k - 0 13",
+    "material_balance": 11,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 291
+  },
+  {
+    "game_num": 9808,
+    "ply": 18,
+    "fen": "2rqkb1r/p1ppnpp1/1p4Pp/1b6/8/P2P3B/1P1PPP1P/RNB1K1NR w KQk - 0 10",
+    "material_balance": -5,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "material_resign",
+    "id": 292
+  },
+  {
+    "game_num": 9818,
+    "ply": 23,
+    "fen": "rnb1k1nr/1p2B2p/p1ppp1p1/3P1p2/4P3/bP3P1P/N1P3P1/1R1QKBNR b Kkq - 0 12",
+    "material_balance": 8,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 293
+  },
+  {
+    "game_num": 9844,
+    "ply": 21,
+    "fen": "1nbq1bBr/3k2p1/rpp5/p3Pp1p/8/1P4P1/PBPPP2P/RN1Q1KNR b - - 0 11",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 294
+  },
+  {
+    "game_num": 9874,
+    "ply": 11,
+    "fen": "rnb1kbnr/3pp1pp/8/pp2Pp2/2P5/1P6/P3PPPP/RN1QKBNR b KQkq - 0 6",
+    "material_balance": 7,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 295
+  },
+  {
+    "game_num": 9904,
+    "ply": 22,
+    "fen": "r1bqkb1r/1pp5/p1Ppp1p1/5p1p/2PPP3/P4P1P/3K2P1/RNBn1BNR w kq - 0 12",
+    "material_balance": -6,
+    "winner": "black",
+    "outcome": -1.0,
+    "end_reason": "value_resign",
+    "id": 296
+  },
+  {
+    "game_num": 9965,
+    "ply": 25,
+    "fen": "rn1qkb1r/2ppp1pp/5p2/pN2P3/8/1P3P1P/PB2P1P1/R2QKBNR b KQkq - 0 13",
+    "material_balance": 6,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 297
+  },
+  {
+    "game_num": 9981,
+    "ply": 21,
+    "fen": "r3kb1r/p1qppppp/1p6/2p5/2P1P1n1/P2P4/1PK1P2P/RNBQ1BNR b kq - 0 11",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "material_resign",
+    "id": 298
+  },
+  {
+    "game_num": 9999,
+    "ply": 25,
+    "fen": "r1b2kBr/1pq1b3/p4p1p/3p2p1/6P1/1P4P1/PRPPPP2/2BQK1NR b K - 0 13",
+    "material_balance": 5,
+    "winner": "white",
+    "outcome": 1.0,
+    "end_reason": "value_resign",
+    "id": 299
+  }
+]

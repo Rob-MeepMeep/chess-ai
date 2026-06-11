@@ -20,17 +20,23 @@ Quality filters applied:
 Canonical endgame positions are added with ground-truth outcomes so
 the value head has direct signal for positions it rarely sees in self-play.
 
+Run 11 adds 193 mid-game material-imbalanced positions (rook or more advantage,
+plies 8-28) extracted from Run 10 self-play and reviewed by an external agent.
+These anchor the value head to material imbalance reasoning in real mid-game
+positions, not just K+Q vs K endgames.
+
 Usage:
   venv/bin/python3 curate_buffer.py
 
 Output:
-  checkpoints/run10_seed_buffer.pt
+  checkpoints/run11_seed_buffer.pt
 
-Then in train_chess.py for Run 10, set:
-  BUFFER_LOAD = "checkpoints/run10_seed_buffer.pt"
+Then in train_chess.py for Run 11, set:
+  BUFFER_LOAD = "checkpoints/run11_seed_buffer.pt"
 """
 
 import csv
+import json
 import random
 import chess
 import torch
@@ -42,14 +48,18 @@ from chessai.replay   import ReplayBuffer
 # Configuration
 # ---------------------------------------------------------------------------
 
-GAMES_CSV      = "logs/run9/games.csv"
-OUTPUT_PATH    = "checkpoints/run10_seed_buffer.pt"
+GAMES_CSV      = "logs/run10/games.csv"
+OUTPUT_PATH    = "checkpoints/run11_seed_buffer.pt"
+
+# Mid-game material positions reviewed by external agent (Run 11 addition)
+REVIEWED_JSON  = "paper/buffer_candidates_reviewed.json"
+CANDIDATES_JSON = "paper/buffer_candidates.json"
 
 # Game quality filters
-MIN_GAME       = 800     # use late Run 9 only — both-colour wins present from ~800 onwards
+MIN_GAME       = 2000    # post-policy-mirroring-bug-fix (fixed at game ~1700)
 MIN_MOVES      = 20      # skip overconfident short games
 MAX_MOVES      = 100     # skip very long games that may be random shuffling
-GOOD_REASONS   = {"material_resign", "checkmate"}  # decisive, trustworthy outcomes
+GOOD_REASONS   = {"material_resign", "checkmate", "value_resign"}  # decisive outcomes
 
 # Canonical positions: (FEN, outcome from current player's perspective)
 # Repeated CANONICAL_REPEATS times — reduced from 200 now that diverse K+Q vs K
@@ -72,6 +82,48 @@ CANONICAL_POSITIONS = [
 N_DIVERSE_PAIRS = 128   # generates 256 positions total (128 W-to-move + 128 B-to-move)
 
 BUFFER_CAPACITY = 50_000
+
+
+def load_reviewed_midgame_positions(reviewed_path, candidates_path):
+    """
+    Load mid-game material-imbalanced positions accepted by external agent review.
+    Returns list of (chess.Board, outcome_float) tuples where outcome is from
+    the current player's perspective (consistent with canonical encoding).
+    """
+    with open(reviewed_path) as f:
+        reviewed = json.load(f)
+    with open(candidates_path) as f:
+        candidates = json.load(f)
+
+    accepted_ids = {r["id"] for r in reviewed if r["accept"]}
+    candidates_by_id = {c["id"]: c for c in candidates}
+
+    positions = []
+    skipped = 0
+    for cid in sorted(accepted_ids):
+        c = candidates_by_id.get(cid)
+        if c is None:
+            skipped += 1
+            continue
+        try:
+            board = chess.Board(c["fen"])
+        except Exception:
+            skipped += 1
+            continue
+
+        # outcome in candidates is from White's perspective (+1.0 White won, -1.0 Black won)
+        outcome_white = float(c["outcome"])
+        # convert to current player's perspective
+        if board.turn == chess.WHITE:
+            outcome_mover = outcome_white
+        else:
+            outcome_mover = -outcome_white
+
+        positions.append((board, outcome_mover))
+
+    if skipped:
+        print(f"  Skipped {skipped} positions (missing or invalid FEN)")
+    return positions
 
 
 def generate_diverse_kq_vs_k(num_pairs=128):
@@ -227,9 +279,21 @@ for board, outcome in diverse_positions:
     canonical_batch.append((state, policy, float(outcome)))
     diverse_count += 1
 
+# Mid-game material-imbalanced positions — Run 11 addition.
+# 193 positions from Run 10 self-play (game 2000+), filtered to plies 8-28,
+# abs(material) >= 5, material-advantaged side won. Reviewed by external agent.
+midgame_positions = load_reviewed_midgame_positions(REVIEWED_JSON, CANDIDATES_JSON)
+midgame_count = 0
+for board, outcome in midgame_positions:
+    state  = encode([board])
+    policy = torch.zeros(4096)
+    canonical_batch.append((state, policy, float(outcome)))
+    midgame_count += 1
+
 buf.add_permanent(canonical_batch)
 print(f"  {static_count:,} static canonical positions ({len(CANONICAL_POSITIONS)} × {CANONICAL_REPEATS})")
 print(f"  {diverse_count:,} diverse K+Q vs K positions ({N_DIVERSE_PAIRS} pairs, 1 each)")
+print(f"  {midgame_count:,} mid-game material-imbalanced positions (Run 10, agent-reviewed)")
 
 # ---------------------------------------------------------------------------
 # Save
@@ -238,5 +302,5 @@ print(f"  {diverse_count:,} diverse K+Q vs K positions ({N_DIVERSE_PAIRS} pairs,
 print(f"\nFinal buffer: {len(buf):,} rolling / {len(buf._permanent):,} permanent ({BUFFER_CAPACITY:,} rolling capacity)")
 buf.save(OUTPUT_PATH)
 print(f"Saved to {OUTPUT_PATH}")
-print(f"\nFor next run, set in train_chess.py:")
+print(f"\nFor Run 11, set in train_chess.py:")
 print(f"  BUFFER_LOAD = \"{OUTPUT_PATH}\"")

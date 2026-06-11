@@ -44,7 +44,7 @@ def material_balance(board: chess.Board) -> int:
     return score
 
 
-def extract_candidate(row: dict) -> dict | None:
+def extract_candidate(row: dict):
     """
     Return the first qualifying position from a game, or None.
 
