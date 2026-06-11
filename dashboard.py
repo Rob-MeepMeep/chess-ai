@@ -2,7 +2,8 @@
 dashboard.py — Local analysis dashboard for chess-ai training runs.
 
 Drop in any combination of CSV files, or point it at a run directory.
-Supports: games.csv, training.csv, eval_games.csv, regression.csv
+Supports: games.csv, training.csv, eval_games.csv, regression.csv,
+          openings.csv, end_reasons.csv, snapshots.csv
 
 Run with:
   venv/bin/streamlit run dashboard.py
@@ -38,6 +39,12 @@ def detect_type(df: pd.DataFrame) -> str:
         return "training"
     if {"outcome", "end_reason", "n_moves"} <= cols:
         return "games"
+    if {"checkmates", "material_resigns", "value_resigns"} <= cols:
+        return "end_reasons"
+    if {"position", "move1", "pct1"} <= cols:
+        return "snapshots"
+    if {"game", "moves"} <= cols and "outcome" not in cols and "position" not in cols:
+        return "openings"
     return "unknown"
 
 def load_run_dir(path: str) -> dict:
@@ -48,6 +55,9 @@ def load_run_dir(path: str) -> dict:
         ("training.csv", "training"),
         ("eval_games.csv", "eval"),
         ("regression.csv", "regression"),
+        ("openings.csv", "openings"),
+        ("end_reasons.csv", "end_reasons"),
+        ("snapshots.csv", "snapshots"),
     ]:
         fp = p / fname
         if fp.exists():
@@ -82,7 +92,11 @@ if run_dir:
         st.sidebar.error(f"No recognised CSVs found in {run_dir}")
 
 for f in (uploaded or []):
-    df = pd.read_csv(f)
+    try:
+        df = pd.read_csv(f, on_bad_lines="skip")
+    except Exception as e:
+        st.sidebar.warning(f"{f.name}: could not parse ({e})")
+        continue
     ftype = detect_type(df)
     if ftype != "unknown":
         dfs[ftype] = df
@@ -319,6 +333,187 @@ if "training" in dfs:
             st.plotly_chart(fig4, use_container_width=True)
 
 # ---------------------------------------------------------------------------
+# Section: openings.csv
+# ---------------------------------------------------------------------------
+
+if "openings" in dfs:
+    df = dfs["openings"]
+    st.header("Opening Repertoire")
+
+    df["first_move"] = df["moves"].fillna("").str.split().str[0]
+    df = df[df["first_move"] != ""]
+
+    total = len(df)
+    window_size = max(200, total // 25)
+
+    top_moves = df["first_move"].value_counts().head(6).index.tolist()
+    df["_move_group"] = df["first_move"].apply(lambda m: m if m in top_moves else "other")
+    df["_bin"] = (df["game"] // window_size) * window_size
+
+    col_left, col_right = st.columns(2)
+
+    with col_left:
+        move_bin = df.groupby(["_bin", "_move_group"]).size().reset_index(name="count")
+        move_bin["pct"] = move_bin["count"] / move_bin.groupby("_bin")["count"].transform("sum") * 100
+        fig = px.bar(
+            move_bin, x="_bin", y="pct", color="_move_group",
+            barmode="stack",
+            title=f"First-move distribution (windows of {window_size} games)",
+            labels={"_bin": "Game", "pct": "% games", "_move_group": "First move"},
+            height=360,
+        )
+        fig.update_layout(margin=dict(t=40, b=20))
+        st.plotly_chart(fig, use_container_width=True)
+
+    with col_right:
+        a2a3_by_bin = (
+            df.groupby("_bin")
+            .apply(lambda x: (x["first_move"] == "a2a3").mean() * 100)
+            .reset_index(name="pct")
+        )
+        fig2 = go.Figure()
+        fig2.add_trace(go.Scatter(
+            x=a2a3_by_bin["_bin"], y=a2a3_by_bin["pct"],
+            name="a2a3 %", line=dict(color="#e05050", width=2),
+            fill="tozeroy", fillcolor="rgba(224,80,80,0.15)",
+        ))
+        fig2.update_layout(
+            title="a2a3 lock-in over training",
+            xaxis_title="Game", yaxis_title="% games starting a2a3",
+            yaxis=dict(range=[0, 100]),
+            height=360, margin=dict(t=40, b=20),
+        )
+        st.plotly_chart(fig2, use_container_width=True)
+
+    st.subheader("Most common opening sequences (first 12 moves)")
+    top_seqs = df["moves"].value_counts().head(10).reset_index()
+    top_seqs.columns = ["Sequence", "Count"]
+    top_seqs["% of games"] = (top_seqs["Count"] / total * 100).map(lambda x: f"{x:.1f}%")
+    st.dataframe(top_seqs, width="stretch", hide_index=True)
+
+# ---------------------------------------------------------------------------
+# Section: end_reasons.csv
+# ---------------------------------------------------------------------------
+
+if "end_reasons" in dfs:
+    df = dfs["end_reasons"]
+    st.header("End Reason Transitions")
+
+    reason_cols = ["checkmates", "material_resigns", "value_resigns", "cap_draws", "rule_draws"]
+    avail = [c for c in reason_cols if c in df.columns]
+    df["_total"] = df[avail].sum(axis=1).replace(0, 1)
+
+    col_left, col_right = st.columns(2)
+
+    with col_left:
+        if "value_resigns" in df.columns and "material_resigns" in df.columns:
+            df["_val_pct"]  = df["value_resigns"]   / df["_total"] * 100
+            df["_mat_pct"]  = df["material_resigns"] / df["_total"] * 100
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=df["game"], y=df["_mat_pct"],
+                name="Material resign", line=dict(color="#f0c040", width=2),
+                fill="tozeroy", fillcolor="rgba(240,192,64,0.25)",
+            ))
+            fig.add_trace(go.Scatter(
+                x=df["game"], y=df["_val_pct"],
+                name="Value resign", line=dict(color="#e09000", width=2),
+                fill="tozeroy", fillcolor="rgba(224,144,0,0.25)",
+            ))
+            fig.update_layout(
+                title="Material resign vs value resign (% of games per window)",
+                xaxis_title="Game", yaxis_title="% of games",
+                height=340, margin=dict(t=40, b=20),
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+    with col_right:
+        if "checkmates" in df.columns:
+            df["_mates_pct"] = df["checkmates"] / df["_total"] * 100
+            fig2 = go.Figure()
+            fig2.add_trace(go.Scatter(
+                x=df["game"], y=df["_mates_pct"],
+                name="Checkmate %", line=dict(color="#50c050", width=2),
+                fill="tozeroy", fillcolor="rgba(80,192,80,0.15)",
+            ))
+            fig2.update_layout(
+                title="Checkmate rate over training",
+                xaxis_title="Game", yaxis_title="% of games",
+                height=340, margin=dict(t=40, b=20),
+            )
+            st.plotly_chart(fig2, use_container_width=True)
+
+# ---------------------------------------------------------------------------
+# Section: snapshots.csv
+# ---------------------------------------------------------------------------
+
+if "snapshots" in dfs:
+    df = dfs["snapshots"]
+    st.header("Policy Snapshots")
+
+    def parse_pct(val):
+        try:
+            return float(str(val).replace("%", ""))
+        except Exception:
+            return None
+
+    df["_pct1"] = df["pct1"].apply(parse_pct)
+
+    start_df = df[df["position"] == "start"].copy()
+
+    col_left, col_right = st.columns(2)
+
+    with col_left:
+        if not start_df.empty:
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=start_df["game"], y=start_df["_pct1"],
+                name="Top-1 visit %", line=dict(color="#50a0e0", width=2),
+                fill="tozeroy", fillcolor="rgba(80,160,224,0.15)",
+                text=start_df["move1"],
+                hovertemplate="Game %{x}<br>Top move: %{text}<br>Visit share: %{y:.1f}%",
+            ))
+            fig.update_layout(
+                title="Policy confidence at start position (top-1 MCTS visit share)",
+                xaxis_title="Game", yaxis_title="% visits on top move",
+                height=340, margin=dict(t=40, b=20),
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+    with col_right:
+        if not start_df.empty:
+            top_opening_moves = start_df["move1"].value_counts().head(5).index.tolist()
+            start_df = start_df.copy()
+            start_df["_move_group"] = start_df["move1"].apply(
+                lambda m: m if m in top_opening_moves else "other"
+            )
+            n_bins = max(10, len(start_df) // 5)
+            bin_size = max(1, len(start_df) // n_bins)
+            start_df["_bin"] = (start_df.index // bin_size)
+            bin_game = start_df.groupby("_bin")["game"].first().to_dict()
+            start_df["_bin_game"] = start_df["_bin"].map(bin_game)
+            move_bin = (
+                start_df.groupby(["_bin_game", "_move_group"])
+                .size()
+                .reset_index(name="count")
+            )
+            fig2 = px.bar(
+                move_bin, x="_bin_game", y="count", color="_move_group",
+                barmode="stack",
+                title="Top move at start position over time",
+                labels={"_bin_game": "Game", "count": "Snapshots", "_move_group": "Move"},
+                height=340,
+            )
+            fig2.update_layout(margin=dict(t=40, b=20))
+            st.plotly_chart(fig2, use_container_width=True)
+
+    st.subheader("Latest snapshot at each canonical position")
+    latest = df.sort_values("game").groupby("position").last().reset_index()
+    show_cols = ["position", "game", "move1", "pct1", "move2", "pct2", "move3", "pct3", "move4", "pct4", "move5", "pct5"]
+    avail_cols = [c for c in show_cols if c in latest.columns]
+    st.dataframe(latest[avail_cols], width="stretch", hide_index=True)
+
+# ---------------------------------------------------------------------------
 # Section: eval_games.csv
 # ---------------------------------------------------------------------------
 
@@ -363,7 +558,7 @@ if "eval" in dfs:
             "W/D %":        f"{wd:.0f}%",
         })
 
-    st.dataframe(pd.DataFrame(summary_rows), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(summary_rows), width="stretch", hide_index=True)
 
     # If multiple evals exist (steps differs), show win rate over time
     if df["hal_steps"].nunique() > 1:
