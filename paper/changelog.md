@@ -151,6 +151,81 @@ A record of significant decisions, config changes, and architectural pivots acro
 - **Usage:** Run `venv/bin/python3 curate_buffer.py` after a training run,
   then set `BUFFER_LOAD = "checkpoints/run7_seed_buffer.pt"` in train_chess.py.
 
+### Run 7 — buffer seeding validated, cap draw collapse (game 1200, 2026-06-06)
+- b-move value reached −0.950 at game 990 — first time value head correctly evaluated K+Q vs K endgame. Proved buffer seeding works: Run 7 bootstrapped meaningfully from game 1 rather than spending hundreds of games re-discovering resign thresholds.
+- **Problem:** Cap draws scored 0.0 outcome regardless of material balance. A game ending at 50-move cap with White up a queen still scored 0/0 draw for both sides — directly contradicting the value head's resign signal. After game 1000 a cap draw spike (likely caused by early value head confusion) flooded the buffer with 0.0 outcomes and collapsed training.
+- Stopped game 1200. Fix needed before Run 8: assign soft outcomes (±0.8) to cap draws where one side is materially ahead.
+
+### [d7b6f83] Prepare Run 8 — cap draw fix, 25% canonical partition, seed buffer
+- **Cap draw soft outcome:** cap draws now score +0.8 / −0.8 when `abs(material) > 3` at the move cap, rather than 0.0. Prevents material-advantage positions from being labelled as draws and contaminating the value head.
+- **Tiered replay buffer:** permanent partition (25% of each batch) reserved for canonical endgame positions — K+Q vs K, K+R vs K in multiple orientations. These positions are never evicted as the rolling buffer cycles. Ensures the value head always sees ground-truth outcomes even as self-play distribution shifts.
+- Seed buffer built from Run 7 games (decisive only, move 20–100) + canonical positions.
+
+### [05e20df] Fix critical MCTS backup sign — value stored from wrong perspective
+- **Problem (affects Runs 1–7):** During MCTS backup, the value estimate was negated *after* being accumulated into `node.W`. The correct AlphaZero convention is to negate *before* storing, so each node records value from the perspective of the player who moved to reach that node. With the sign inverted, every visit to a node updated its statistics in the wrong direction — the policy head was effectively learning to prefer the worst moves.
+- **Effect:** All prior runs trained on backwards value signal. This explains 0% win rate vs random across seven runs despite the value head converging to reasonable regression values.
+- **Fix:** flip sign before `node.W += value`, not after. One-line change with run-wide consequences.
+
+### [3c5270a] eval_chess.py — background-safe eval for concurrent training
+- Added `--cpu` flag to force CPU device during eval, freeing the MPS backend for a concurrent training loop.
+- Added `--regression-only` flag for a ~5-second value head sanity check that can run safely at any point without interrupting training.
+
+### Run 8 — first wins, Geometry Trap (game 2010, 10,160 steps, 2026-06-07)
+- Win rate vs random: 4% (game 560) → 12% (game 1000) → 18% (game 1500) → 12% (game 2010, regression trough).
+- ~240 checkmates across the run. Notable: Fool's Mate (game 823), Scholar's Mate (game 830), Na5# (game 1886), Bg7# (game 1509).
+- Loss: 3.093 (new low across all runs). b-move: −0.921 (new high). w-wins: +0.048 (oscillating throughout — see Geometry Trap).
+- **Geometry Trap identified:** w-wins oscillated near zero throughout Run 8 while b-move converged cleanly. Root cause: `RESIGN_MATERIAL` cuts games before White ever has the material advantage to trigger decisive win signals. White's winning endgames are underrepresented in the buffer; training data asymmetry prevents the value head from learning White wins.
+- vs Stockfish depth 1: 0% throughout. No draws.
+
+### [93057d3] Run 9 infrastructure — RESIGN_MATERIAL=3, diverse endgame buffer
+- `RESIGN_MATERIAL` lowered 7 → 3. A 3-pawn material advantage (minor piece up) now triggers resignation, generating White win signals much earlier in games.
+- Diverse K+Q vs K endgame seeding: 256 positions at varied board locations with ground-truth ±1 outcomes added to the permanent buffer partition. Gives the value head direct, repeated signal for the most important endgame the agent needs to learn to convert.
+- Seed buffer built from Run 8 games (decisive, games 1000–2010, both colours).
+
+### Run 9 — Geometry Trap resolved, f2f3 local minimum (game 1000, 15,135 steps, 2026-06-07)
+- **Geometry Trap resolved:** w-wins reached +0.9990 at game 410. First time value head correctly evaluated a White-winning K+Q vs K endgame. The RESIGN_MATERIAL=3 change fixed the training data asymmetry — White winning positions now enter the buffer.
+- First White wins vs random: 8% as White at game 1000 (was 0% across all prior runs).
+- Black regression: 24% → 12% as Black; 4 losses to random — policy in mid-transition between old and new training distribution.
+- **f2f3 opening local minimum:** greedy eval opened `1. f2f3` in 21–70% of games throughout. Self-play partners learned to exploit the open diagonal; value signal reinforced f2f3 avoidance in some games, then re-selected it others. Policy converged to a local minimum.
+- Loss: 1.6–1.9 (well below Run 8). Zero cap draws. W/B balance 25/25 at game 800.
+- Decision: Dirichlet noise at root breaks opening lock-in. Stop Run 9 at game 1000; implement noise for Run 10.
+
+### [0d60be1] Run 10 infrastructure — temperature scheduling, Run 9 seed buffer
+- **Temperature scheduling:** first 30 plies of each self-play game use stochastic multinomial sampling over the policy distribution. From ply 31 onward, greedy argmax. Hard binary cutoff — no decay schedule. Increases training diversity in the opening and early middlegame without sacrificing endgame quality.
+- `N_SIMULATIONS` halved: 200 → 100. Doubles game throughput; MCTS quality sufficient at this stage.
+- `ReplayBuffer` capacity expanded: 50,000 → 75,000 rolling positions.
+- Checkpoint and log paths updated: `run10_hal_chess.pt`, `logs/run10/`.
+- Seed buffer built from Run 9 games 800–1000 (decisive, both-colour wins).
+
+### [b88d867] Policy mirroring for canonical encoding, value resign winner fix
+- **Policy mirroring:** MCTS was computing prior probabilities using canonical (always-White-to-move) board encoding, but storing them in the original board's move index. For Black, the canonical flip means the move indices no longer correspond to the unflipped board's legal moves — policy priors were targeting wrong squares. Fixed with `mirror_policy()` applied in `mcts.py` and `train_chess.py` to remap Black's policy vector back to the original board's coordinate space.
+- **Value resign winner:** when a resign was triggered by the value head (not material balance), the winner was determined by material balance anyway. This could assign the wrong colour as winner in positions where the value head and material signal disagreed. Fixed to use the value head's sign for value-triggered resigns.
+
+### [b14eab7] Replay buffer sample — explicit ratio, edge case guard, shuffle
+- **Buffer sample crash:** `random.sample(rolling_buffer, k)` raised `ValueError` when the rolling buffer had fewer positions than requested sample size during early training. Fixed with explicit guard: if rolling buffer undersized, draw all available positions.
+- Batch composition now uses explicit ratio: 75% rolling, 25% permanent. Shuffle applied to combined batch before training. Prevents gradient order bias from consistent position ordering.
+
+### Run 10 — eval improvements (game ~5400)
+- **`hal_move_noisy_at(n_sims)`:** new eval move function that applies Dirichlet noise at the MCTS root while keeping greedy (argmax) move selection. Breaks determinism in Stockfish eval games without degrading play quality — consecutive eval games see different opening exploration without temperature-driven quality loss.
+- **`add_noise` parameter in `choose_move()`:** allows noise injection independently of the `greedy` flag. Previously noise was tied to training mode only; now eval can selectively add noise regardless of greedy/stochastic setting.
+- Stockfish depth 1 eval now uses `hal_move_noisy_at(200)` — 200 simulations, greedy + noise.
+- **First draws vs Stockfish depth 1:** 3 draws at game ~5400 eval. First time in the project HAL has not lost every game against a rated engine.
+
+### Run 10 — Scholar's Mate trap resolved (game ~5960 → game 7500)
+- **Game ~5960:** 17/25 eval games as White vs Stockfish depth 1 ended in Scholar's Mate against HAL — greedy policy consistently opened f2f3/g2g3/g4, exposing the h5-e8 diagonal. Trap worsened across the run as Black self-play policy learned to exploit it and reinforced the signal from the other side.
+- **Self-play game 6030 (45,105 steps):** HAL as Black delivered Scholar's Mate in 8 plies (`b1c3 a7a5 f2f3 c7c6 g2g3 e7e5 g3g4 Qh4#`). Generated direct −1 training signal on the f3/g3/g4 sequence for White.
+- **Game 7500:** 0/25 Scholar's Mates. The greedy first-move shifted from f2f3 to a2a3 (66% of games) — a2a3 doesn't expose the diagonal. f3/g3/g4 sequence received enough −1 signal from self-play losses and Stockfish defeats to drop out of greedy selection.
+
+### Run 10 — first White draw vs Stockfish depth 1 (game ~9050, 60,270 steps)
+- Eval game 59 (as White): 174 moves, drawn by 50-move rule. Opening: `f2f3 e7e5 e2e4 g8e7 c2c4 e7c6 d2d3 f8b4`. Dirichlet noise in `hal_move_noisy_at` escaped a2a3 to f2f3, but HAL followed with central development (e4/c4/d3) rather than the Scholar's Mate continuation.
+- First time HAL has drawn as White against any rated engine. (First ever project draw vs Stockfish was Black draw, game ~5400.)
+- Win rate vs random at same eval: 14% (trough from negative start value bias, −0.057). Not structural collapse — same trough pattern seen at game ~2600 before recovery.
+
+### [1241f60] Disable Stockfish depth 3/5 eval pending depth 1 threshold
+- Depth 3 and depth 5 matchups commented out of `eval_chess.py`. All results were 0/0/25 (no wins, no draws) — no signal, only eval time cost.
+- Re-enable thresholds: add depth 3 when HAL reaches 20% W/D vs depth 1; add depth 5 when 20% W/D vs depth 3.
+- Current Stockfish eval: depth 1 only (`for depth in [1]`).
+
 ---
 
 *Updated throughout the project. For full diff history see git log.*
