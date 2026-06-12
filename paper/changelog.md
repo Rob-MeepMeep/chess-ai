@@ -226,6 +226,27 @@ A record of significant decisions, config changes, and architectural pivots acro
 - Re-enable thresholds: add depth 3 when HAL reaches 20% W/D vs depth 1; add depth 5 when 20% W/D vs depth 3.
 - Current Stockfish eval: depth 1 only (`for depth in [1]`).
 
+### Run 11 — buffer curation pipeline (2026-06-11)
+- **`extract_buffer_candidates.py`:** extracts FEN positions from Run 10 decisive games (game 2000+) where abs(material) ≥ 5 at plies 8–28 and the material-advantaged side won. Output: `paper/buffer_candidates.json` (~300 candidates).
+- **External agent review:** all 300 candidates reviewed by Claude — 193 accepted, 107 rejected with rationale. Output: `paper/buffer_candidates_reviewed.json`.
+- **`curate_buffer.py` updated for Run 11:** loads 40 static canonical positions + 256 diverse K+Q vs K + 193 agent-reviewed mid-game positions = 489 permanent positions total. The 193 mid-game positions are the fix for the missing_queen oscillation seen throughout Run 10 — they anchor the value head to real material-advantage outcomes in mid-game positions, not just canonical endgames.
+
+### Run 11 — regression logging (2026-06-11)
+- **`record_regression()` in `chessai/logger.py`:** evaluates value head on 4 canonical positions (start, w_wins, b_move, missing_queen) and appends to `logs/run11/regression.csv` every 200 games. Gives a continuous curve of value head health through the run instead of requiring manual spot-checks.
+- **`train_chess.py`:** `REGRESSION_EVERY = 200` config constant; `logger.record_regression(game_num, agent)` called in main loop.
+- Positions match `eval_chess.py` REGRESSION_POSITIONS exactly so logged values are directly comparable to manual eval output.
+
+### Run 11 — eval watcher (2026-06-11)
+- **`eval_watcher.py`:** standalone script that polls `logs/run11/games.csv` every 30 seconds and fires `eval_chess.py` whenever a 1500-game boundary is crossed. Run in a second terminal alongside `train_chess.py`. Initialises `last_eval_at` from current game count to avoid catch-up evals when started mid-run. Stops cleanly on Ctrl+C.
+
+### Run 11 — dashboard extended (2026-06-11, 2026-06-12)
+- **`dashboard.py`** extended from 4 to 7 CSV types:
+  - **`openings.csv`:** first-move distribution over time (stacked bar) + a2a3 lock-in line chart + top-10 opening sequences table. Quantifies the a2a3 → b2b4 transition in Run 11.
+  - **`end_reasons.csv`:** material resign vs value resign proportions over time + checkmate rate trend. Shows when the value head becomes the primary resign signal.
+  - **`snapshots.csv`:** top-1 MCTS visit share at start position over time (policy confidence curve) + which move was top-1 per snapshot window + latest canonical position table.
+- CSV upload crash fixed: `on_bad_lines='skip'` + try/except for malformed rows (e.g. Run 8 games.csv with mid-run column count change).
+- `st.dataframe()` `use_container_width` deprecation fixed: updated to `width='stretch'`.
+
 ---
 
 *Updated throughout the project. For full diff history see git log.*

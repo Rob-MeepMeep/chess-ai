@@ -1,6 +1,6 @@
 # chess-ai — Project Run Notes
 **Authors:** Rob Kirkland, Ellis Ward  
-**Last updated:** 2026-06-11 (Run 10 complete — game ~9900 final eval)
+**Last updated:** 2026-06-12 (Run 11 in progress — game ~3400)
 
 This document is the persistent context record for the chess-ai project. Any agent or collaborator picking up this project should read this alongside `paper/phase3_architecture.md` and `paper/changelog.md` before touching any code.
 
@@ -1457,6 +1457,97 @@ Start-adjusted missing queen of −0.143 is the best reading at positive start b
 Final 100-game window: W24/B26 — near-balanced self-play at closure.
 
 **Run 10 closed.** Next: extract_buffer_candidates.py → external agent review → curate Run 11 seed buffer.
+
+---
+
+---
+
+### Run 11 — MacBook Pro M5 Pro (IN PROGRESS, started 2026-06-11)
+
+- **Config:** 160ch / 10 blocks / 100 sims / 54 planes / RESIGN_MATERIAL=3 / RESIGN_CONSECUTIVE=5
+- **Seeded weights:** Run 10 final checkpoint (64,925 steps, 26% vs random)
+- **Seed buffer:** 489 permanent positions
+  - 40 static canonical endgames
+  - 256 diverse K+Q vs K positions (varied board locations, ground-truth ±1 outcomes)
+  - 193 agent-reviewed mid-game material-imbalanced positions from Run 10 decisive games 2000+ (abs(material) ≥ 5 at plies 8–28, advantaged side won) — fixes missing queen oscillation
+- **Key new infrastructure:**
+  - Regression logging every 200 games → `logs/run11/regression.csv` (continuous curve, replaces manual spot-checks)
+  - `eval_watcher.py`: polls games.csv every 30s, auto-fires `eval_chess.py` at each 1500-game boundary
+  - `dashboard.py` extended: 7 CSV types (games, training, eval, regression, openings, end_reasons, snapshots)
+
+**Buffer pipeline:** `extract_buffer_candidates.py` extracted ~300 candidate FEN positions from Run 10 decisive games. External agent (Claude) reviewed all 300 — accepted 193, rejected 107 with rationale. Accepted positions added to permanent partition via `curate_buffer.py`. First time external agent review used for data curation.
+
+---
+
+#### Value Head Regression — Run 11
+
+Logged automatically every 200 games. Four positions: start (~0), w_wins (K+Q vs K White to move, →+1), b_move (K+Q vs K Black to move, →−1), missing_queen (opening board White missing queen, →<0).
+
+| Game | start | w_wins | b_move | missing_queen | Notes |
+|------|-------|--------|--------|---------------|-------|
+| ~90 (manual) | — | +0.9990 | −0.9900 | −0.362 | Run starts strong on missing_queen |
+| 200 | +0.0748 | +0.9995 | −0.9888 | +0.0123 | Near-zero bounce — oscillation |
+| 400 | −0.0111 | +0.9996 | −0.9975 | −0.1286 | Returning negative |
+| 600 | −0.0016 | +0.9999 | −0.9983 | −0.0359 | Weak; b_move tightening |
+| 800 | +0.0678 | +0.9987 | −0.9993 | **−0.4047** | ★ Cycle 1 peak — strongest reading yet |
+| 1000 | +0.0540 | +0.9988 | −0.9931 | +0.0173 | Near-zero bounce |
+| 1200 | +0.0406 | +0.9991 | −0.9759 | −0.2710 | Recovering |
+| 1400 | +0.0097 | +0.9970 | −0.9847 | −0.0455 | Near-zero — eval caught here |
+| 1600 | −0.0683 | **+1.0000** | −0.9995 | −0.4973 | ★ Cycle 2 peak; w_wins hits +1.0000 |
+| 1800 | +0.0703 | **+1.0000** | −0.9946 | **−0.6052** | ★ Run high — deepest missing_queen yet |
+| 2000 | −0.0350 | +0.9999 | −0.9993 | −0.1332 | Post-peak decay |
+| 2200 | +0.0271 | +0.9999 | −0.9995 | −0.0898 | Continuing decay |
+| 2400 | +0.0117 | +0.9970 | −0.9984 | −0.0219 | Near-zero |
+| 2600 | +0.0172 | +0.9976 | **−0.9998** | −0.0618 | b_move almost exactly −1 |
+| 2800 | −0.0007 | +0.9997 | −0.9993 | −0.1205 | Building |
+| 3000 | **−0.0000** | +0.9999 | −0.9997 | −0.2867 | ★ Cycle 3 peak — eval ran here |
+| 3200 | −0.0113 | +0.9999 | −0.9999 | −0.1964 | Post-peak decay |
+| 3400 | +0.0200 | +0.9992 | −0.9923 | −0.0062 | Near-zero |
+
+**Oscillation pattern:** missing_queen cycles with ~800-game period. Peaks at games 800 (−0.40), 1600–1800 (−0.50, −0.61), 3000 (−0.29). Near-zero troughs between. The signal is consistently negative since game 1000 (no more positive crossings), but amplitude is not growing — the rolling self-play buffer competes against the permanent anchor positions and pulls the value head back toward zero each cycle. w_wins and b_move are stable and near-perfect throughout; `start` oscillates ±0.07 around zero.
+
+The −0.6052 reading at game 1800 is the deepest missing_queen signal in the project (Run 10 maximum was −0.089 at closure).
+
+---
+
+#### Eval Results — Run 11
+
+| Steps | Game | vs Random | White | Black | vs SF1 W/D | Notes |
+|-------|------|-----------|-------|-------|------------|-------|
+| 65,425 | ~100 | 16% | 12% | 20% | 6% (3 cap draws) | Value head mid-transition; 80% cap draw rate |
+| 72,425 | ~1500 | 12% | 8% | 16% | 6% (2 formal + 1 cap) | Caught near-zero oscillation (missing_queen −0.045 at eval) |
+| 79,875 | ~3000 | **18%** | 12% | **24%** | 0% | Best Black result; first loss to random as White (1 game); missing_queen −0.287 at eval |
+
+Zero losses to random across all evals except one White game at steps 79,875.
+Cap draw rate vs random ~80% throughout — HAL reaches material advantages but policy does not consistently convert within 200 moves.
+Two formal draws vs Stockfish depth 1 as Black (steps 72,425) — first formal draws as Black vs SF1.
+SF1 W/D regressed to 0% at steps 79,875 — likely sampling variance (3/50 = 6% true rate; 0/50 within confidence interval).
+
+---
+
+#### Training Observations — Run 11 (game ~3400)
+
+**Outcomes and end reasons (2890 games sampled):**
+- W/B: 50% / 50% — perfectly balanced throughout
+- Checkmates: 4.3% rate (vs 5.3% Run 10) — consistent
+- White checkmates: 61, Black checkmates: 62 — balanced
+- Material resign: ~55–58% per window
+- Value resign: rising 36% → 44% — value head contributing more resign decisions over time
+- Cap draws: effectively zero (1 in 2890 games)
+
+**Notable checkmates:**
+- Game 767: Fool's Mate in 6 moves — `1. f4 Na6 2. g4 e5 3. fxe5 Qh4#`
+- Games 946: Fool's Mate in 6 moves — `1. g4 e5 2. a3 b6 3. f3 Qh4#`
+- Games 1215, 1373, 1454: Scholar's Mate in 5 moves — `1. a4 f5 2. e3 g5 3. Qh5#` (three times in 500 games, same pattern)
+- Most common mating moves: Qh5 (d1h5, 16 times), Qh4 (d8h4, 12 times)
+
+**Opening repertoire:**
+- 20 unique White first moves in 2890 games — genuinely diverse (cf. 100% a2a3 in Run 10 greedy eval)
+- a2a3 dropped from 15% (early) to 7% (game 2500+) — Dirichlet noise successfully breaking lock-in
+- b2b4 (Polish Opening) emerged as most common move (12.8%); d2d4 at 6–13% across windows
+- 357 unique 2-move opening sequences — diverse policy
+
+**Loss curve:** Rising from 0.37 (early) to 2.31 (game 2300) — consistent with learning progression. Targets become harder as agent improves; rising loss indicates genuine representation learning, not divergence.
 
 ---
 
