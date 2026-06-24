@@ -1462,7 +1462,7 @@ Final 100-game window: W24/B26 — near-balanced self-play at closure.
 
 ---
 
-### Run 11 — MacBook Pro M5 Pro (IN PROGRESS, started 2026-06-11)
+### Run 11 — MacBook Pro M5 Pro (COMPLETE — games 1–5389, steps 64,925–91,775, 2026-06-11 to 2026-06-24)
 
 - **Config:** 160ch / 10 blocks / 100 sims / 54 planes / RESIGN_MATERIAL=3 / RESIGN_CONSECUTIVE=5
 - **Seeded weights:** Run 10 final checkpoint (64,925 steps, 26% vs random)
@@ -1503,10 +1503,21 @@ Logged automatically every 200 games. Four positions: start (~0), w_wins (K+Q vs
 | 3000 | **−0.0000** | +0.9999 | −0.9997 | −0.2867 | ★ Cycle 3 peak — eval ran here |
 | 3200 | −0.0113 | +0.9999 | −0.9999 | −0.1964 | Post-peak decay |
 | 3400 | +0.0200 | +0.9992 | −0.9923 | −0.0062 | Near-zero |
+| 3600 | −0.0098 | +0.9998 | −0.9999 | −0.1587 | Building |
+| 3800 | −0.0092 | +0.9987 | −0.9995 | −0.0074 | Back to near-zero — peak fell between readings |
+| 4000 | −0.0061 | +0.9996 | −0.9924 | −0.0281 | Near-zero; Belgium gap (2026-06-13 → 2026-06-24) |
+| 4200 | −0.0596 | +0.9981 | −0.9952 | −0.1293 | Building |
+| 4400 | +0.0116 | +0.9998 | −0.9968 | −0.0412 | Dropped again — brief ~200-game cycle |
+| 4600 | +0.0076 | **+1.0000** | −0.9992 | −0.0291 | Near-zero |
+| 4800 | −0.0064 | +0.9994 | −0.9958 | −0.2427 | ★ Cycle 4 peak |
+| 5000 | +0.0255 | +0.9998 | −0.9985 | −0.1994 | Decaying from peak |
+| 5200 | +0.0004 | +0.9978 | −0.9971 | −0.0763 | Near-zero; eval spike noted separately |
 
-**Oscillation pattern:** missing_queen cycles with ~800-game period. Peaks at games 800 (−0.40), 1600–1800 (−0.50, −0.61), 3000 (−0.29). Near-zero troughs between. The signal is consistently negative since game 1000 (no more positive crossings), but amplitude is not growing — the rolling self-play buffer competes against the permanent anchor positions and pulls the value head back toward zero each cycle. w_wins and b_move are stable and near-perfect throughout; `start` oscillates ±0.07 around zero.
+**Eval spike (step 90,780):** The manual eval at step 90,780 (game ~5190) measured missing_queen at **−0.7139** — the deepest reading in project history (previous high: −0.6052, game 1800). The game 5200 regression, run ~10 minutes later with a slightly later checkpoint, read −0.076. This confirms the oscillation includes very brief transient spikes (sub-100-game duration) that the 200-game regression cadence cannot catch. The eval happened to land exactly on one such spike.
 
-The −0.6052 reading at game 1800 is the deepest missing_queen signal in the project (Run 10 maximum was −0.089 at closure).
+**Oscillation pattern — full Run 11:** missing_queen cycles with variable period (~400–800 games). Peaks: 800 (−0.40), 1600–1800 (−0.50, −0.61), 3000 (−0.29), 3600 (−0.16), 4200 (−0.13), 4800 (−0.24), plus transient spike at ~5190 (−0.71). The long-period peaks are broadly dampening; the transient spikes are a separate phenomenon. w_wins and b_move stable and near-perfect throughout. `start` oscillates ±0.07 in early run, develops a mild negative bias by game 5000 (−0.1345 at final eval — slight Black-advantage bias).
+
+The −0.7139 transient reading at step 90,780 is the deepest missing_queen signal in the project (Run 10 maximum was −0.089 at closure; game 1800 sustained peak was −0.6052).
 
 ---
 
@@ -1516,38 +1527,86 @@ The −0.6052 reading at game 1800 is the deepest missing_queen signal in the pr
 |-------|------|-----------|-------|-------|------------|-------|
 | 65,425 | ~100 | 16% | 12% | 20% | 6% (3 cap draws) | Value head mid-transition; 80% cap draw rate |
 | 72,425 | ~1500 | 12% | 8% | 16% | 6% (2 formal + 1 cap) | Caught near-zero oscillation (missing_queen −0.045 at eval) |
-| 79,875 | ~3000 | **18%** | 12% | **24%** | 0% | Best Black result; first loss to random as White (1 game); missing_queen −0.287 at eval |
+| 79,875 | ~3000 | **18%** | 12% | **24%** | 0% | Best Black result; 1 White loss to random; mq=−0.287 (peak) |
+| 87,375 | ~4500 | 14% | **20%** | 8% | — | Trough eval (mq=−0.010); best White result |
+| 90,780 | ~5200 | 18% | 16% | 20% | 8% (2 cap) | Transient peak eval (mq=−0.714 spike); 1 White loss |
 
-Zero losses to random across all evals except one White game at steps 79,875.
-Cap draw rate vs random ~80% throughout — HAL reaches material advantages but policy does not consistently convert within 200 moves.
-Two formal draws vs Stockfish depth 1 as Black (steps 72,425) — first formal draws as Black vs SF1.
-SF1 W/D regressed to 0% at steps 79,875 — likely sampling variance (3/50 = 6% true rate; 0/50 within confidence interval).
+**Best individual results:** White 20% (steps 87,375, trough phase), Black 24% (steps 79,875, peak phase). Both colours never above 20% simultaneously this run (cf. Run 10 final: 28%/24%).
+
+**Key patterns:**
+- White improving through the run independent of oscillation phase: 8% trough (72k steps) → 20% trough (87k steps)
+- Black performance oscillation-dependent: 24% at peak → 8% at trough — value head drives Black confidence on the missing-queen and cap-draw positions
+- Cap draw rate vs random: ~80% throughout — structural, not oscillation-related. HAL achieves material advantages but cannot convert within 200 moves.
+- Zero losses to random in most evals; two White losses total across all 5 evals (steps 79,875 and 90,780)
+- vs Stockfish depth 1: maximum 8% W/D (2 cap draws as White); 0% as Black; no formal draws. Below the 20% threshold for depth 3.
+- Start position bias: developed late — reads −0.1345 at final eval (should be ~0.0). Network developed slight conviction that Black has edge from move 1; likely affects White aggression.
 
 ---
 
-#### Training Observations — Run 11 (game ~3400)
+#### Training Observations — Run 11 (final, 5389 games)
 
-**Outcomes and end reasons (2890 games sampled):**
-- W/B: 50% / 50% — perfectly balanced throughout
-- Checkmates: 4.3% rate (vs 5.3% Run 10) — consistent
-- White checkmates: 61, Black checkmates: 62 — balanced
-- Material resign: ~55–58% per window
-- Value resign: rising 36% → 44% — value head contributing more resign decisions over time
-- Cap draws: effectively zero (1 in 2890 games)
+**Outcomes and end reasons (5389 games):**
+- W/B: 50% / 50% — balanced throughout
+- Checkmates: **211 total** (105 White, 106 Black) — 3.9% rate, balanced across colours
+- Material resign: ~55–65% per 50-game window
+- Value resign: rising 36% (early) → 64% peak (game 5050) → 30% (late, trough phase) — strongly oscillation-dependent; tracks missing_queen phase
+- Cap draws: effectively zero across entire run
 
 **Notable checkmates:**
 - Game 767: Fool's Mate in 6 moves — `1. f4 Na6 2. g4 e5 3. fxe5 Qh4#`
-- Games 946: Fool's Mate in 6 moves — `1. g4 e5 2. a3 b6 3. f3 Qh4#`
-- Games 1215, 1373, 1454: Scholar's Mate in 5 moves — `1. a4 f5 2. e3 g5 3. Qh5#` (three times in 500 games, same pattern)
-- Most common mating moves: Qh5 (d1h5, 16 times), Qh4 (d8h4, 12 times)
+- Game 946: Fool's Mate in 6 moves — `1. g4 e5 2. a3 b6 3. f3 Qh4#`
+- Games 1215, 1373, 1454, 3721: Scholar's Mate in 5 moves — `1. d4 f6 2. e4 g5 3. Qh5#` (four occurrences; three in 500 games, plus game 3721 as late rediscovery)
+- Game 3721 visualised as HTML board replay — the Fool's Mate pattern: Black's d7/e7 pawns seal the king, queen diagonal runs h5→g6→f7→e8
+- Most common mating moves: Qh5 (d1h5), Qh4 (d8h4)
 
 **Opening repertoire:**
-- 20 unique White first moves in 2890 games — genuinely diverse (cf. 100% a2a3 in Run 10 greedy eval)
-- a2a3 dropped from 15% (early) to 7% (game 2500+) — Dirichlet noise successfully breaking lock-in
+- 20+ unique White first moves across the run — genuinely diverse
+- a2a3 dropped from 15% (early) to 7% (game 2500+) — Dirichlet noise breaking Run 10 lock-in
 - b2b4 (Polish Opening) emerged as most common move (12.8%); d2d4 at 6–13% across windows
-- 357 unique 2-move opening sequences — diverse policy
+- 357 unique 2-move opening sequences documented
 
-**Loss curve:** Rising from 0.37 (early) to 2.31 (game 2300) — consistent with learning progression. Targets become harder as agent improves; rising loss indicates genuine representation learning, not divergence.
+**Loss curve:** Rising from 0.37 (early) to ~2.3–2.4 (games 2000–5000) — consistent with learning. Rising loss indicates harder targets as agent improves.
+
+---
+
+#### Run 11 Summary and Findings
+
+**What worked:**
+- Regression logging every 200 games gave a continuous signal curve — revealed the oscillation structure clearly for the first time
+- eval_watcher auto-fired evals at 1500-game boundaries — removed manual intervention; the one manually triggered eval (game ~5200) was the most useful result
+- Dirichlet noise broke the a2a3 opening lock-in from Run 10
+- White policy measurably improved: 8% trough → 20% trough (same oscillation phase, different step count) — genuine generalisation, not noise
+- Value head on w_wins and b_move perfect and stable throughout (≥ 0.99)
+
+**What didn't work:**
+- missing_queen oscillation: reduced amplitude on long-period cycles but not resolved; transient spikes (e.g. −0.714) persist and the 200-game regression cadence misses them
+- Cap draw conversion: 80%+ vs random throughout — the cap-draw problem is structural. HAL builds material advantage but cannot convert within 200 moves. More endgame conversion material needed in the permanent buffer.
+- Start position bias: late-run degradation. The network developed a −0.13 conviction that Black has an edge from move 1. This may have suppressed White aggression in the final eval.
+- vs Stockfish: no progress. Maximum 8% W/D (2 cap draws as White), 0% as Black. Well below the 20% W/D threshold to unlock depth 3.
+
+**Ceiling assessment:** At 18% vs random (matching game 3000 peak despite 3× stronger missing_queen signal at final eval), the policy appears to have reached a local ceiling under the current training regime. Further training without config changes is unlikely to break through. Run 12 warranted.
+
+---
+
+#### Run 12 — Plan
+
+**Start from:** Run 11 final checkpoint (~91,775 steps, 18% vs random)
+
+**Change 1 — Stage 2 resign (priority):**  
+Remove `RESIGN_MATERIAL` entirely. The condition (w_wins AND b_move ≥ ±0.90 consistently) has been met for thousands of games. RESIGN_MATERIAL=3 is a training wheel the value head no longer needs. Letting the value head drive all resigns should reduce the artificial game truncation that may be contributing to the cap draw problem.
+
+**Change 2 — Permanent buffer additions (cap draw conversion):**  
+Add K+Q vs K+P, K+R vs K, and K+2P vs K positions to the permanent partition — endgames requiring active conversion technique, not just material recognition. This directly targets the 80% cap draw rate. Current buffer (K+Q vs K) teaches material value but not how to convert within a move limit.
+
+**Change 3 — Monitor start position bias:**  
+Add a sanity check: if start position value exceeds ±0.20 at any regression reading, flag it. The −0.1345 reading at Run 11's close is a warning; if it worsens in Run 12 it warrants investigation (likely a consequence of the value head's Black-biased training distribution).
+
+**Keep the same:**  
+- 160ch / 10 blocks / 54 planes  
+- N_SIMULATIONS=100 training / 50 eval vs random / 200 eval vs SF  
+- Regression every 200 games  
+- eval_watcher at 1500-game boundaries  
+- Dirichlet noise α=0.3, ε=0.25
 
 ---
 

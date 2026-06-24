@@ -247,6 +247,19 @@ A record of significant decisions, config changes, and architectural pivots acro
 - CSV upload crash fixed: `on_bad_lines='skip'` + try/except for malformed rows (e.g. Run 8 games.csv with mid-run column count change).
 - `st.dataframe()` `use_container_width` deprecation fixed: updated to `width='stretch'`.
 
+### Run 11 — complete (2026-06-24)
+- **5389 games, steps 64,925–91,775.** Best result: 18% vs random (matching game 3000 peak); best White: 20% (trough phase, step 87,375); best Black: 24% (peak phase, step 79,875).
+- **Findings:** missing_queen oscillation persists with transient spikes (−0.714 at step 90,780, project record). Cap draw rate (~80% vs random) is structural — confirmed as the primary remaining gap. White policy improved measurably across the run independent of oscillation phase. Start position bias developed late (−0.1345 at final eval). vs Stockfish depth 1: max 8% W/D; no formal draws.
+- **Run 11 closed.** Run 12 plan: remove RESIGN_MATERIAL (Stage 2 resign), add endgame conversion positions to permanent buffer (K+Q vs K+P, K+R vs K), monitor start position bias.
+
+### Run 11 — Fool's Mate visualisation (2026-06-24)
+- Game 3721: Scholar's/Fool's Mate in 5 half-moves (`1. d4 f6 2. e4 g5 3. Qh5#`) visualised as HTML board replay artifact.
+- Board-by-board progression of all 6 positions with animated attack diagonal and pulsing king-in-check highlight. Saved to Desktop as `game3721.html`.
+
+### Run 11 — Windows portability notes (2026-06-24)
+- `paper/windows_port_notes.md` added: assessment of changes required to run chess-ai on the 3XS Edge RX (AMD Ryzen 5 9600X / AMD RX 9070 XT 16GB / Windows 11).
+- Key changes: device detection block in `train_chess.py` and `eval_chess.py` (add CUDA/ROCm path before MPS fallback); no `caffeinate` on Windows; Windows Stockfish binary; venv activation command. AMD GPU options: torch-directml (easiest) or WSL2+ROCm (best performance).
+
 ---
 
 *Updated throughout the project. For full diff history see git log.*
