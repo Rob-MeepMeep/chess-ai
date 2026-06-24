@@ -43,16 +43,15 @@ PRINT_EVERY       = 10      # print progress line every N games
 REGRESSION_EVERY  = 200     # log value head regression to regression.csv
 RESIGN_THRESHOLD   = -0.95  # value head score below which a position is hopeless
 RESIGN_CONSECUTIVE = 5      # raised from 3 — let positions breathe, force more closing technique
-RESIGN_MATERIAL    = 3      # lowered from 7 for Run 9 — forces HAL to grind out major advantages
-                            # (rook/queen up) rather than resigning early; floods rolling buffer
-                            # with winning-side positions to balance the b-move training signal
+# RESIGN_MATERIAL removed for Run 12 — Stage 2 resign now active.
+# w_wins and b_move have been ≥ ±0.99 for thousands of games; value head is the sole resign signal.
 
 # Run identity — change RUN_NAME to start a new named run with its own logs and buffer.
 # CKPT_LOAD: None = load RUN_NAME's own checkpoint; set to a path to seed weights from another run.
 # BUFFER_LOAD: None = load RUN_NAME's own buffer; set to a path to load from another run.
-RUN_NAME    = "run11"
-CKPT_LOAD   = "checkpoints/run10_hal_chess.pt"          # continue from run10 — 26% vs random, w-wins 0.989, b-move 0.995
-BUFFER_LOAD = "checkpoints/run11_seed_buffer.pt"        # curated seed buffer: run10 games 2000+, 193 agent-reviewed mid-game positions
+RUN_NAME    = "run12"
+CKPT_LOAD   = "checkpoints/run11_hal_chess.pt"          # continue from run11 — 18% vs random, w-wins stable, b-move stable
+BUFFER_LOAD = "checkpoints/run12_seed_buffer.pt"        # curated seed buffer: run11 games 2000+, adds K+R vs K and K+Q vs K+P endgame positions
 
 CKPT_PATH   = f"checkpoints/{RUN_NAME}_hal_chess.pt"
 BUFFER_PATH = f"checkpoints/{RUN_NAME}_replay_buffer.pt"
@@ -169,19 +168,15 @@ for game_num in range(start_game + 1, N_GAMES + 1):
         history = ([board.copy()] + history)[:3]
         board.push_uci(move_uci)
 
-        # Check whether either side is in a hopeless position.
-        # Material check fires independently of the network — bootstraps early training.
-        # Value check kicks in once the value head has learned to distinguish positions.
-        # abs() used for both: we want to resign regardless of which side is losing.
+        # Stage 2 resign (Run 12): value head is the sole resign signal.
+        # Material-based resign removed — w_wins and b_move are both ≥ ±0.99; the value
+        # head has learned to evaluate hopeless positions reliably without the material crutch.
         v            = agent.get_value(board, history)
-        mat          = _material_balance(board)
-        mat_hopeless = abs(mat) > RESIGN_MATERIAL
         val_hopeless = abs(v) > 0.95   # RESIGN_THRESHOLD magnitude
-        if mat_hopeless or val_hopeless:
+        if val_hopeless:
             resign_streak += 1
-            # Record which condition fired first (material takes priority if both true)
             if resign_cause is None:
-                resign_cause = "material" if mat_hopeless else "value"
+                resign_cause = "value"
         else:
             resign_streak = 0
             resign_cause  = None
@@ -192,12 +187,9 @@ for game_num in range(start_game + 1, N_GAMES + 1):
     result        = board.result()
     outcome_scale = 1.0   # overridden to 0.8 for material-imbalanced cap draws
     if resign_streak >= RESIGN_CONSECUTIVE:
-        if resign_cause == "material":
-            winner = chess.WHITE if _material_balance(board) > 0 else chess.BLACK
-        else:
-            # value resignation: winner is whoever the value head says is winning
-            winner = board.turn if v > 0 else (chess.WHITE if board.turn == chess.BLACK else chess.BLACK)
-        end_reason = f"{resign_cause}_resign"
+        # value resignation: winner is whoever the value head says is winning
+        winner     = board.turn if v > 0 else (chess.WHITE if board.turn == chess.BLACK else chess.BLACK)
+        end_reason = "value_resign"
     elif result == "1-0":
         winner     = chess.WHITE
         end_reason = "checkmate"

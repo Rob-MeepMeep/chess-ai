@@ -48,8 +48,8 @@ from chessai.replay   import ReplayBuffer
 # Configuration
 # ---------------------------------------------------------------------------
 
-GAMES_CSV      = "logs/run10/games.csv"
-OUTPUT_PATH    = "checkpoints/run11_seed_buffer.pt"
+GAMES_CSV      = "logs/run11/games.csv"
+OUTPUT_PATH    = "checkpoints/run12_seed_buffer.pt"
 
 # Mid-game material positions reviewed by external agent (Run 11 addition)
 REVIEWED_JSON  = "paper/buffer_candidates_reviewed.json"
@@ -79,7 +79,9 @@ CANONICAL_POSITIONS = [
     ("r1bqkb1r/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",  0.7),  # black missing knight
 ]
 
-N_DIVERSE_PAIRS = 128   # generates 256 positions total (128 W-to-move + 128 B-to-move)
+N_DIVERSE_PAIRS    = 128  # K+Q vs K: generates 256 positions total (128 W-to-move + 128 B-to-move)
+N_KR_VS_K_PAIRS    = 64   # K+R vs K: 128 positions — rook endgame conversion
+N_KQ_VS_KP_PAIRS   = 64   # K+Q vs K+P: 128 positions — queen vs passer conversion
 
 BUFFER_CAPACITY = 50_000
 
@@ -168,6 +170,99 @@ def generate_diverse_kq_vs_k(num_pairs=128):
                 seen_fens.add(fen_b)
 
     return positions[:num_pairs * 2]
+
+
+def generate_diverse_kr_vs_k(num_pairs=64):
+    """
+    Generates spatially diverse K+R vs K positions.
+    Rook side always wins — outcomes ±1.0 from the current player's perspective.
+    Addresses the cap draw conversion gap: HAL needs to see rook endgame technique,
+    not just queen endgames.
+    """
+    positions = []
+    seen_fens = set()
+
+    while len(positions) < num_pairs * 2:
+        squares = random.sample(list(chess.SQUARES), 3)
+        wk_sq, wr_sq, bk_sq = squares[0], squares[1], squares[2]
+
+        board = chess.Board(None)
+        board.set_piece_at(wk_sq, chess.Piece(chess.KING, chess.WHITE))
+        board.set_piece_at(wr_sq, chess.Piece(chess.ROOK, chess.WHITE))
+        board.set_piece_at(bk_sq, chess.Piece(chess.KING, chess.BLACK))
+
+        board_w = board.copy()
+        board_w.turn = chess.WHITE
+        if (board_w.is_valid()
+                and not board_w.is_checkmate()
+                and not board_w.is_stalemate()):
+            fen_w = board_w.fen()
+            if fen_w not in seen_fens:
+                positions.append((board_w, 1.0))
+                seen_fens.add(fen_w)
+
+        board_b = board.copy()
+        board_b.turn = chess.BLACK
+        if (board_b.is_valid()
+                and not board_b.is_checkmate()
+                and not board_b.is_stalemate()):
+            fen_b = board_b.fen()
+            if fen_b not in seen_fens:
+                positions.append((board_b, -1.0))
+                seen_fens.add(fen_b)
+
+    return positions[:num_pairs * 2]
+
+
+def generate_diverse_kq_vs_kp(num_pairs=64):
+    """
+    Generates spatially diverse K+Q vs K+P positions (White has queen, Black has pawn).
+    Queen side nearly always wins — outcomes ±0.9 (soft, not ±1.0, because a
+    7th-rank pawn can force a draw in some configurations).
+    Teaches HAL to convert a queen advantage against a passed pawn, directly
+    targeting the cap draw conversion problem.
+    """
+    positions = []
+    seen_fens = set()
+
+    while len(positions) < num_pairs * 2:
+        wk_sq = random.choice(list(chess.SQUARES))
+        wq_sq = random.choice(list(chess.SQUARES))
+        bk_sq = random.choice(list(chess.SQUARES))
+        # Black pawn: ranks 2–7 (chess notation) = 0-indexed ranks 1–6
+        bp_sq = chess.square(random.randint(0, 7), random.randint(1, 6))
+
+        if len({wk_sq, wq_sq, bk_sq, bp_sq}) < 4:
+            continue
+
+        board = chess.Board(None)
+        board.set_piece_at(wk_sq, chess.Piece(chess.KING, chess.WHITE))
+        board.set_piece_at(wq_sq, chess.Piece(chess.QUEEN, chess.WHITE))
+        board.set_piece_at(bk_sq, chess.Piece(chess.KING, chess.BLACK))
+        board.set_piece_at(bp_sq, chess.Piece(chess.PAWN, chess.BLACK))
+
+        board_w = board.copy()
+        board_w.turn = chess.WHITE
+        if (board_w.is_valid()
+                and not board_w.is_checkmate()
+                and not board_w.is_stalemate()):
+            fen_w = board_w.fen()
+            if fen_w not in seen_fens:
+                positions.append((board_w, 0.9))
+                seen_fens.add(fen_w)
+
+        board_b = board.copy()
+        board_b.turn = chess.BLACK
+        if (board_b.is_valid()
+                and not board_b.is_checkmate()
+                and not board_b.is_stalemate()):
+            fen_b = board_b.fen()
+            if fen_b not in seen_fens:
+                positions.append((board_b, -0.9))
+                seen_fens.add(fen_b)
+
+    return positions[:num_pairs * 2]
+
 
 # ---------------------------------------------------------------------------
 # Load and filter games
@@ -279,7 +374,30 @@ for board, outcome in diverse_positions:
     canonical_batch.append((state, policy, float(outcome)))
     diverse_count += 1
 
-# Mid-game material-imbalanced positions — Run 11 addition.
+# Diverse K+R vs K positions — 128 rook endgame configurations (Run 12 addition).
+# Targets the cap draw conversion gap: HAL wins material but can't convert within
+# 200 moves. Rook endgame technique requires active box-and-push play.
+kr_positions = generate_diverse_kr_vs_k(N_KR_VS_K_PAIRS)
+kr_count = 0
+for board, outcome in kr_positions:
+    state  = encode([board])
+    policy = torch.zeros(4096)
+    canonical_batch.append((state, policy, float(outcome)))
+    kr_count += 1
+
+# Diverse K+Q vs K+P positions — 128 queen-vs-passer configurations (Run 12 addition).
+# Teaches HAL to convert a queen advantage against a Black passed pawn — the scenario
+# where the 80% cap draw rate most often applies. Outcomes ±0.9 (soft win, not ±1.0,
+# because a 7th-rank pawn can force a draw in some configurations).
+kq_kp_positions = generate_diverse_kq_vs_kp(N_KQ_VS_KP_PAIRS)
+kq_kp_count = 0
+for board, outcome in kq_kp_positions:
+    state  = encode([board])
+    policy = torch.zeros(4096)
+    canonical_batch.append((state, policy, float(outcome)))
+    kq_kp_count += 1
+
+# Mid-game material-imbalanced positions — carried forward from Run 11.
 # 193 positions from Run 10 self-play (game 2000+), filtered to plies 8-28,
 # abs(material) >= 5, material-advantaged side won. Reviewed by external agent.
 midgame_positions = load_reviewed_midgame_positions(REVIEWED_JSON, CANDIDATES_JSON)
@@ -293,6 +411,8 @@ for board, outcome in midgame_positions:
 buf.add_permanent(canonical_batch)
 print(f"  {static_count:,} static canonical positions ({len(CANONICAL_POSITIONS)} × {CANONICAL_REPEATS})")
 print(f"  {diverse_count:,} diverse K+Q vs K positions ({N_DIVERSE_PAIRS} pairs, 1 each)")
+print(f"  {kr_count:,} diverse K+R vs K positions ({N_KR_VS_K_PAIRS} pairs, 1 each) [Run 12]")
+print(f"  {kq_kp_count:,} diverse K+Q vs K+P positions ({N_KQ_VS_KP_PAIRS} pairs, 1 each) [Run 12]")
 print(f"  {midgame_count:,} mid-game material-imbalanced positions (Run 10, agent-reviewed)")
 
 # ---------------------------------------------------------------------------
