@@ -144,6 +144,9 @@ Average game length: 84 → 77 → 69 → 68 → 60 moves. Consistently shorteni
 
 **Run 4 concluded at game 2300.** Data archived at `paper/data/run4/`.
 
+**Decision: close Run 4 at game 2300.**
+Value resigns now dominating material resigns (genuine positional conviction), game lengths shortening consistently. The goal of Run 4 was to confirm the training loop was functional after the bug fixes — that's confirmed. Next question: is the colour bias structural (in the encoder plane) or learned (in the weights)? Run 5 tests this by using the Run 4 weights with a fresh buffer. If bias persists with Run 4 weights, it's in the weights. If it disappears, it's a buffer artefact.
+
 ---
 
 ### Run 5 — MacBook Pro M5 Pro (abandoned at game 100, 2026-05-31)
@@ -270,6 +273,9 @@ the two measure different things: recognising lost positions vs forcing checkmat
 3. Regression test flatlines while value resigns grow — important gap to document
 4. Eval win rate is gated entirely on checkmate delivery, which requires more training
 5. Loss 6.26 → 3.48 over 5000 games from scratch — genuine learning curve documented
+
+**Decision: close Run 6 at game 5000.**
+The value head is not generalising. K+Q vs K remained near-zero throughout 5000 games despite the network clearly learning to play chess (value resigns active, checkmates occurring, loss declining). The problem is the training distribution: all training positions come from self-play between two weak agents — K+Q vs K positions are never reached in practice, so the value head never sees them as training examples. The fix is buffer seeding: inject pre-built canonical endgame positions directly into the training buffer so the value head receives explicit signal from game 1. This is the primary motivation for Run 7.
 
 ---
 
@@ -435,6 +441,9 @@ network output — but the value head itself is no longer contributing signal.
    independently. Value resigns and regression tests measure different things.
 5. Black bias emerged post-game 1000 (self-play meta, not encoder structural issue) — 5 consecutive
    windows 56–70% black before early stop
+
+**Decision: close Run 7 at game 1200.**
+Value head collapsed irreversibly at game 1000 after the cap draw spike. Two root causes identified: (1) cap draws assigned outcome 0.0, causing value head to associate endgame-like positions with draws; (2) cap draw spike was sharp enough to overwhelm the 12.5% permanent partition's corrective gradient. Both bugs must be fixed before further training is useful. Fix for Run 8: cap draw outcome changed to ±0.8 when material > 3 (not 0.0), permanent partition increased from 12.5% to 25%. Carry Run 7 weights forward — they are biased but the policy head has genuine chess structure worth keeping.
 
 ---
 
@@ -1607,6 +1616,88 @@ Add a sanity check: if start position value exceeds ±0.20 at any regression rea
 - Regression every 200 games  
 - eval_watcher at 1500-game boundaries  
 - Dirichlet noise α=0.3, ε=0.25
+
+---
+
+#### Run 12 — Progress (in progress, game 2090+, steps ~101,000+)
+
+**Configuration:**
+- Start weights: Run 11 final checkpoint (~91,775 steps)
+- Seed buffer: 745 permanent positions (40 static canonical + 256 diverse K+Q vs K + 128 K+R vs K [new] + 128 K+Q vs K+P [new] + 193 agent-reviewed mid-game)
+- Stage 2 resign: value-only — `RESIGN_MATERIAL` removed entirely
+- N_SIMULATIONS = 100 | MAX_GAME_MOVES = 150 | REGRESSION_EVERY = 200
+
+**Regression history:**
+
+| Game | start | w_wins | b_move | missing_queen | Steps |
+|------|-------|--------|--------|---------------|-------|
+| 200 | +0.010 | +0.9991 | −0.9944 | −0.320 | 92,630 |
+| 400 | +0.005 | +0.9991 | −0.9938 | +0.004 | 93,180 |
+| 600 | +0.044 | +0.9997 | −0.9955 | +0.032 | ~94,180 |
+| 800 | +0.054 | +0.9971 | −0.9958 | +0.047 | ~95,180 |
+| 1000 | +0.028 | +0.9963 | −0.9888 | +0.027 | ~96,280 |
+| 1200 | +0.040 | +0.9979 | −0.9928 | +0.038 | ~97,280 |
+| 1400 | +0.029 | +0.9976 | −0.9818 | +0.030 | ~98,280 |
+| 1600 | +0.040 | +0.9994 | −0.9952 | +0.041 | ~99,280 |
+| 1800 | +0.062 | +0.9977 | −0.9788 | +0.064 | ~100,280 |
+| 2000 | +0.042 | +0.9996 | −0.9921 | +0.024 | ~101,280 |
+
+**b_move oscillation pattern — confirmed ~400-game period:**
+```
+Dip 1:  game ~1000 (−0.9888)  →  Recovery: game ~1200 (−0.9928)
+Dip 2:  game ~1400 (−0.9818)  →  Recovery: game ~1600 (−0.9952)
+Dip 3:  game ~1677 (−0.9754)  →  Recovery: game ~2000 (−0.9921)
+```
+Dip troughs deepening slightly each cycle (−0.9888 → −0.9818 → −0.9754), but each recovery returns to −0.99 range. Pattern is oscillation around a healthy baseline, not secular drift. All values remain above the 0.95 resign threshold. Predicted dip 4: games ~2200–2400.
+
+**Cause of oscillation (working theory):** The rolling buffer accumulates ~40–50% cap-draw games (soft outcome ±0.8). These positions resemble endgame material imbalances — similar to K+Q vs K — but with a less decisive outcome signal. Gradient updates from these positions pull b_move toward −0.8-something. The permanent K+Q vs K positions (±1.0) fight back and win, causing the recovery. Proposed fix for Run 13: increase PERM_FRACTION from 0.25 to 0.33.
+
+**missing_queen oscillation:** Small amplitude throughout (+0.003 to +0.064 range). No large spikes like Run 11's −0.714. The Run 12 regression (200 game cadence) has not caught a major spike; inline readings confirm the oscillation is real but muted.
+
+**Stage 2 resign — effect on outcome distribution:**
+
+| Window | cap_draw% | checkmate% | val_resign% | avg moves |
+|--------|-----------|------------|-------------|-----------|
+| 1–200 | 4.0% | 12.5% | 81.5% | 66.9 |
+| 201–400 | 13.5% | 17.5% | 61.5% | 83.8 |
+| 401–600 | 35.5% | 26.0% | 17.5% | 110.5 |
+| 601–800 | 39.5% | 29.0% | 2.0% | 122.7 |
+| 801–1000 | 39.0% | 32.5% | 1.5% | 119.7 |
+| 1001–1200 | 41.0% | 26.0% | 0.0% | 121.0 |
+| 1201–1270 | 31.4% | 24.3% | 1.4% | 122.2 |
+
+Value resign collapsed from 81.5% (early) to ~0% (games 1000+) as expected — the value head now drives all resigns. Consequence: games play to the 150-move cap more often, raising the cap draw rate from ~4% (early) to ~41% (mid-run). This is the intended behaviour — HAL must now learn to *convert* advantages rather than having material-based resignation truncate those games.
+
+**Checkmate rate:** Solid at 26–32.5% (games 401–1000), dropping slightly to ~24–26% in games 1001–1270 as more games become cap draws. 56 checkmates in games 1071–1270, including two 9-move forced mates. Best sustained checkmate production of any run so far.
+
+**h2h3 opening lock-in:** Policy converged to 1.h2h3 under greedy eval — same deterministic lock-in as a2a3 in Run 10. Dirichlet noise diversifies training games but greedy eval still converges to a single first move. Not a training error; a greedy-eval artefact.
+
+**Loss:** Rose from ~0.7 (early) to a plateau of ~2.0–2.4 (games 1000+). Has not declined through game 2000. Elevated loss likely reflects the harder training distribution (complex midgame positions + cap-draw soft outcomes + larger policy action space). Expected to remain elevated through the cap-draw phase.
+
+**Eval Results — Run 12 (game 1500, auto-fired by eval_watcher):**
+
+| Matchup | HAL W% | HAL D% | HAL L% | Notes |
+|---------|--------|--------|--------|-------|
+| HAL (White) vs Random | 24% | 76% | 0% | High draw rate |
+| HAL (Black) vs Random | 16% | 84% | 0% | High draw rate |
+| **Overall vs Random** | **20%** | **—** | **0%** | Above Run 11 best (18%) |
+| HAL vs SF depth 1 (White) | 0% | 0% | 100% | — |
+| SF depth 1 vs HAL (Black) | — | 4% | 96% | 1 draw (cap) |
+| **Overall vs SF depth 1** | **0%** | **2%** | **—** | 1 draw from 50 games |
+
+- 20% vs random at game 1500 is ahead of Run 11's best (18%) and on a trajectory toward Run 10's 26% peak
+- Zero losses to random either colour — clean baseline
+- Draw rate vs random (76%/84%) reflects the cap-draw conversion gap: HAL wins material but can't close within 200 eval moves
+- 1 draw vs Stockfish depth 1 as Black — HAL held a 200-move game against a ~1100 ELO engine. No wins yet.
+- 20% W/D threshold for depth 3 escalation not yet reached
+
+---
+
+#### Run 12 — Ongoing Findings
+
+**Start position bias:** start value climbed to +0.062 at game 1800 (should be ~0.0) before recovering to +0.042 at game 2000. Tracking: still within acceptable range (flag at ±0.20), but the peak at game 1800 is the highest in the run. No action taken; monitoring.
+
+**Cap draw structural gap:** Conversion of material advantages within 150 moves remains the core unsolved problem. The K+R vs K and K+Q vs K+P positions in the permanent buffer are the intended fix, but the effect requires more training time to generalise from canonical board positions to the varied king placements seen in real games. No measurable decline in cap draw rate as of game 2000.
 
 ---
 

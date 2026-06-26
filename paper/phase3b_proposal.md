@@ -28,6 +28,76 @@ it closes, the natural next move is to scale up.
 
 ---
 
+## 1b. Observed Constraints in the Current Architecture
+
+Run 12 (in progress, game 2090+) has been a controlled experiment: the same 160ch/10-block
+network, same 100 simulations, but with two targeted fixes (Stage 2 resign, expanded endgame
+buffer). The results clarify where the ceiling is and why.
+
+### The cap draw structural gap
+
+The most persistent problem across Runs 9–12 is conversion failure. In eval vs random, HAL
+draws ~76–84% of games — not because the positions are balanced, but because HAL wins material
+and then cannot force a result within the 200-move eval cap. In self-play training, 40–50% of
+games hit the 150-move cap with clear material imbalances.
+
+This has two consequences:
+1. **Slow learning.** Cap-draw games receive soft outcomes (±0.8) rather than decisive ones (±1.0).
+   The value head receives ambiguous feedback on positions it should clearly evaluate as wins or losses.
+2. **Self-reinforcing.** As the buffer fills with cap-draw games, the value head is trained to
+   evaluate endgame-like positions as ±0.8, which suppresses resignation, which produces more cap draws.
+
+The K+R vs K and K+Q vs K+P permanent buffer positions (added in Run 12) directly target this.
+Early results (game 2000) show no measurable improvement in cap draw rate yet — the canonical
+positions need more time to generalise to the varied king placements in real games.
+
+### b_move oscillation and its cause
+
+The value head's evaluation of K+Q vs K (Black to move) oscillates with a ~400-game period
+throughout Run 12, with dip troughs at games ~1000, ~1400, ~1677 and recoveries at ~1200, ~1600,
+~2000. The cause: when the rolling buffer is in a draw-heavy phase, the cap-draw soft outcomes
+(±0.8) pull the value head away from the ±1.0 canonical signal. The permanent positions fight
+back and win, producing the recovery.
+
+This oscillation is manageable — b_move stays above the 0.95 resign threshold throughout — but
+it indicates the permanent buffer weight (25% of each batch) is not quite enough to anchor the
+value head against the rolling buffer's influence. **Proposed fix for Run 13:** increase
+`PERM_FRACTION` from 0.25 to 0.33 in `chessai/replay.py`.
+
+### Signal quality vs model capacity
+
+The honest question about the current ceiling is: is it capacity-limited or signal-quality-limited?
+
+**Evidence for capacity-limited:**
+- Win rate vs random has plateaued at 18–26% across Runs 9–12 despite training for 10,000+ games
+- Opening, middlegame, and endgame patterns compete for the same limited representational space —
+  the network oscillates between mastering one and forgetting another
+- vs Stockfish depth 1: maximum 10% W/D (5 draws in Run 10) from a ~1100 ELO opponent with
+  principled positional play the small network cannot represent
+
+**Evidence for signal-quality-limited:**
+- The cap-draw problem contaminates 40–50% of self-play training positions with ambiguous outcomes
+- 100 simulations per move produces coarser policy targets than 200 simulations; subtle move
+  quality differences don't separate reliably at this resolution
+- Opening policy lock-in (a2a3 in Run 10, h2h3 in Run 12) suggests the policy is converging
+  on local optima that more diverse training signal would break
+
+**Most likely:** both contribute, in proportions we cannot determine without the experiment.
+Phase 3b addresses both simultaneously. If the new architecture trajectory is steep (crossing
+26% within 2,000 games), capacity was the binding constraint. If the ramp is slow, signal
+quality matters more and further sim-count or buffer changes are the next lever.
+
+### Opening policy lock-in
+
+Despite Dirichlet noise in training, greedy eval consistently converges to a single first move:
+a2a3 (Run 10), h2h3 (Run 12). The noise diversifies training games effectively, but the policy
+distribution is too peaked to survive greedy (argmax) selection at eval time. This is not a
+bug — it reflects a genuine policy preference — but it caps eval quality by making HAL's
+opening entirely predictable. A larger network with more representational capacity should
+maintain a more distributed policy, making this less likely to recur.
+
+---
+
 ## 2. The Hardware Transition
 
 **New machine:** 3XS Edge RX desktop  
@@ -228,6 +298,79 @@ quality, training data diversity, or the inherent ceiling of self-play at this s
 This is the Phase 3 threshold for escalating to depth 3. The current architecture has
 reached 10% W/D (5 cap draws, Run 10). A 256ch/20-block network with 200 simulations
 is the most direct path to crossing 20%.
+
+---
+
+## 6b. Realistic Expectations — Benefit by Benefit
+
+This section records the honest pre-experiment expectations, so the Phase 3b results can be
+evaluated against them rather than against vague optimism.
+
+### Architecture (160ch/10b → 256ch/20b)
+
+The 5× parameter increase gives the network representational capacity it currently lacks:
+the ability to learn opening theory, middlegame patterns, and endgame technique in the same
+model without oscillating between them. The current network's oscillation behaviour (b_move
+cycling, missing_queen instability, opening lock-in) is consistent with a model that has
+insufficient capacity to hold all three domains simultaneously.
+
+**Honest uncertainty:** we don't know if the current ceiling is capacity-limited or
+signal-quality-limited. If the cap draw noise is the dominant problem, a bigger network
+trained on the same noisy signal may just learn the same mistakes more confidently.
+
+**Diagnostic:** if the new architecture crosses 26% vs random within 2,000 games (seeded
+start), capacity was the binding constraint. If it takes 8,000–10,000 games to match the
+current best, signal quality matters more and further sim-count or buffer changes are the
+next lever.
+
+### MCTS simulations (100 → 200)
+
+Arguably the most impactful single change for training signal quality. At 200 sims per move
+the policy targets (visit count distributions) are sharper — good moves get visited
+proportionally more, ambiguous positions get better resolution. This means every self-play
+game generates a cleaner training target.
+
+**Important:** the MCTS loop is partially CPU-bound (Python tree traversal). The GPU only
+accelerates the neural network forward passes within each simulation. Speedup from better
+hardware applies to the inference fraction only, not the tree traversal.
+
+### Hardware (M5 Pro → RX 9070 XT)
+
+The benefit is less dramatic than the headline specs suggest. The 24GB M5 Pro unified figure
+is shared with the CPU — in practice the GPU has less than the headline. The RX 9070 XT has
+dedicated 16GB with its own bus. But the MCTS Python overhead doesn't shrink with faster hardware.
+
+**Practical estimate:** a 256ch/20b network at 200 sims on the RX 9070 XT will take similar
+wall-clock time per game to the current 100 sims on M5 Pro. The gain is not speed — it is that
+you get 2× the simulation quality for the same time budget, and the larger network doesn't
+become the bottleneck (the M5 Pro would be memory-bandwidth-constrained at 256ch/20b).
+
+### Buffer (75k → 200k)
+
+More diverse training data, less correlated batches. Primarily dampens the b_move oscillation
+observed throughout Runs 10–12. However, with 745 permanent positions in a 200,000-capacity
+buffer, permanent positions are only 0.37% of the buffer by count. **Increasing PERM_FRACTION
+from 0.25 to 0.33 is more important than the buffer capacity change** — it determines how
+aggressively the canonical positions anchor the value head against the rolling buffer's influence.
+
+### Summary table
+
+| Improvement | Mechanism | Realistic benefit |
+|---|---|---|
+| 256ch/20 blocks | More representational capacity | Crossing the 26% vs random ceiling; stronger Stockfish resistance |
+| 200 simulations | Sharper policy targets | Faster convergence, better opening diversity, cleaner training signal |
+| AMD GPU | Faster inference | Handles larger network without becoming the bottleneck |
+| 200k buffer | Less correlated training | Reduced oscillation amplitude |
+| PERM_FRACTION 0.33 | Stronger canonical anchoring | Reduced b_move oscillation specifically |
+| Seeded buffer | Endgame knowledge from game 1 | Faster value head convergence than fresh-buffer runs |
+
+**Realistic targets:**
+
+| Metric | Current best | Phase 3b (within 10k games) |
+|---|---|---|
+| Win rate vs random | 26% (Run 10) | 40–50% |
+| vs Stockfish depth 1 W/D | 10% (Run 10) | Cross 20% threshold |
+| vs Stockfish depth 3 W/D | 0% | Possible with extended training |
 
 ---
 
