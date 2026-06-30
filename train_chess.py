@@ -61,7 +61,9 @@ LOG_DIR     = f"logs/{RUN_NAME}"
 # Device
 # ---------------------------------------------------------------------------
 
-if torch.backends.mps.is_available():
+if torch.cuda.is_available():       # NVIDIA CUDA or AMD ROCm (appears as "cuda" under ROCm)
+    device = torch.device("cuda")
+elif torch.backends.mps.is_available():
     device = torch.device("mps")
 else:
     device = torch.device("cpu")
