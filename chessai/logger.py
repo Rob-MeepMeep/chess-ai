@@ -149,7 +149,7 @@ class Logger:
 
         for name, fen in CANONICAL_POSITIONS.items():
             board = chess.Board(fen)
-            _, policy = agent.choose_move(
+            _, policy, _ = agent.choose_move(
                 board, history=[],
                 greedy=True,
                 n_simulations=SNAPSHOT_SIMS,
@@ -174,10 +174,15 @@ class Logger:
         Four positions match eval_chess.py's REGRESSION_POSITIONS exactly so
         the logged values are directly comparable to manual eval output.
         """
+        # K+Q FENs replaced 2026-07-09: the old w_wins position was illegal
+        # (black in check, white to move) and the old b_move position was
+        # already checkmate — a terminal state the value head never trains on.
+        # regression.csv values before this date are not comparable.
+        # Keep in sync with eval_chess.REGRESSION_POSITIONS.
         fens = {
             "start":         "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-            "w_wins":        "8/8/8/8/8/6K1/6Q1/7k w - - 0 1",
-            "b_move":        "8/8/8/8/8/6K1/6Q1/7k b - - 0 1",
+            "w_wins":        "k7/8/8/8/4K3/8/3Q4/8 w - - 0 1",
+            "b_move":        "k7/8/8/8/4K3/8/3Q4/8 b - - 0 1",
             "missing_queen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1",
         }
         agent.network.eval()

@@ -1,18 +1,26 @@
 """
 train_chess.py — AlphaZero-style self-play training loop for HAL-4000.
 
+LOCKSTEP SELF-PLAY (Run 13 perf work):
+  N_PARALLEL_GAMES games run at once in this single process. Each step, every
+  game's MCTS contributes its wave of leaf positions to ONE pooled network
+  call — 16 games × 8-leaf waves ≈ a 128-position batch — instead of each
+  game making its own tiny batch-8 calls. The GPU was idling at ~70%
+  utilisation waiting for sequential Python between batch-8 calls; pooling
+  across games is how it gets fed properly without any multiprocessing.
+
+  Games are still completely independent: each has its own board, history,
+  GameBuffer and resign state. They just share inference. A finished game is
+  committed, logged and replaced with a fresh one, so game numbers are
+  assigned in completion order.
+
 Each game: use MCTS to select every move, store (position, policy, turn) in
 a GameBuffer. At game end fill in outcomes and commit to the ReplayBuffer.
 Once the buffer is large enough, run a batch of training steps.
 
-Speed guide (MacBook Pro M5 Pro, MPS, untrained network):
-  N_SIMULATIONS = 200  — ~90-115s/game, ~250-320 hours for 10k games
-  N_SIMULATIONS = 100  — ~45-60s/game,  ~125-165 hours for 10k games
-  N_SIMULATIONS =  50  — ~20-30s/game,  ~55-85 hours for 10k games
-  N_SIMULATIONS =  25  — ~10-15s/game,  ~28-42 hours for 10k games
-
-To run overnight (prevents sleep, sleeps Mac on completion):
-  caffeinate -dims python3 train_chess.py; osascript -e 'tell application "System Events" to sleep'
+The resign check now reuses the search's own value estimate (the chosen
+child's Q) instead of a separate network call per move — a whole search is a
+strictly better estimate than one raw forward pass, and it's free.
 """
 
 import os
@@ -26,6 +34,7 @@ from chessai.encoder import encode
 from chessai.moves   import mirror_policy
 from chessai.logger  import Logger
 from chessai.replay  import ReplayBuffer, GameBuffer
+from run_config      import RUN_NAME, CKPT_PATH, BUFFER_PATH, LOG_DIR
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -33,29 +42,28 @@ from chessai.replay  import ReplayBuffer, GameBuffer
 
 N_GAMES          = 10_000
 N_SIMULATIONS    = 600
+N_PARALLEL_GAMES = 16       # games sharing each pooled network call (lockstep)
 BATCH_SIZE       = 512
 TRAIN_STEPS      = 5        # gradient updates per game (once buffer is ready)
 MIN_BUFFER       = 500      # don't train until buffer holds this many positions
 MAX_GAME_MOVES   = 150      # hard cap — bumped from 100; resign logic should terminate most games first
-CHECKPOINT_EVERY  = 10      # save checkpoint every N games
+CHECKPOINT_EVERY  = 10      # save weights every N games
+BUFFER_SAVE_EVERY = 200     # save the replay buffer every N games — it's GB-scale,
+                            # so saving it as often as the weights blocked the loop
 SNAPSHOT_EVERY    = 50      # log MCTS strategy snapshots every N games
 PRINT_EVERY       = 10      # print progress line every N games
 REGRESSION_EVERY  = 200     # log value head regression to regression.csv
-RESIGN_THRESHOLD   = -0.95  # value head score below which a position is hopeless
+RESIGN_THRESHOLD   = -0.95  # value score below which a position is hopeless
 RESIGN_CONSECUTIVE = 5      # raised from 3 — let positions breathe, force more closing technique
 # RESIGN_MATERIAL removed for Run 12 — Stage 2 resign now active.
-# w_wins and b_move have been ≥ ±0.99 for thousands of games; value head is the sole resign signal.
+# The resign signal is the search value; note that a fresh network resigns
+# nothing (value ≈ 0 everywhere), so early games run to the move cap.
 
-# Run identity — change RUN_NAME to start a new named run with its own logs and buffer.
 # CKPT_LOAD: None = load RUN_NAME's own checkpoint; set to a path to seed weights from another run.
 # BUFFER_LOAD: None = load RUN_NAME's own buffer; set to a path to load from another run.
-RUN_NAME    = "run13_retune"
+# RUN_NAME itself lives in run_config.py — shared with eval/watcher/API.
 CKPT_LOAD   = None
 BUFFER_LOAD = "checkpoints/run13_seed_buffer.pt"
-
-CKPT_PATH   = f"checkpoints/{RUN_NAME}_hal_chess.pt"
-BUFFER_PATH = f"checkpoints/{RUN_NAME}_replay_buffer.pt"
-LOG_DIR     = f"logs/{RUN_NAME}"
 
 # ---------------------------------------------------------------------------
 # Device
@@ -117,17 +125,18 @@ if os.path.exists(_buf_to_load):
     perm_str = f" + {perm_n:,} permanent" if perm_n else ""
     print(f"  Replay buffer loaded: {len(replay):,} rolling{perm_str} ({_buf_to_load})")
 
-print(f"N_SIMULATIONS = {N_SIMULATIONS} | N_GAMES = {N_GAMES:,}\n")
+print(f"N_SIMULATIONS = {N_SIMULATIONS} | N_PARALLEL_GAMES = {N_PARALLEL_GAMES} "
+      f"| N_GAMES = {N_GAMES:,}\n")
 
 # ---------------------------------------------------------------------------
-# Training loop
+# Helpers
 # ---------------------------------------------------------------------------
 
 _PIECE_VALUES = {chess.PAWN: 1, chess.KNIGHT: 3, chess.BISHOP: 3,
                  chess.ROOK: 5, chess.QUEEN: 9}
 
 def _material_balance(board: chess.Board) -> int:
-    """Positive = white ahead. Used for material-based resignation."""
+    """Positive = white ahead. Used for scoring games that hit the move cap."""
     score = 0
     for piece, val in _PIECE_VALUES.items():
         score += val * len(board.pieces(piece, chess.WHITE))
@@ -135,156 +144,212 @@ def _material_balance(board: chess.Board) -> int:
     return score
 
 
-_game_times: list = []   # rolling window for seconds-per-game estimate
-_t_run_start = time.time()
-_tally_w, _tally_b, _tally_d = 0, 0, 0  # W/B/D counts since last tally reset
+class SelfPlayGame:
+    """One game's state in the lockstep pool: its board, its in-progress
+    search, and its resign bookkeeping. Everything the old single-game loop
+    kept in local variables, one object per concurrent game."""
 
-for game_num in range(start_game + 1, N_GAMES + 1):
-    _t_game_start = time.time()
+    def __init__(self):
+        self.board         = chess.Board()
+        self.history       = []          # last 3 boards for the 4-frame encoder
+        self.buf           = GameBuffer()
+        self.moves         = []
+        self.search        = None        # in-progress SearchState, or None
+        self.resign_streak = 0
+        self.v             = 0.0         # search value after the latest move
+        self.t_start       = time.time()
 
-    board   = chess.Board()
-    history = []
-    game_buf = GameBuffer()
-    moves   = []
-    loss    = 0.0
+    @property
+    def over(self) -> bool:
+        return (self.board.is_game_over()
+                or self.resign_streak >= RESIGN_CONSECUTIVE
+                or len(self.moves) >= MAX_GAME_MOVES)
 
-    # --- Self-play: one complete game ---
-    resign_streak = 0     # consecutive moves where the side to move is hopeless
-    resign_cause  = None  # "material" or "value" — which condition fired
 
-    while not board.is_game_over() and len(moves) < MAX_GAME_MOVES:
+def _finish_game(g: SelfPlayGame) -> tuple:
+    """
+    Determine winner and end reason, commit the game to the replay buffer.
+    A real board result always outranks resignation: if checkmate landed on
+    the same ply the resign streak filled, the board is the truth — the old
+    order let the value head's opinion overwrite an actual mate.
+    """
+    outcome_scale = 1.0
 
-        # Encode current position BEFORE making the move
-        state = encode([board] + history)
-
-        # MCTS selects a move — stochastic during training
-        move_uci, policy = agent.choose_move(board, history, greedy=False)
-        if board.turn == chess.BLACK:
-            policy = mirror_policy(policy)
-
-        # Store this position in the game buffer
-        game_buf.push(state, policy, board.turn)
-        moves.append(move_uci)
-
-        # Keep only the last 3 boards — encoder uses current + 3 history = 4 total
-        history = ([board.copy()] + history)[:3]
-        board.push_uci(move_uci)
-
-        # Stage 2 resign (Run 12): value head is the sole resign signal.
-        # Material-based resign removed — w_wins and b_move are both ≥ ±0.99; the value
-        # head has learned to evaluate hopeless positions reliably without the material crutch.
-        v            = agent.get_value(board, history)
-        val_hopeless = abs(v) > 0.95   # RESIGN_THRESHOLD magnitude
-        if val_hopeless:
-            resign_streak += 1
-            if resign_cause is None:
-                resign_cause = "value"
+    if g.board.is_game_over():
+        result = g.board.result()
+        if result == "1-0":
+            winner, end_reason = chess.WHITE, "checkmate"
+        elif result == "0-1":
+            winner, end_reason = chess.BLACK, "checkmate"
         else:
-            resign_streak = 0
-            resign_cause  = None
-        if resign_streak >= RESIGN_CONSECUTIVE:
-            break   # losing side resigns
-
-    # --- Determine winner and end reason ---
-    result        = board.result()
-    outcome_scale = 1.0   # overridden to 0.8 for material-imbalanced cap draws
-    if resign_streak >= RESIGN_CONSECUTIVE:
-        # value resignation: winner is whoever the value head says is winning
-        winner     = board.turn if v > 0 else (chess.WHITE if board.turn == chess.BLACK else chess.BLACK)
+            winner, end_reason = None, "rule_draw"   # stalemate, repetition, 50-move, bare kings
+    elif g.resign_streak >= RESIGN_CONSECUTIVE:
+        # Value resignation: winner is whoever the search says is winning.
+        # g.v is from the perspective of the player to move after the last push.
+        if g.v > 0:
+            winner = g.board.turn
+        else:
+            winner = chess.WHITE if g.board.turn == chess.BLACK else chess.BLACK
         end_reason = "value_resign"
-    elif result == "1-0":
-        winner     = chess.WHITE
-        end_reason = "checkmate"
-    elif result == "0-1":
-        winner     = chess.BLACK
-        end_reason = "checkmate"
-    elif board.is_stalemate() or board.is_insufficient_material():
-        winner     = None
-        end_reason = "rule_draw"
-    elif board.is_fifty_moves() or board.is_repetition():
-        winner     = None
-        end_reason = "rule_draw"
-    elif len(moves) >= MAX_GAME_MOVES:
-        # Cap draw: if one side is clearly ahead on material, treat as a soft win
+    else:
+        # Move cap: if one side is clearly ahead on material, treat as a soft win
         # rather than a draw. Assigning outcome 0.0 to lopsided positions contaminates
         # the value head — it learns "endgame-looking positions = draw" which directly
         # contradicts the canonical endgame signal.
-        _cap_mat = _material_balance(board)
-        if abs(_cap_mat) > 3:
-            winner        = chess.WHITE if _cap_mat > 0 else chess.BLACK
+        cap_mat = _material_balance(g.board)
+        if abs(cap_mat) > 3:
+            winner        = chess.WHITE if cap_mat > 0 else chess.BLACK
             outcome_scale = 0.8   # strong signal without claiming a win was forced
         else:
-            winner        = None
-            outcome_scale = 1.0
+            winner = None
         end_reason = "cap_draw"
-    else:
-        winner     = None
-        end_reason = "rule_draw"
 
-    # Commit game positions with outcomes to replay buffer
-    game_buf.commit(replay, winner, scale=outcome_scale)
+    g.buf.commit(replay, winner, scale=outcome_scale)
+    return winner, end_reason
 
-    # --- Training steps ---
-    if replay.ready(MIN_BUFFER):
-        for _ in range(TRAIN_STEPS):
-            batch = replay.sample(BATCH_SIZE)
-            loss  = agent.train(batch)
 
-    # --- Logging ---
-    logger.record_game(game_num, winner, moves, loss, end_reason, steps=agent.steps)
+# ---------------------------------------------------------------------------
+# Lockstep training loop
+# ---------------------------------------------------------------------------
 
-    if game_num % SNAPSHOT_EVERY == 0:
-        logger.record_snapshot(game_num, agent)
+_t_run_start  = time.time()
+_game_times: list = []                   # per-game durations (overlapping wall time)
+_tally_w, _tally_b, _tally_d = 0, 0, 0   # W/B/D counts since last tally reset
 
-    if game_num % REGRESSION_EVERY == 0:
-        logger.record_regression(game_num, agent)
+game_num      = start_game               # completed-game counter (log numbering)
+games_started = start_game
+active: list  = []
+loss          = 0.0
+mcts          = agent.mcts
 
-    # --- Checkpoint ---
-    if game_num % CHECKPOINT_EVERY == 0:
-        agent.save(CKPT_PATH)
-        replay.save(BUFFER_PATH)
+while game_num < N_GAMES:
 
-    # --- Terminal progress ---
-    _game_times.append(time.time() - _t_game_start)
-    if len(_game_times) > 20:
-        _game_times.pop(0)
+    # Keep the pool full while there are games left to schedule
+    while len(active) < N_PARALLEL_GAMES and games_started < N_GAMES:
+        active.append(SelfPlayGame())
+        games_started += 1
+    if not active:
+        break
 
-    # Running W/B/D tally — resets every 50 games so bias is visible early
-    if winner == chess.WHITE:
-        _tally_w += 1
-    elif winner == chess.BLACK:
-        _tally_b += 1
-    else:
-        _tally_d += 1
+    # --- 1. Every game needs a search in progress ---
+    for g in active:
+        if g.search is None:
+            g.search = mcts.begin_search(g.board, g.history,
+                                         N_SIMULATIONS, add_noise=True)
 
-    if game_num % PRINT_EVERY == 0 or game_num <= 5:
-        w_str      = "W" if winner == chess.WHITE else "B" if winner == chess.BLACK else "D"
-        secs       = sum(_game_times) / len(_game_times)
-        games_left = N_GAMES - game_num
-        eta_h      = (secs * games_left) / 3600
-        elapsed_h  = (time.time() - _t_run_start) / 3600
-        tally_str  = f"W{_tally_w}/B{_tally_b}/D{_tally_d}"
-        print(
-            f"Game {game_num:>5} | {w_str} | "
-            f"moves: {len(moves):>3} | "
-            f"loss: {loss:.4f} | "
-            f"[{tally_str}] | "
-            f"buffer: {len(replay):>6} | "
-            f"steps: {agent.steps:>6} | "
-            f"{secs:.0f}s/game | "
-            f"elapsed: {elapsed_h:.1f}h | "
-            f"ETA: {eta_h:.1f}h"
-        )
+    # --- 2. Pool every game's leaf wave into ONE network call ---
+    batches = [mcts.gather_leaves(g.search) for g in active]
+    tensors = [b for b in batches if b is not None]
+    if tensors:
+        logits, values = mcts.evaluate(torch.cat(tensors))
+    off = 0
+    for g, b in zip(active, batches):
+        if b is None:
+            mcts.apply_results(g.search, None, None)   # all-terminal wave: backup only
+        else:
+            n = b.shape[0]
+            mcts.apply_results(g.search, logits[off:off + n], values[off:off + n])
+            off += n
 
-    # Reset tally every 50 games so it stays readable
-    if game_num % 50 == 0:
-        _tally_w, _tally_b, _tally_d = 0, 0, 0
+    # --- 3. Finished searches become moves; finished games get replaced ---
+    finished = []
+    for g in active:
+        if not g.search.done:
+            continue
+
+        # Encode current position BEFORE making the move
+        state = encode([g.board] + g.history)
+
+        policy = mcts.extract_policy(g.search)
+        move_uci, policy, v = agent.pick_move(g.board, policy, g.search.root,
+                                              greedy=False)
+        g.search = None
+        g.v      = v
+
+        # Policy targets are stored in the network's frame of reference —
+        # mirrored when it was black to move, matching the encoded state
+        stored_policy = mirror_policy(policy) if g.board.turn == chess.BLACK else policy
+        g.buf.push(state, stored_policy, g.board.turn)
+        g.moves.append(move_uci)
+
+        # Keep only the last 3 boards — encoder uses current + 3 history = 4 total
+        g.history = ([g.board.copy()] + g.history)[:3]
+        g.board.push_uci(move_uci)
+
+        # Stage 2 resign: the search value is the sole resign signal.
+        # abs() — resign regardless of which side is hopeless.
+        if abs(v) > abs(RESIGN_THRESHOLD):
+            g.resign_streak += 1
+        else:
+            g.resign_streak = 0
+
+        if g.over:
+            finished.append(g)
+
+    # --- 4. Commit finished games: outcomes, training, logging, checkpoints ---
+    for g in finished:
+        active.remove(g)
+        game_num += 1
+        winner, end_reason = _finish_game(g)
+
+        if replay.ready(MIN_BUFFER):
+            for _ in range(TRAIN_STEPS):
+                loss = agent.train(replay.sample(BATCH_SIZE))
+
+        logger.record_game(game_num, winner, g.moves, loss, end_reason,
+                           steps=agent.steps)
+
+        if game_num % SNAPSHOT_EVERY == 0:
+            logger.record_snapshot(game_num, agent)
+        if game_num % REGRESSION_EVERY == 0:
+            logger.record_regression(game_num, agent)
+        if game_num % CHECKPOINT_EVERY == 0:
+            agent.save(CKPT_PATH)
+        if game_num % BUFFER_SAVE_EVERY == 0:
+            replay.save(BUFFER_PATH)
+
+        # --- Terminal progress ---
+        _game_times.append(time.time() - g.t_start)
+        if len(_game_times) > 20:
+            _game_times.pop(0)
+
+        if winner == chess.WHITE:
+            _tally_w += 1
+        elif winner == chess.BLACK:
+            _tally_b += 1
+        else:
+            _tally_d += 1
+
+        if game_num % PRINT_EVERY == 0 or game_num <= 5:
+            w_str     = "W" if winner == chess.WHITE else "B" if winner == chess.BLACK else "D"
+            elapsed_h = (time.time() - _t_run_start) / 3600
+            done_n    = game_num - start_game
+            # Throughput, not per-game time — games overlap in the lockstep pool
+            rate      = done_n / elapsed_h if elapsed_h > 0 else 0.0
+            eta_h     = (N_GAMES - game_num) / rate if rate > 0 else float("inf")
+            tally_str = f"W{_tally_w}/B{_tally_b}/D{_tally_d}"
+            print(
+                f"Game {game_num:>5} | {w_str} | "
+                f"moves: {len(g.moves):>3} | "
+                f"loss: {loss:.4f} | "
+                f"[{tally_str}] | "
+                f"buffer: {len(replay):>6} | "
+                f"steps: {agent.steps:>6} | "
+                f"{rate:.1f} games/h | "
+                f"elapsed: {elapsed_h:.1f}h | "
+                f"ETA: {eta_h:.1f}h"
+            )
+
+        # Reset tally every 50 games so it stays readable
+        if game_num % 50 == 0:
+            _tally_w, _tally_b, _tally_d = 0, 0, 0
 
 # ---------------------------------------------------------------------------
 # Final checkpoint and summary
 # ---------------------------------------------------------------------------
 
 agent.save(CKPT_PATH)
-print(f"\nTraining complete — {N_GAMES:,} games, {agent.steps:,} training steps.")
+replay.save(BUFFER_PATH)
+print(f"\nTraining complete — {game_num:,} games, {agent.steps:,} training steps.")
 print(f"Checkpoint: {CKPT_PATH}")
 print(f"Logs:       {LOG_DIR}/")

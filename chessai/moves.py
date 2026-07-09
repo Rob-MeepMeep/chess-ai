@@ -10,6 +10,7 @@ complexity of encoding it isn't worth the overhead at this stage.
 """
 
 import chess
+import numpy as np
 import torch
 
 
@@ -51,11 +52,14 @@ def legal_move_mask(board: chess.Board) -> torch.Tensor:
         mask[move_to_index(move)] = True
     return mask
 
-_MIRROR_INDICES = None
+_MIRROR_CACHE: dict = {}   # one cached tensor per device — .to(device) every call
+                           # was silently re-uploading 4096 int64s to the GPU per use
+_MIRROR_NP = None
 
 def get_mirror_indices(device=None) -> torch.Tensor:
-    global _MIRROR_INDICES
-    if _MIRROR_INDICES is None:
+    key = str(device) if device is not None else "cpu"
+    cached = _MIRROR_CACHE.get(key)
+    if cached is None:
         indices = []
         for idx in range(4096):
             from_sq = idx // 64
@@ -63,10 +67,20 @@ def get_mirror_indices(device=None) -> torch.Tensor:
             mirrored_from = chess.square_mirror(from_sq)
             mirrored_to   = chess.square_mirror(to_sq)
             indices.append(mirrored_from * 64 + mirrored_to)
-        _MIRROR_INDICES = torch.tensor(indices, dtype=torch.long)
-    if device is not None:
-        return _MIRROR_INDICES.to(device)
-    return _MIRROR_INDICES
+        cached = torch.tensor(indices, dtype=torch.long)
+        if device is not None:
+            cached = cached.to(device)
+        _MIRROR_CACHE[key] = cached
+    return cached
+
+
+def get_mirror_indices_np() -> np.ndarray:
+    """Numpy view of the mirror table — used by MCTS expansion, which now runs
+    on CPU numpy arrays instead of doing per-move GPU lookups."""
+    global _MIRROR_NP
+    if _MIRROR_NP is None:
+        _MIRROR_NP = get_mirror_indices().numpy()
+    return _MIRROR_NP
 
 def mirror_policy(policy: torch.Tensor) -> torch.Tensor:
     """

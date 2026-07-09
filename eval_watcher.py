@@ -16,9 +16,12 @@ import subprocess
 import sys
 import time
 
-RUN_NAME      = "run12"
+from run_config import LOG_DIR   # follows the active run automatically —
+                                 # a hardcoded copy here once watched a
+                                 # finished run's log and never fired
+
 EVAL_INTERVAL = 1500
-GAMES_CSV     = f"logs/{RUN_NAME}/games.csv"
+GAMES_CSV     = os.path.join(LOG_DIR, "games.csv")
 POLL_SECONDS  = 30
 
 

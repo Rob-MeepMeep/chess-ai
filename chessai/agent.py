@@ -57,7 +57,7 @@ class ChessAgent:
                     n_simulations: int = None,
                     add_noise: bool = None) -> tuple:
         """
-        Run MCTS and return (uci_move, policy).
+        Run MCTS and return (uci_move, policy, value_after).
 
         greedy=False  — stochastic sampling for the first TEMP_MOVES plies (opening
                         diversity), then argmax thereafter (decisive endgame signal).
@@ -65,15 +65,28 @@ class ChessAgent:
         add_noise     — override Dirichlet noise at MCTS root. Defaults to not greedy.
                         Set True with greedy=True for diverse-but-strong eval games.
 
-        Returns the chosen UCI move string and the full policy tensor (4096,)
-        so the training loop can store it in the GameBuffer.
+        Returns the chosen UCI move string, the full policy tensor (4096,) for
+        the GameBuffer, and value_after: the search's estimate of the position
+        AFTER the chosen move, from the perspective of the player then to move.
+        This is the same quantity the old per-move get_value() call measured,
+        but backed by a full search instead of one raw network guess — and it
+        costs nothing extra, so the resign check no longer needs its own
+        network call every ply.
         """
         n = n_simulations or self.n_simulations
         if add_noise is None:
             add_noise = not greedy
 
-        policy = self.mcts.search(board, history, n, add_noise=add_noise)
+        policy, root = self.mcts.search(board, history, n, add_noise=add_noise)
+        return self.pick_move(board, policy, root, greedy=greedy)
 
+    def pick_move(self, board: chess.Board, policy: torch.Tensor,
+                  root, greedy: bool = False) -> tuple:
+        """
+        Turn a finished search (policy + root) into a move. Split out from
+        choose_move so the lockstep training loop, which drives the search
+        steps itself, can share the exact same selection logic.
+        """
         ply = len(board.move_stack)
         if greedy or ply >= TEMP_MOVES:
             # Greedy: take the most-visited move
@@ -82,13 +95,17 @@ class ChessAgent:
             # Stochastic: sample proportional to visit counts
             move_idx = torch.multinomial(policy, num_samples=1).item()
 
-        move = index_to_move(move_idx, board)
-        return move.uci(), policy
+        move  = index_to_move(move_idx, board)
+        child = root.children.get(move_idx)
+        # child.Q is from the mover's perspective; after the move it is the
+        # opponent's turn, so their view of the position is the negation.
+        value_after = -child.Q if (child is not None and child.N > 0) else 0.0
+        return move.uci(), policy, value_after
 
     def get_value(self, board: chess.Board, history: list) -> float:
-        """Single forward pass value estimate. Used for resignation check."""
+        """Single forward pass value estimate. Used by regression logging."""
         encoded = encode([board] + list(history)).unsqueeze(0).to(self.device)
-        with torch.no_grad():
+        with torch.inference_mode():
             _, value = self.network(encoded)
         return value.item()
 

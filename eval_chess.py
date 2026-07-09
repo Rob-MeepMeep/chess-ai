@@ -31,6 +31,7 @@ import torch
 
 from chessai.agent   import ChessAgent
 from chessai.encoder import encode
+from run_config      import CKPT_PATH, LOG_DIR   # single source for the active run
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -40,10 +41,10 @@ N_GAMES_RANDOM     = 25    # bump to 100 for final paper benchmark
 N_GAMES_STOCKFISH  = 25    # 25 per matchup — enough for meaningful numbers in a proper benchmark
 N_GAMES_PREV       = 25    # games vs previous checkpoint
 N_SIMS_RANDOM      = 50    # sims vs random — lower is fine, random doesn't punish weak play
+N_SIMS_PREV        = 100   # sims for the checkpoint-vs-checkpoint improvement test
 # Per-depth sim counts — higher depths warrant more search to have any chance
 SIMS_BY_DEPTH      = {1: 200, 3: 500, 5: 500}
 MAX_GAME_MOVES     = 200   # hard cap — 200 plies is enough; if HAL can't convert by then it's a policy problem
-CKPT_PATH          = "checkpoints/run13_hal_chess.pt"
 STOCKFISH_PATH     = "stockfish"   # assumes stockfish is on PATH
 
 # ---------------------------------------------------------------------------
@@ -92,11 +93,15 @@ print(f"  Checkpoint:    {CKPT_PATH}\n")
 # A trained network should approach +1 / -1 on decisive endgames.
 # ---------------------------------------------------------------------------
 
+# K+Q FENs replaced 2026-07-09: the old w_wins position was ILLEGAL (black in
+# check with white to move) and the old b_move position was already checkmate —
+# a terminal state the value head never trains on. regression.csv values before
+# this date are not comparable. Keep in sync with logger.record_regression().
 REGRESSION_POSITIONS = {
     # FEN                                                    description          expect
     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1": ("start",              "~0.0"),
-    "8/8/8/8/8/6K1/6Q1/7k w - - 0 1":                            ("K+Q vs K (w wins)", "near +1"),
-    "8/8/8/8/8/6K1/6Q1/7k b - - 0 1":                            ("K+Q vs K (b move)", "near -1"),
+    "k7/8/8/8/4K3/8/3Q4/8 w - - 0 1":                            ("K+Q vs K (w wins)", "near +1"),
+    "k7/8/8/8/4K3/8/3Q4/8 b - - 0 1":                            ("K+Q vs K (b move)", "near -1"),
     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1": ("white missing queen", "< 0"),
 }
 
@@ -113,7 +118,7 @@ print()
 
 def hal_move(board: chess.Board, history: list) -> str:
     """HAL plays greedily at N_SIMS_RANDOM — fast, sufficient against random."""
-    move_uci, _ = hal.choose_move(board, history, greedy=True)
+    move_uci, _, _ = hal.choose_move(board, history, greedy=True)
     return move_uci
 
 def hal_move_at(n_sims: int):
@@ -121,7 +126,7 @@ def hal_move_at(n_sims: int):
     def _move(board: chess.Board, history: list) -> str:
         orig = hal.n_simulations
         hal.n_simulations = n_sims
-        move_uci, _ = hal.choose_move(board, history, greedy=True)
+        move_uci, _, _ = hal.choose_move(board, history, greedy=True)
         hal.n_simulations = orig
         return move_uci
     return _move
@@ -132,7 +137,7 @@ def hal_move_noisy_at(n_sims: int):
     def _move(board: chess.Board, history: list) -> str:
         orig = hal.n_simulations
         hal.n_simulations = n_sims
-        move_uci, _ = hal.choose_move(board, history, greedy=True, add_noise=True)
+        move_uci, _, _ = hal.choose_move(board, history, greedy=True, add_noise=True)
         hal.n_simulations = orig
         return move_uci
     return _move
@@ -174,10 +179,10 @@ def play_game(white_fn, black_fn):
     return result, move_list
 
 # ---------------------------------------------------------------------------
-# Eval game log — one row per game, written to logs/run8/eval_games.csv
+# Eval game log — one row per game, written to <LOG_DIR>/eval_games.csv
 # ---------------------------------------------------------------------------
 
-_EVAL_LOG_PATH = os.path.join("logs", "run13", "eval_games.csv")
+_EVAL_LOG_PATH = os.path.join(LOG_DIR, "eval_games.csv")
 _eval_game_num = 0   # sequential across the whole eval run
 
 def _init_eval_log() -> None:
@@ -281,12 +286,14 @@ except FileNotFoundError:
 if args.prev:
     print("── Tier 3: HAL vs Previous Checkpoint ────────────────────\n")
     try:
-        hal_prev = ChessAgent(device, n_simulations=N_SIMULATIONS)
+        # (was N_SIMULATIONS — a name this file never defined; every --prev
+        # run died with a NameError the except below didn't catch)
+        hal_prev = ChessAgent(device, n_simulations=N_SIMS_PREV)
         hal_prev.load(args.prev)
         print(f"Previous checkpoint steps: {hal_prev.steps:,}\n")
 
         def hal_prev_move(board, history):
-            move_uci, _ = hal_prev.choose_move(board, history, greedy=True)
+            move_uci, _, _ = hal_prev.choose_move(board, history, greedy=True)
             return move_uci
 
         evaluate("5. HAL current (White) vs HAL previous (Black)",

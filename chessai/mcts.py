@@ -8,18 +8,24 @@ Each simulation does four things:
   4. BACKUP   — propagate the value back up the path, flipping sign at each
                 level (what's good for me is bad for my opponent)
 
-BATCHING:
-  Instead of running simulations one at a time (50 separate network calls),
-  we run BATCH_SIMS simulations in parallel up to their leaf nodes, then
-  evaluate all leaves in one network call. Reduces MPS round-trips from 50
-  to ~7 (50 / BATCH_SIMS), keeping the GPU busy.
+BATCHING (two levels):
+  Within one tree: BATCH_SIMS simulations run to their leaves, then all
+  leaves are evaluated in one network call (with VIRTUAL LOSS keeping the
+  parallel simulations on different branches).
 
-VIRTUAL LOSS:
-  To prevent all parallel simulations selecting the same path, we apply a
-  temporary penalty to in-flight nodes so other simulations choose different
-  branches. Removed when the real value is backed up.
+  Across trees: the search is split into three steps — gather_leaves(),
+  evaluate(), apply_results() — so a training loop running many games at
+  once can pool every game's leaves into a single large network call.
+  16 games × 8-leaf waves = a 128-position batch, which is what a modern
+  GPU actually wants. search() below is just these three steps in a loop,
+  so single-game callers (eval, the API server) work exactly as before.
 
-Expected speedup over sequential MCTS: 2–4× on MPS.
+CPU/GPU DISCIPLINE:
+  Exactly one host→device transfer (the encoded batch in) and one
+  device→host transfer (logits + values out) per network call. All prior
+  math — mirroring, masking, softmax — happens on CPU numpy afterwards.
+  The previous version called .item() once per legal move per leaf
+  (~18,000 device round-trips per move at 600 sims), which starved the GPU.
 """
 
 import numpy as np
@@ -27,12 +33,15 @@ import torch
 import chess
 
 from chessai.encoder import encode
-from chessai.moves  import mirror_policy, move_to_index, index_to_move, legal_move_mask
+from chessai.moves  import get_mirror_indices_np, move_to_index, index_to_move
 
 C_PUCT          = 1.5
 DIRICHLET_ALPHA = 0.3
 DIRICHLET_EPS   = 0.25
-BATCH_SIMS      = 8      # leaves evaluated per network call
+BATCH_SIMS      = 32     # leaves evaluated per network call within ONE tree.
+                         # Virtual loss keeps quality reasonable up to ~64;
+                         # bigger batches should come from more parallel games,
+                         # not bigger waves (less distortion of a single search).
 VIRTUAL_LOSS    = 1.0    # penalty applied to in-flight nodes
 
 
@@ -56,109 +65,177 @@ class MCTSNode:
         return self.Q + c_puct * self.P * (n_parent ** 0.5) / (1 + self.N)
 
 
+class SearchState:
+    """
+    One in-progress search: the tree plus enough bookkeeping to pause after
+    gather_leaves() and resume in apply_results(). This is what lets many
+    games interleave their searches through shared network calls.
+    """
+    __slots__ = ("root", "board", "history", "n_target", "sims_done",
+                 "noise_pending", "_wave", "_expand_meta")
+
+    def __init__(self, board: chess.Board, history: list,
+                 n_simulations: int, add_noise: bool):
+        self.root          = MCTSNode(prior=1.0)
+        self.board         = board
+        self.history       = list(history)[:3]
+        self.n_target      = n_simulations
+        self.sims_done     = 0
+        self.noise_pending = add_noise   # applied once the root is expanded
+        self._wave         = None        # in-flight (path, board, history) triples
+        self._expand_meta  = None        # node_id → (node, board) awaiting priors
+
+    @property
+    def done(self) -> bool:
+        return self.sims_done >= self.n_target
+
+
 class MCTS:
 
     def __init__(self, network: torch.nn.Module, device: torch.device,
-                 c_puct: float = C_PUCT):
-        self.network = network
-        self.device  = device
-        self.c_puct  = c_puct
+                 c_puct: float = C_PUCT, batch_sims: int = BATCH_SIMS):
+        self.network    = network
+        self.device     = device
+        self.c_puct     = c_puct
+        self.batch_sims = batch_sims
+        # bf16 inference roughly halves inference time on CUDA/ROCm.
+        # Training stays fp32 — this only affects self-play evaluation.
+        self.autocast   = (device.type == "cuda")
         self.network.eval()
 
+    # ------------------------------------------------------------------
+    # Single-tree convenience API (eval, API server, snapshots)
+    # ------------------------------------------------------------------
+
     def search(self, board: chess.Board, history: list,
-               n_simulations: int, add_noise: bool = False) -> torch.Tensor:
+               n_simulations: int, add_noise: bool = False) -> tuple:
         """
-        Run n_simulations from the current position using batched leaf evaluation.
-        Returns a policy tensor of shape (4096,), normalised visit counts.
+        Run a complete search on one tree.
+        Returns (policy, root): policy is a (4096,) tensor of normalised
+        visit counts; root exposes child Q-values (used for resign checks).
         """
-        root = MCTSNode(prior=1.0)
-        self._expand_node(root, board, history)
+        state = self.begin_search(board, history, n_simulations, add_noise)
+        while not state.done:
+            batch = self.gather_leaves(state)
+            if batch is None:
+                self.apply_results(state, None, None)
+            else:
+                logits, values = self.evaluate(batch)
+                self.apply_results(state, logits, values)
+        return self.extract_policy(state), state.root
 
-        if add_noise and root.children:
-            self._add_dirichlet_noise(root)
+    # ------------------------------------------------------------------
+    # Step-driven API — the lockstep training loop drives these directly
+    # ------------------------------------------------------------------
 
-        sims_done = 0
-        while sims_done < n_simulations:
-            wave = min(BATCH_SIMS, n_simulations - sims_done)
+    def begin_search(self, board: chess.Board, history: list,
+                     n_simulations: int, add_noise: bool = False) -> SearchState:
+        """Start a search. The root is expanded by the first wave (batched
+        with everything else) rather than by a separate network call."""
+        return SearchState(board, history, n_simulations, add_noise)
 
-            # --- 1. Select leaves for this wave ---
-            wave_data = []   # list of (path, sim_board, sim_history)
-            for _ in range(wave):
-                path, sim_board, sim_hist = self._select_to_leaf(
-                    root, board.copy(), list(history)
-                )
-                wave_data.append((path, sim_board, sim_hist))
-                self._apply_virtual_loss(path)
+    def gather_leaves(self, state: SearchState):
+        """
+        Select the next wave of leaves and return their encoded positions as
+        one CPU tensor ready for the network — or None if every leaf in the
+        wave is terminal (apply_results must still be called to back up).
+        """
+        # First wave: the root itself is the only leaf, so a full wave would
+        # just burn sims re-evaluating it. Spend exactly one.
+        if not state.root.is_expanded:
+            wave = 1
+        else:
+            wave = min(self.batch_sims, state.n_target - state.sims_done)
 
-            # --- 2. Batch-expand unique non-terminal leaves ---
-            # leaf node = path[-1]; use id() to deduplicate shared leaves
-            node_values: dict[int, float] = {}
-            to_expand: dict[int, tuple]   = {}   # node_id → (node, board, hist)
+        wave_data = []
+        for _ in range(wave):
+            path, sim_board, sim_hist = self._select_to_leaf(
+                state.root, state.board.copy(), list(state.history)
+            )
+            wave_data.append((path, sim_board, sim_hist))
+            self._apply_virtual_loss(path)
 
-            for path, sim_board, sim_hist in wave_data:
-                leaf    = path[-1]
-                node_id = id(leaf)
-                if (not sim_board.is_game_over()
-                        and not leaf.is_expanded
-                        and node_id not in to_expand):
-                    to_expand[node_id] = (leaf, sim_board, sim_hist)
+        # Deduplicate shared leaves; skip terminal ones (they need no network)
+        to_expand: dict[int, tuple] = {}
+        for path, sim_board, sim_hist in wave_data:
+            leaf    = path[-1]
+            node_id = id(leaf)
+            if (not sim_board.is_game_over()
+                    and not leaf.is_expanded
+                    and node_id not in to_expand):
+                to_expand[node_id] = (leaf, sim_board, sim_hist)
 
-            if to_expand:
-                node_ids = list(to_expand.keys())
-                leaves   = [to_expand[nid][0] for nid in node_ids]
-                boards   = [to_expand[nid][1] for nid in node_ids]
-                hists    = [to_expand[nid][2] for nid in node_ids]
+        state._wave        = wave_data
+        state._expand_meta = to_expand
 
-                # Single batched network call
-                batch_tensor = torch.cat(
-                    [encode([b] + h).unsqueeze(0) for b, h in zip(boards, hists)],
-                    dim=0
-                ).to(self.device)
+        if not to_expand:
+            return None
+        return torch.stack([encode([b] + h) for _, b, h in to_expand.values()])
 
-                with torch.no_grad():
-                    logits_batch, value_batch = self.network(batch_tensor)
+    def evaluate(self, batch: torch.Tensor) -> tuple:
+        """
+        One network call for a batch of encoded positions (from one tree or
+        many). Returns (logits, values) as float32 numpy arrays — everything
+        downstream is CPU work.
+        """
+        with torch.inference_mode():
+            x = batch.to(self.device)
+            if self.autocast:
+                with torch.autocast("cuda", dtype=torch.bfloat16):
+                    logits, values = self.network(x)
+            else:
+                logits, values = self.network(x)
+        return (logits.float().cpu().numpy(),
+                values.float().cpu().numpy())
 
-                for i, (node_id, node, sim_board) in enumerate(
-                        zip(node_ids, leaves, boards)):
-                    logits = logits_batch[i].clone()
-                    if sim_board.turn == chess.BLACK:
-                        logits = mirror_policy(logits)
-                    mask   = legal_move_mask(sim_board).to(self.device)
-                    logits[~mask] = float("-inf")
-                    priors = torch.softmax(logits, dim=0)
+    def apply_results(self, state: SearchState,
+                      logits: np.ndarray, values: np.ndarray) -> None:
+        """
+        Expand the leaves gathered by gather_leaves() using the network's
+        output rows, then remove virtual loss and back up all wave paths.
+        """
+        node_values: dict[int, float] = {}
+        if state._expand_meta:
+            for i, (node_id, (leaf, sim_board, _)) in enumerate(
+                    state._expand_meta.items()):
+                self._expand_from_logits(leaf, sim_board, logits[i])
+                node_values[node_id] = float(values[i, 0])
 
-                    for move in sim_board.legal_moves:
-                        idx = move_to_index(move)
-                        node.children[idx] = MCTSNode(
-                            prior=priors[idx].item(), parent=node
-                        )
-                    node.is_expanded   = True
-                    node_values[node_id] = value_batch[i].item()
+        for path, sim_board, _ in state._wave:
+            self._remove_virtual_loss(path)
+            leaf = path[-1]
+            if sim_board.is_game_over():
+                value = self._terminal_value(sim_board)
+            else:
+                value = node_values[id(leaf)]
+            self._backup(path, value)
 
-            # --- 3. Remove virtual loss and backup ---
-            for path, sim_board, sim_hist in wave_data:
-                self._remove_virtual_loss(path)
-                leaf    = path[-1]
-                node_id = id(leaf)
+        state.sims_done   += len(state._wave)
+        state._wave        = None
+        state._expand_meta = None
 
-                if sim_board.is_game_over():
-                    value = self._terminal_value(sim_board)
-                else:
-                    value = node_values[node_id]
+        # Root just got expanded — apply exploration noise before the real waves
+        if state.noise_pending and state.root.is_expanded:
+            self._add_dirichlet_noise(state.root)
+            state.noise_pending = False
 
-                self._backup(path, value)
-
-            sims_done += wave
-
-        # Normalise visit counts → policy
+    def extract_policy(self, state: SearchState) -> torch.Tensor:
+        """Normalised visit counts as a (4096,) tensor."""
         policy = torch.zeros(4096)
-        for idx, child in root.children.items():
+        for idx, child in state.root.children.items():
             policy[idx] = child.N
         total = policy.sum()
         if total > 0:
-            policy = policy / total
-        return policy
+            return policy / total
+        # Degenerate case (n_simulations too small to visit any child):
+        # fall back to the network priors so callers always get a distribution.
+        for idx, child in state.root.children.items():
+            policy[idx] = child.P
+        total = policy.sum()
+        return policy / total if total > 0 else policy
 
+    # ------------------------------------------------------------------
+    # Internals
     # ------------------------------------------------------------------
 
     def _select_to_leaf(self, root: MCTSNode, sim_board: chess.Board,
@@ -181,21 +258,28 @@ class MCTS:
                        key=lambda idx: node.children[idx].ucb(self.c_puct))
         return best_idx, node.children[best_idx]
 
-    def _expand_node(self, node: MCTSNode, board: chess.Board,
-                     history: list) -> None:
-        """Synchronous single-node expansion — used for the root only."""
-        encoded = encode([board] + list(history)).unsqueeze(0).to(self.device)
-        with torch.no_grad():
-            policy_logits, _ = self.network(encoded)
-        policy_logits = policy_logits.squeeze(0)
-        if board.turn == chess.BLACK:
-            policy_logits = mirror_policy(policy_logits)
-        mask = legal_move_mask(board).to(self.device)
-        policy_logits[~mask] = float("-inf")
-        priors = torch.softmax(policy_logits, dim=0)
-        for move in board.legal_moves:
-            idx = move_to_index(move)
-            node.children[idx] = MCTSNode(prior=priors[idx].item(), parent=node)
+    def _expand_from_logits(self, node: MCTSNode, board: chess.Board,
+                            logits: np.ndarray) -> None:
+        """
+        Create children from one row of network output. Legal moves are
+        generated ONCE; priors come from a softmax over just those entries
+        (equivalent to masking illegal moves to -inf, without touching the
+        other ~4060 logits). For black, the network sees a mirrored board,
+        so we read its output through the mirror table instead of building
+        a full mirrored copy.
+        """
+        legal = list(board.legal_moves)
+        idxs  = np.fromiter((move_to_index(m) for m in legal),
+                            dtype=np.int64, count=len(legal))
+        take  = get_mirror_indices_np()[idxs] if board.turn == chess.BLACK else idxs
+
+        lg = logits[take]
+        lg = lg - lg.max()            # stability: softmax is shift-invariant
+        priors = np.exp(lg)
+        priors /= priors.sum()
+
+        for idx, prior in zip(idxs, priors):
+            node.children[int(idx)] = MCTSNode(prior=float(prior), parent=node)
         node.is_expanded = True
 
     def _apply_virtual_loss(self, path: list) -> None:

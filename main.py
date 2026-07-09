@@ -16,13 +16,21 @@ from typing import Optional, List
 from pydantic import BaseModel
 
 from chessai.agent import ChessAgent
+from run_config    import CKPT_PATH   # the active run's checkpoint — the old
+                                      # hardcoded "hal_chess.pt" matched no run,
+                                      # so the API silently served random weights
 
 # ── Load HAL on startup ───────────────────────────────────────────────────────
 
-device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-agent  = ChessAgent(device, n_simulations=50)
+if torch.cuda.is_available():
+    device = torch.device("cuda")
+elif torch.backends.mps.is_available():
+    device = torch.device("mps")
+else:
+    device = torch.device("cpu")
+agent = ChessAgent(device, n_simulations=50)
 
-CKPT = "checkpoints/hal_chess.pt"
+CKPT = CKPT_PATH
 try:
     agent.load(CKPT)
     print(f"HAL-4000 loaded from {CKPT} ({agent.steps:,} training steps)")
@@ -83,7 +91,7 @@ def get_move(request: MoveRequest):
     try:
         board, history = replay_moves(request.moves)
 
-        move_uci, _ = agent.choose_move(
+        move_uci, _, _ = agent.choose_move(
             board, history,
             greedy=True,
             n_simulations=request.n_simulations
