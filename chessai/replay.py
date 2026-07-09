@@ -52,7 +52,7 @@ class ReplayBuffer:
         Up to 25% of each batch is drawn from the permanent partition (if populated).
         Returns three stacked tensors: (states, policies, outcomes).
         """
-        perm_ratio = 0.25
+        perm_ratio = 0.33
         perm_size = int(batch_size * perm_ratio)
 
         actual_perm_size = min(perm_size, len(self._permanent))

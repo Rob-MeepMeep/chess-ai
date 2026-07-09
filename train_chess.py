@@ -32,8 +32,8 @@ from chessai.replay  import ReplayBuffer, GameBuffer
 # ---------------------------------------------------------------------------
 
 N_GAMES          = 10_000
-N_SIMULATIONS    = 100      # halved from 200 — ~2x speedup; quality tradeoff acceptable at current training stage
-BATCH_SIZE       = 64
+N_SIMULATIONS    = 600
+BATCH_SIZE       = 512
 TRAIN_STEPS      = 5        # gradient updates per game (once buffer is ready)
 MIN_BUFFER       = 500      # don't train until buffer holds this many positions
 MAX_GAME_MOVES   = 150      # hard cap — bumped from 100; resign logic should terminate most games first
@@ -49,9 +49,9 @@ RESIGN_CONSECUTIVE = 5      # raised from 3 — let positions breathe, force mor
 # Run identity — change RUN_NAME to start a new named run with its own logs and buffer.
 # CKPT_LOAD: None = load RUN_NAME's own checkpoint; set to a path to seed weights from another run.
 # BUFFER_LOAD: None = load RUN_NAME's own buffer; set to a path to load from another run.
-RUN_NAME    = "run12"
-CKPT_LOAD   = "checkpoints/run11_hal_chess.pt"          # continue from run11 — 18% vs random, w-wins stable, b-move stable
-BUFFER_LOAD = "checkpoints/run12_seed_buffer.pt"        # curated seed buffer: run11 games 2000+, adds K+R vs K and K+Q vs K+P endgame positions
+RUN_NAME    = "run13_retune"
+CKPT_LOAD   = None
+BUFFER_LOAD = "checkpoints/run13_seed_buffer.pt"
 
 CKPT_PATH   = f"checkpoints/{RUN_NAME}_hal_chess.pt"
 BUFFER_PATH = f"checkpoints/{RUN_NAME}_replay_buffer.pt"
@@ -77,7 +77,7 @@ print(f"Device: {device}")
 os.makedirs("checkpoints", exist_ok=True)
 
 agent  = ChessAgent(device, n_simulations=N_SIMULATIONS)
-replay = ReplayBuffer(capacity=75_000)
+replay = ReplayBuffer(capacity=200_000)
 logger = Logger(log_dir=LOG_DIR, snapshot_interval=SNAPSHOT_EVERY)
 
 start_game = 0

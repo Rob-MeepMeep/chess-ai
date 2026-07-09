@@ -25,8 +25,8 @@ import torch.nn as nn
 
 from chessai.encoder import N_PLANES   # 54
 
-N_CHANNELS = 160
-N_BLOCKS   = 10
+N_CHANNELS = 256
+N_BLOCKS   = 20
 N_MOVES    = 4096   # 64 × 64 flat move encoding
 
 

@@ -48,8 +48,8 @@ from chessai.replay   import ReplayBuffer
 # Configuration
 # ---------------------------------------------------------------------------
 
-GAMES_CSV      = "logs/run11/games.csv"
-OUTPUT_PATH    = "checkpoints/run12_seed_buffer.pt"
+GAMES_CSV      = "logs/run12/games.csv"
+OUTPUT_PATH    = "checkpoints/run13_seed_buffer.pt"
 
 # Mid-game material positions reviewed by external agent (Run 11 addition)
 REVIEWED_JSON  = "paper/buffer_candidates_reviewed.json"
@@ -83,7 +83,7 @@ N_DIVERSE_PAIRS    = 128  # K+Q vs K: generates 256 positions total (128 W-to-mo
 N_KR_VS_K_PAIRS    = 64   # K+R vs K: 128 positions — rook endgame conversion
 N_KQ_VS_KP_PAIRS   = 64   # K+Q vs K+P: 128 positions — queen vs passer conversion
 
-BUFFER_CAPACITY = 50_000
+BUFFER_CAPACITY = 200_000
 
 
 def load_reviewed_midgame_positions(reviewed_path, candidates_path):
@@ -271,42 +271,44 @@ def generate_diverse_kq_vs_kp(num_pairs=64):
 print(f"Reading {GAMES_CSV}...")
 selected = []
 
-with open(GAMES_CSV, newline="") as f:
-    next(f)  # skip header
-    for line in f:
-        parts = line.strip().split(",")
-        if len(parts) < 6:
-            continue
-        game_num   = int(parts[0])
-        outcome    = parts[1]
-        end_reason = parts[2]
-        n_moves    = int(parts[3])
-        # Run 8 games.csv has mixed formats: steps/timestamp columns were added
-        # mid-run (~game 1000). Old rows: 6 cols (moves at index 5).
-        # New rows: 8 cols (steps at 5, timestamp at 6, moves at 7+).
-        if len(parts) >= 8 and parts[5].isdigit():
-            moves = " ".join(parts[7:]).split()
-        else:
-            moves = " ".join(parts[5:]).split()
+try:
+    with open(GAMES_CSV, newline="") as f:
+        next(f)  # skip header
+        for line in f:
+            parts = line.strip().split(",")
+            if len(parts) < 6:
+                continue
+            game_num   = int(parts[0])
+            outcome    = parts[1]
+            end_reason = parts[2]
+            n_moves    = int(parts[3])
+            # Run 8 games.csv has mixed formats: steps/timestamp columns were added
+            # mid-run (~game 1000). Old rows: 6 cols (moves at index 5).
+            # New rows: 8 cols (steps at 5, timestamp at 6, moves at 7+).
+            if len(parts) >= 8 and parts[5].isdigit():
+                moves = " ".join(parts[7:]).split()
+            else:
+                moves = " ".join(parts[5:]).split()
 
-        if game_num < MIN_GAME:
-            continue
-        if n_moves < MIN_MOVES:
-            continue
-        if n_moves > MAX_MOVES:
-            continue
-        if end_reason not in GOOD_REASONS:
-            continue
-        if outcome not in ("W", "B"):
-            continue
+            if game_num < MIN_GAME:
+                continue
+            if n_moves < MIN_MOVES:
+                continue
+            if n_moves > MAX_MOVES:
+                continue
+            if end_reason not in GOOD_REASONS:
+                continue
+            if outcome not in ("W", "B"):
+                continue
 
-        selected.append({
-            "game":    game_num,
-            "outcome": outcome,
-            "moves":   moves,
-        })
-
-print(f"  {len(selected)} games passed filters (from MIN_GAME={MIN_GAME})")
+            selected.append({
+                "game":    game_num,
+                "outcome": outcome,
+                "moves":   moves,
+            })
+    print(f"  {len(selected)} games passed filters (from MIN_GAME={MIN_GAME})")
+except FileNotFoundError:
+    print(f"  Warning: {GAMES_CSV} not found. Skipping self-play game extraction. Seed buffer will only contain canonical and reviewed positions.")
 
 # ---------------------------------------------------------------------------
 # Replay games and extract positions
@@ -422,5 +424,5 @@ print(f"  {midgame_count:,} mid-game material-imbalanced positions (Run 10, agen
 print(f"\nFinal buffer: {len(buf):,} rolling / {len(buf._permanent):,} permanent ({BUFFER_CAPACITY:,} rolling capacity)")
 buf.save(OUTPUT_PATH)
 print(f"Saved to {OUTPUT_PATH}")
-print(f"\nFor Run 11, set in train_chess.py:")
+print(f"\nFor Run 13, set in train_chess.py:")
 print(f"  BUFFER_LOAD = \"{OUTPUT_PATH}\"")
