@@ -52,6 +52,8 @@ STOCKFISH_PATH     = "stockfish"   # assumes stockfish is on PATH
 # ---------------------------------------------------------------------------
 
 parser = argparse.ArgumentParser()
+parser.add_argument("--ckpt", default=None,
+                    help="Checkpoint to evaluate (default: the active run's, from run_config)")
 parser.add_argument("--prev", default=None,
                     help="Path to previous checkpoint for improvement test")
 parser.add_argument("--regression-only", action="store_true",
@@ -80,11 +82,23 @@ if args.cpu:
 # Load HAL
 # ---------------------------------------------------------------------------
 
+ckpt_path = args.ckpt or CKPT_PATH
 hal = ChessAgent(device, n_simulations=N_SIMS_RANDOM)
-hal.load(CKPT_PATH)
-print(f"Loaded HAL-4000")
-print(f"  Trained steps: {hal.steps:,}")
-print(f"  Checkpoint:    {CKPT_PATH}\n")
+try:
+    hal.load(ckpt_path)
+    print(f"Loaded HAL-4000")
+    print(f"  Trained steps: {hal.steps:,}")
+    print(f"  Checkpoint:    {ckpt_path}\n")
+except FileNotFoundError:
+    if args.regression_only:
+        # A fresh network is a legitimate regression baseline — should read ~0
+        # everywhere. Useful before game 1 of a new run.
+        print(f"No checkpoint at {ckpt_path} — regression on fresh random weights "
+              f"(expect ~0.0 for every position).\n")
+    else:
+        print(f"No checkpoint at {ckpt_path}.")
+        print(f"Train first, or point at one with --ckpt <path>.")
+        exit(1)
 
 # ---------------------------------------------------------------------------
 # Value head regression test
