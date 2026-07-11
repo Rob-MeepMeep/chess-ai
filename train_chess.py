@@ -48,8 +48,8 @@ TRAIN_STEPS      = 5        # gradient updates per game (once buffer is ready)
 MIN_BUFFER       = 500      # don't train until buffer holds this many positions
 MAX_GAME_MOVES   = 150      # hard cap — bumped from 100; resign logic should terminate most games first
 CHECKPOINT_EVERY  = 10      # save weights every N games
-BUFFER_SAVE_EVERY = 200     # save the replay buffer every N games — it's GB-scale,
-                            # so saving it as often as the weights blocked the loop
+BUFFER_SAVE_EVERY = 50      # save the replay buffer every N games — was 200 but that
+                            # meant hours of self-play data at risk on interrupt
 SNAPSHOT_EVERY    = 50      # log MCTS strategy snapshots every N games
 PRINT_EVERY       = 10      # print progress line every N games
 REGRESSION_EVERY  = 200     # log value head regression to regression.csv
@@ -222,134 +222,145 @@ active: list  = []
 loss          = 0.0
 mcts          = agent.mcts
 
-while game_num < N_GAMES:
+try:
+    while game_num < N_GAMES:
 
-    # Keep the pool full while there are games left to schedule
-    while len(active) < N_PARALLEL_GAMES and games_started < N_GAMES:
-        active.append(SelfPlayGame())
-        games_started += 1
-    if not active:
-        break
+        # Keep the pool full while there are games left to schedule
+        while len(active) < N_PARALLEL_GAMES and games_started < N_GAMES:
+            active.append(SelfPlayGame())
+            games_started += 1
+        if not active:
+            break
 
-    # --- 1. Every game needs a search in progress ---
-    for g in active:
-        if g.search is None:
-            g.search = mcts.begin_search(g.board, g.history,
-                                         N_SIMULATIONS, add_noise=True)
+        # --- 1. Every game needs a search in progress ---
+        for g in active:
+            if g.search is None:
+                g.search = mcts.begin_search(g.board, g.history,
+                                             N_SIMULATIONS, add_noise=True)
 
-    # --- 2. Pool every game's leaf wave into ONE network call ---
-    batches = [mcts.gather_leaves(g.search) for g in active]
-    tensors = [b for b in batches if b is not None]
-    if tensors:
-        logits, values = mcts.evaluate(torch.cat(tensors))
-    off = 0
-    for g, b in zip(active, batches):
-        if b is None:
-            mcts.apply_results(g.search, None, None)   # all-terminal wave: backup only
-        else:
-            n = b.shape[0]
-            mcts.apply_results(g.search, logits[off:off + n], values[off:off + n])
-            off += n
+        # --- 2. Pool every game's leaf wave into ONE network call ---
+        batches = [mcts.gather_leaves(g.search) for g in active]
+        tensors = [b for b in batches if b is not None]
+        if tensors:
+            logits, values = mcts.evaluate(torch.cat(tensors))
+        off = 0
+        for g, b in zip(active, batches):
+            if b is None:
+                mcts.apply_results(g.search, None, None)   # all-terminal wave: backup only
+            else:
+                n = b.shape[0]
+                mcts.apply_results(g.search, logits[off:off + n], values[off:off + n])
+                off += n
 
-    # --- 3. Finished searches become moves; finished games get replaced ---
-    finished = []
-    for g in active:
-        if not g.search.done:
-            continue
+        # --- 3. Finished searches become moves; finished games get replaced ---
+        finished = []
+        for g in active:
+            if not g.search.done:
+                continue
 
-        # Encode current position BEFORE making the move
-        state = encode([g.board] + g.history)
+            # Encode current position BEFORE making the move
+            state = encode([g.board] + g.history)
 
-        policy = mcts.extract_policy(g.search)
-        move_uci, policy, v = agent.pick_move(g.board, policy, g.search.root,
-                                              greedy=False)
-        g.search = None
-        g.v      = v
+            policy = mcts.extract_policy(g.search)
+            move_uci, policy, v = agent.pick_move(g.board, policy, g.search.root,
+                                                  greedy=False)
+            g.search = None
+            g.v      = v
 
-        # Policy targets are stored in the network's frame of reference —
-        # mirrored when it was black to move, matching the encoded state
-        stored_policy = mirror_policy(policy) if g.board.turn == chess.BLACK else policy
-        g.buf.push(state, stored_policy, g.board.turn)
-        g.moves.append(move_uci)
+            # Policy targets are stored in the network's frame of reference —
+            # mirrored when it was black to move, matching the encoded state
+            stored_policy = mirror_policy(policy) if g.board.turn == chess.BLACK else policy
+            g.buf.push(state, stored_policy, g.board.turn)
+            g.moves.append(move_uci)
 
-        # Keep only the last 3 boards — encoder uses current + 3 history = 4 total
-        g.history = ([g.board.copy()] + g.history)[:3]
-        g.board.push_uci(move_uci)
+            # Keep only the last 3 boards — encoder uses current + 3 history = 4 total
+            g.history = ([g.board.copy()] + g.history)[:3]
+            g.board.push_uci(move_uci)
 
-        # Stage 2 resign: the search value is the sole resign signal.
-        # abs() — resign regardless of which side is hopeless.
-        if abs(v) > abs(RESIGN_THRESHOLD):
-            g.resign_streak += 1
-        else:
-            g.resign_streak = 0
+            # Stage 2 resign: the search value is the sole resign signal.
+            # abs() — resign regardless of which side is hopeless.
+            if abs(v) > abs(RESIGN_THRESHOLD):
+                g.resign_streak += 1
+            else:
+                g.resign_streak = 0
 
-        if g.over:
-            finished.append(g)
+            if g.over:
+                finished.append(g)
 
-    # --- 4. Commit finished games: outcomes, training, logging, checkpoints ---
-    for g in finished:
-        active.remove(g)
-        game_num += 1
-        winner, end_reason = _finish_game(g)
+        # --- 4. Commit finished games: outcomes, training, logging, checkpoints ---
+        for g in finished:
+            active.remove(g)
+            game_num += 1
+            winner, end_reason = _finish_game(g)
 
-        if replay.ready(MIN_BUFFER):
-            for _ in range(TRAIN_STEPS):
-                loss = agent.train(replay.sample(BATCH_SIZE))
+            if replay.ready(MIN_BUFFER):
+                for _ in range(TRAIN_STEPS):
+                    loss = agent.train(replay.sample(BATCH_SIZE))
 
-        logger.record_game(game_num, winner, g.moves, loss, end_reason,
-                           steps=agent.steps)
+            logger.record_game(game_num, winner, g.moves, loss, end_reason,
+                               steps=agent.steps)
 
-        if game_num % SNAPSHOT_EVERY == 0:
-            logger.record_snapshot(game_num, agent)
-        if game_num % REGRESSION_EVERY == 0:
-            logger.record_regression(game_num, agent)
-        if game_num % CHECKPOINT_EVERY == 0:
-            agent.save(CKPT_PATH)
-        if game_num % BUFFER_SAVE_EVERY == 0:
-            replay.save(BUFFER_PATH)
+            if game_num % SNAPSHOT_EVERY == 0:
+                logger.record_snapshot(game_num, agent)
+            if game_num % REGRESSION_EVERY == 0:
+                logger.record_regression(game_num, agent)
+            if game_num % CHECKPOINT_EVERY == 0:
+                agent.save(CKPT_PATH)
+            if game_num % BUFFER_SAVE_EVERY == 0:
+                replay.save(BUFFER_PATH)
+                agent.save(CKPT_PATH)   # keep weights in sync with buffer
 
-        # --- Terminal progress ---
-        _game_times.append(time.time() - g.t_start)
-        if len(_game_times) > 20:
-            _game_times.pop(0)
+            # --- Terminal progress ---
+            _game_times.append(time.time() - g.t_start)
+            if len(_game_times) > 20:
+                _game_times.pop(0)
 
-        if winner == chess.WHITE:
-            _tally_w += 1
-        elif winner == chess.BLACK:
-            _tally_b += 1
-        else:
-            _tally_d += 1
+            if winner == chess.WHITE:
+                _tally_w += 1
+            elif winner == chess.BLACK:
+                _tally_b += 1
+            else:
+                _tally_d += 1
 
-        if game_num % PRINT_EVERY == 0 or game_num <= 5:
-            w_str     = "W" if winner == chess.WHITE else "B" if winner == chess.BLACK else "D"
-            elapsed_h = (time.time() - _t_run_start) / 3600
-            done_n    = game_num - start_game
-            # Throughput, not per-game time — games overlap in the lockstep pool
-            rate      = done_n / elapsed_h if elapsed_h > 0 else 0.0
-            eta_h     = (N_GAMES - game_num) / rate if rate > 0 else float("inf")
-            tally_str = f"W{_tally_w}/B{_tally_b}/D{_tally_d}"
-            print(
-                f"Game {game_num:>5} | {w_str} | "
-                f"moves: {len(g.moves):>3} | "
-                f"loss: {loss:.4f} | "
-                f"[{tally_str}] | "
-                f"buffer: {len(replay):>6} | "
-                f"steps: {agent.steps:>6} | "
-                f"{rate:.1f} games/h | "
-                f"elapsed: {elapsed_h:.1f}h | "
-                f"ETA: {eta_h:.1f}h"
-            )
+            if game_num % PRINT_EVERY == 0 or game_num <= 5:
+                w_str     = "W" if winner == chess.WHITE else "B" if winner == chess.BLACK else "D"
+                elapsed_h = (time.time() - _t_run_start) / 3600
+                done_n    = game_num - start_game
+                # Throughput, not per-game time — games overlap in the lockstep pool
+                rate      = done_n / elapsed_h if elapsed_h > 0 else 0.0
+                eta_h     = (N_GAMES - game_num) / rate if rate > 0 else float("inf")
+                tally_str = f"W{_tally_w}/B{_tally_b}/D{_tally_d}"
+                print(
+                    f"Game {game_num:>5} | {w_str} | "
+                    f"moves: {len(g.moves):>3} | "
+                    f"loss: {loss:.4f} | "
+                    f"[{tally_str}] | "
+                    f"buffer: {len(replay):>6} | "
+                    f"steps: {agent.steps:>6} | "
+                    f"{rate:.1f} games/h | "
+                    f"elapsed: {elapsed_h:.1f}h | "
+                    f"ETA: {eta_h:.1f}h"
+                )
 
-        # Reset tally every 50 games so it stays readable
-        if game_num % 50 == 0:
-            _tally_w, _tally_b, _tally_d = 0, 0, 0
+            # Reset tally every 50 games so it stays readable
+            if game_num % 50 == 0:
+                _tally_w, _tally_b, _tally_d = 0, 0, 0
 
-# ---------------------------------------------------------------------------
-# Final checkpoint and summary
-# ---------------------------------------------------------------------------
 
-agent.save(CKPT_PATH)
-replay.save(BUFFER_PATH)
-print(f"\nTraining complete — {game_num:,} games, {agent.steps:,} training steps.")
-print(f"Checkpoint: {CKPT_PATH}")
-print(f"Logs:       {LOG_DIR}/")
+except KeyboardInterrupt:
+    print(f"\n{'='*60}")
+    print(f"Interrupted at game {game_num} — saving checkpoint and buffer...")
+    agent.save(CKPT_PATH)
+    replay.save(BUFFER_PATH)
+    print(f"  Checkpoint: {CKPT_PATH}")
+    print(f"  Buffer:     {BUFFER_PATH}  ({len(replay):,} rolling + {len(replay._permanent):,} permanent)")
+    print(f"  Resume will start at game {game_num + 1}")
+    print(f"{'='*60}")
+
+else:
+    # Natural completion — no interrupt
+    agent.save(CKPT_PATH)
+    replay.save(BUFFER_PATH)
+    print(f"\nTraining complete — {game_num:,} games, {agent.steps:,} training steps.")
+    print(f"Checkpoint: {CKPT_PATH}")
+    print(f"Logs:       {LOG_DIR}/")

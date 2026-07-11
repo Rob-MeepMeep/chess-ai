@@ -28,6 +28,7 @@ STORAGE FORMAT:
   batch. List indexing is O(1).
 """
 
+import os
 import random
 from typing import Optional
 import chess
@@ -133,11 +134,13 @@ class ReplayBuffer:
 
     def save(self, path: str) -> None:
         """Persist both partitions to disk (sparse policies — format 2)."""
+        tmp = path + ".tmp"
         torch.save({
             'format':    _SAVE_FORMAT,
             'rolling':   self._buffer,
             'permanent': self._permanent,
-        }, path)
+        }, tmp)
+        os.replace(tmp, path)
 
     def load(self, path: str) -> None:
         """Reload a saved buffer. Reads all three historical layouts:

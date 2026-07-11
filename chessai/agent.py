@@ -16,6 +16,7 @@ network provided in DQN. The search always looks ahead, so a single
 overconfident network prediction can't corrupt the training signal.
 """
 
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -157,11 +158,13 @@ class ChessAgent:
     # ------------------------------------------------------------------
 
     def save(self, path: str) -> None:
+        tmp = path + ".tmp"
         torch.save({
             "network":   self.network.state_dict(),
             "optimizer": self.optimizer.state_dict(),
             "steps":     self.steps,
-        }, path)
+        }, tmp)
+        os.replace(tmp, path)
 
     def load(self, path: str) -> None:
         ckpt = torch.load(path, map_location=self.device, weights_only=False)
