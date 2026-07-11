@@ -583,9 +583,9 @@ if "eval" in dfs:
 st.divider()
 st.subheader("AI Commentary")
 
-with st.expander("Generate analysis from Claude", expanded=False):
+with st.expander("Generate AI analysis", expanded=False):
     api_key = st.text_input(
-        "Anthropic API key",
+        "API key",
         type="password",
         value=os.environ.get("ANTHROPIC_API_KEY", ""),
         help="Or set ANTHROPIC_API_KEY in your environment",
@@ -659,7 +659,7 @@ with st.expander("Generate analysis from Claude", expanded=False):
             )
 
             client = anthropic.Anthropic(api_key=api_key)
-            with st.spinner("Asking Claude..."):
+            with st.spinner("Generating analysis..."):
                 message = client.messages.create(
                     model="claude-sonnet-4-6",
                     max_tokens=1024,

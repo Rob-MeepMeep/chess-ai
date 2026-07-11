@@ -228,7 +228,7 @@ A record of significant decisions, config changes, and architectural pivots acro
 
 ### Run 11 — buffer curation pipeline (2026-06-11)
 - **`extract_buffer_candidates.py`:** extracts FEN positions from Run 10 decisive games (game 2000+) where abs(material) ≥ 5 at plies 8–28 and the material-advantaged side won. Output: `paper/buffer_candidates.json` (~300 candidates).
-- **External agent review:** all 300 candidates reviewed by Claude — 193 accepted, 107 rejected with rationale. Output: `paper/buffer_candidates_reviewed.json`.
+- **External agent review:** all 300 candidates reviewed by external analysis — 193 accepted, 107 rejected with rationale. Output: `paper/buffer_candidates_reviewed.json`.
 - **`curate_buffer.py` updated for Run 11:** loads 40 static canonical positions + 256 diverse K+Q vs K + 193 agent-reviewed mid-game positions = 489 permanent positions total. The 193 mid-game positions are the fix for the missing_queen oscillation seen throughout Run 10 — they anchor the value head to real material-advantage outcomes in mid-game positions, not just canonical endgames.
 
 ### Run 11 — regression logging (2026-06-11)

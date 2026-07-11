@@ -316,10 +316,10 @@ White's knights go to the rim (Na3, Nh3→Ng1) and stall. Black advances queensi
 
 ---
 
-## Games 1441–1910 — Gemini-Identified Highlights
+## Games 1441–1910 — External Analysis Highlights
 
 An independent assessment of games 1500–1900 (401 games in PGN format) was run through
-Gemini to get an external perspective on play quality for the Phase 3 paper. Full response
+an external analysis tool to get an outside perspective on play quality for the Phase 3 paper. Full response
 is in `paper/gemini_run8_assessment.md`. Two games were flagged as paper-worthy.
 
 ---
@@ -357,14 +357,14 @@ has no escape. Knight checkmates require precise coordination — the knight mus
 square from which it both delivers check and covers every king flight square. HAL calculated
 this three-move sequence precisely.
 
-Gemini's assessment: *"This sequence demonstrates genuine tactical awareness that any human
+External assessment: *"This sequence demonstrates genuine tactical awareness that any human
 club player would praise."*
 
 ---
 
 ### Broader observations: games 1441–1910
 
-Gemini identified two dominant patterns across the late window:
+External analysis identified two dominant patterns across the late window:
 
 **F-pawn fixation** — HAL overuses f3/f4 (White) and f6/f5 (Black) for early centre
 influence, a legacy of the Qh4/Qh5 patterns it learned to exploit and deliver in the
@@ -376,7 +376,7 @@ instinct: continuous queen checks, diagonal pressure, piece coordination to stri
 squares. Games 1509 and 1886 are the clearest examples, but the pattern appears across
 many late-window games.
 
-**The geometric legacy** — Gemini independently noted that HAL compensates for the
+**The geometric legacy** — External analysis independently noted that HAL compensates for the
 colour-blind encoder by preferring forcing tactical lines where board geometry is
 unambiguous. Unable to rely on stable perspective evaluation, the network defaults to
 positions where concrete calculation overrides positional ambiguity. This is the adaptive
@@ -403,5 +403,5 @@ evidence of both sides improving. The knight and bishop checkmates in the final 
 
 ---
 
-*Data source: logs/run8/games.csv. External analysis: Gemini assessment of games 1500–1900,
+*Data source: logs/run8/games.csv. External analysis: independent assessment of games 1500–1900,
 full response in `paper/gemini_run8_assessment.md`.*

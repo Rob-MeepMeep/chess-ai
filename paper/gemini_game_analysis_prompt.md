@@ -1,11 +1,11 @@
-# Gemini Game Analysis Prompt — Run 8
+# Run 8 — Game Analysis Prompt
 **For use in Phase 3 paper. Run after Run 8 completes.**
 
 ---
 
 ## Purpose
 
-Feed this prompt + game data to Gemini (or equivalent web AI) to get an independent
+Feed this prompt + game data to an external analysis tool to get an independent
 assessment of HAL-4000's play quality across Run 8. The output informs the Phase 3 paper
 write-up — particularly the sections on tactical evolution and what the agent actually learned.
 
@@ -48,7 +48,7 @@ def uci_to_pgn(uci_moves: str, game_num: int, white="HAL-4000", black="HAL-4000"
 
 ## The Prompt
 
-Paste this into Gemini, followed immediately by the prepared PGN games.
+Paste this into an external analysis tool, followed immediately by the prepared PGN games.
 
 ---
 
@@ -97,7 +97,7 @@ Paste this into Gemini, followed immediately by the prepared PGN games.
 
 ## What to do with the output
 
-- Paste Gemini's response into `paper/gemini_run8_assessment.md` (create when ready)
+- Paste the response into `paper/gemini_run8_assessment.md` (create when ready)
 - Extract any specific game annotations or observations into `checkmate_analysis.md`
 - Use the "paper-worthy material" section to inform the Phase 3 paper narrative
 

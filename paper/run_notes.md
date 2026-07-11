@@ -701,7 +701,7 @@ caffeinate -dims venv/bin/python3 train_chess.py
 6. ~~Eval at game 1000~~ — ✓ done. 12% win rate (3× improvement from game 560). 20% target not met; continuing.
 7. ~~Eval at game 1500~~ — ✓ done. 18% win rate vs random (20% as Black). 0% vs Stockfish depth 1. Target met as Black; overall just short at 18%.
 8. ~~Eval at game 2000~~ — ✓ done. 12% win rate vs random (regression from 18%). 0% vs Stockfish depth 1. See final summary below.
-9. ~~Gemini game analysis~~ — ✓ done. Output: `paper/gemini_run8_assessment.md`.
+9. ~~External analysis of play quality~~ — ✓ done. Output: `paper/gemini_run8_assessment.md`.
 10. **Stage 2 resign** — once K+Q vs K reads ±0.9 consistently, remove material resign entirely.
 11. **Phase 4** — UCI wrapper → Lichess bot account → ELO rating.
 
@@ -739,7 +739,7 @@ Revised diagnosis: **training data distribution asymmetry**. RESIGN_MATERIAL end
 Despite loss reaching a new low (3.093) and b-move reaching a new high (−0.921), win rate regressed from 18% to 12% at game 2010. The 84% draw rate confirms HAL consistently reaches winning positions but cannot convert them. The value head's w-wins blindspot (reading near zero for winning positions) prevents MCTS from pressing material advantages. This is the binding constraint — more training under the same conditions would not resolve it.
 
 **External assessment:**
-Gemini analysis of games 1500–1900 (401 games): confirmed play quality jump from "geometric chaotic" (game 1500) to "coherent predatory" (game 1890). Identified f-pawn fixation as a recurring tactical overcorrection and noted HAL compensates for perspective ambiguity by preferring forcing tactical lines. Games 1886 (Na5#) and 1509 (Bg7#) flagged as paper-worthy. Full assessment: `paper/gemini_run8_assessment.md`.
+External analysis of games 1500–1900 (401 games): confirmed play quality jump from "geometric chaotic" (game 1500) to "coherent predatory" (game 1890). Identified f-pawn fixation as a recurring tactical overcorrection and noted HAL compensates for perspective ambiguity by preferring forcing tactical lines. Games 1886 (Na5#) and 1509 (Bg7#) flagged as paper-worthy. Full assessment: `paper/gemini_run8_assessment.md`.
 
 ### Decision: start Run 9
 
@@ -1484,7 +1484,7 @@ Final 100-game window: W24/B26 — near-balanced self-play at closure.
   - `eval_watcher.py`: polls games.csv every 30s, auto-fires `eval_chess.py` at each 1500-game boundary
   - `dashboard.py` extended: 7 CSV types (games, training, eval, regression, openings, end_reasons, snapshots)
 
-**Buffer pipeline:** `extract_buffer_candidates.py` extracted ~300 candidate FEN positions from Run 10 decisive games. External agent (Claude) reviewed all 300 — accepted 193, rejected 107 with rationale. Accepted positions added to permanent partition via `curate_buffer.py`. First time external agent review used for data curation.
+**Buffer pipeline:** `extract_buffer_candidates.py` extracted ~300 candidate FEN positions from Run 10 decisive games. External review covered all 300 — accepted 193, rejected 107 with rationale. Accepted positions added to permanent partition via `curate_buffer.py`. First time external agent review used for data curation.
 
 ---
 

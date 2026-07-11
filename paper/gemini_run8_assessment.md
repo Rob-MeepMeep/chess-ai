@@ -1,12 +1,12 @@
-# Gemini Run 8 Assessment
+# Run 8 — External Analysis Assessment
 **Rob Kirkland, Ellis Ward**
 
 *External assessment generated 2026-06-06. Input: 401 games (1500–1900) in PGN format,
-fed to Gemini with the prompt from `paper/gemini_game_analysis_prompt.md`.*
+fed through the prompt from `paper/gemini_game_analysis_prompt.md`.*
 
 ---
 
-## Gemini Response (verbatim)
+## External Analysis Response (verbatim)
 
 ### 1. Play Quality Assessment
 
