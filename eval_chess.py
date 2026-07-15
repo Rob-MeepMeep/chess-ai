@@ -23,6 +23,9 @@ MPS backend. Bump them to 100/50 for the final paper benchmark after training en
 import argparse
 import csv
 import os
+# WSL2 ROCm GPU detection requirement
+os.environ["HSA_ENABLE_DXG_DETECTION"] = "1"
+
 import random
 import time
 import chess

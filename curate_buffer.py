@@ -41,6 +41,10 @@ import csv
 import json
 import random
 import chess
+import os
+# WSL2 ROCm GPU detection requirement
+os.environ["HSA_ENABLE_DXG_DETECTION"] = "1"
+
 import torch
 
 from chessai.encoder  import encode

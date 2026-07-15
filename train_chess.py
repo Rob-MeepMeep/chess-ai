@@ -24,6 +24,9 @@ strictly better estimate than one raw forward pass, and it's free.
 """
 
 import os
+# WSL2 ROCm GPU detection requirement
+os.environ["HSA_ENABLE_DXG_DETECTION"] = "1"
+
 import csv
 import time
 import chess

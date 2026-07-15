@@ -8,6 +8,10 @@ To run:
   venv/bin/uvicorn main:app --reload --port 8765
 """
 
+import os
+# WSL2 ROCm GPU detection requirement
+os.environ["HSA_ENABLE_DXG_DETECTION"] = "1"
+
 import torch
 import chess
 from fastapi import FastAPI, HTTPException
