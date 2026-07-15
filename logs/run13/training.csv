@@ -1,0 +1,2 @@
+game,white_wins,black_wins,draws,avg_loss,avg_game_length,len_0_20,len_21_40,len_41_60,len_61_80,len_81plus,steps,timestamp
+50,22,25,3,3.993474,106.4,1,3,6,6,34,230,2026-07-09 21:11:38

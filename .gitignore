@@ -8,13 +8,12 @@ __pycache__/
 
 # Model checkpoints and training data (will be large files)
 checkpoints/
-logs/
+
 *.pt
 *.pth
 replay_buffer/
 
-# TensorBoard logs
-runs/
+
 
 # OS files
 .DS_Store
