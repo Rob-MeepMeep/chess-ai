@@ -53,6 +53,10 @@ MAX_GAME_MOVES   = 150      # hard cap — bumped from 100; resign logic should 
 CHECKPOINT_EVERY  = 10      # save weights every N games
 BUFFER_SAVE_EVERY = 50      # save the replay buffer every N games — was 200 but that
                             # meant hours of self-play data at risk on interrupt
+MILESTONE_EVERY   = 500     # keep an immutable checkpoint copy every N games —
+                            # CKPT_PATH is overwritten constantly, so without these
+                            # there is no rollback if self-play degrades, and the
+                            # --prev eval has nothing older to compare against
 SNAPSHOT_EVERY    = 50      # log MCTS strategy snapshots every N games
 PRINT_EVERY       = 10      # print progress line every N games
 REGRESSION_EVERY  = 200     # log value head regression to regression.csv
@@ -66,7 +70,7 @@ RESIGN_CONSECUTIVE = 5      # raised from 3 — let positions breathe, force mor
 # BUFFER_LOAD: None = load RUN_NAME's own buffer; set to a path to load from another run.
 # RUN_NAME itself lives in run_config.py — shared with eval/watcher/API.
 CKPT_LOAD   = None
-BUFFER_LOAD = "checkpoints/run13_seed_buffer.pt"
+BUFFER_LOAD = "checkpoints/run14_seed_buffer.pt"
 
 # ---------------------------------------------------------------------------
 # Device
@@ -312,6 +316,9 @@ try:
             if game_num % BUFFER_SAVE_EVERY == 0:
                 replay.save(BUFFER_PATH)
                 agent.save(CKPT_PATH)   # keep weights in sync with buffer
+            if game_num % MILESTONE_EVERY == 0:
+                # Immutable snapshot — never overwritten, ~290MB each
+                agent.save(CKPT_PATH.replace(".pt", f"_g{game_num:05d}.pt"))
 
             # --- Terminal progress ---
             _game_times.append(time.time() - g.t_start)

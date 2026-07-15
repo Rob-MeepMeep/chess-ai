@@ -55,7 +55,7 @@ from chessai.replay   import ReplayBuffer
 # ---------------------------------------------------------------------------
 
 GAMES_CSV      = "logs/run12/games.csv"
-OUTPUT_PATH    = "checkpoints/run13_seed_buffer.pt"
+OUTPUT_PATH    = "checkpoints/run14_seed_buffer.pt"
 
 # Mid-game material positions reviewed by external agent (Run 11 addition)
 REVIEWED_JSON  = "paper/buffer_candidates_reviewed.json"
