@@ -34,7 +34,7 @@ Usage:
   venv/bin/python3 curate_buffer.py
 
 Output:
-  checkpoints/run13_seed_buffer.pt
+  checkpoints/run14_seed_buffer.pt
 """
 
 import csv
@@ -54,7 +54,7 @@ from chessai.replay   import ReplayBuffer
 # Configuration
 # ---------------------------------------------------------------------------
 
-GAMES_CSV      = "logs/run12/games.csv"
+GAMES_CSV      = "logs/run13_retune/games.csv"
 OUTPUT_PATH    = "checkpoints/run14_seed_buffer.pt"
 
 # Mid-game material positions reviewed by external agent (Run 11 addition)
@@ -62,7 +62,10 @@ REVIEWED_JSON  = "paper/buffer_candidates_reviewed.json"
 CANDIDATES_JSON = "paper/buffer_candidates.json"
 
 # Game quality filters
-MIN_GAME       = 2000    # post-policy-mirroring-bug-fix (fixed at game ~1700)
+MIN_GAME       = 200     # run13_retune started from a pre-trained checkpoint so
+                         # the network was coherent from game 1; skip only the
+                         # very first warmup games (run12's threshold of 2000 was
+                         # a bug-fix boundary that doesn't apply here)
 MIN_MOVES      = 20      # skip overconfident short games
 MAX_MOVES      = 100     # skip very long games that may be random shuffling
 GOOD_REASONS   = {"material_resign", "checkmate", "value_resign"}  # decisive outcomes
