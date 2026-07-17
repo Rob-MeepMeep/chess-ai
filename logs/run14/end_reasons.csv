@@ -12,3 +12,5 @@ game,checkmates,material_resigns,value_resigns,cap_draws,rule_draws
 550,18,0,0,31,1
 600,20,0,1,27,2
 650,18,0,0,31,1
+700,18,0,2,28,2
+750,20,0,1,27,2
