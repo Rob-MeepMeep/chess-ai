@@ -74,3 +74,8 @@ game,position,move1,pct1,move2,pct2,move3,pct3,move4,pct4,move5,pct5
 750,after_d4,g7g6,13.1%,d7d5,10.1%,e7e6,9.1%,g7g5,6.1%,f7f6,6.1%
 750,italian_game,e1e2,6.1%,g2g4,5.1%,d2d4,5.1%,f3e5,5.1%,h2h3,4.0%
 750,queens_gambit,a7a6,6.1%,b7b5,6.1%,f7f6,6.1%,g7g6,6.1%,h7h6,5.1%
+800,start,d2d4,27.3%,c2c4,7.1%,a2a4,7.1%,g2g3,6.1%,e2e3,6.1%
+800,after_e4,d7d5,24.2%,e7e6,14.1%,c7c5,7.1%,h7h6,7.1%,f7f5,6.1%
+800,after_d4,d7d5,21.2%,e7e6,15.2%,g7g6,12.1%,f7f6,5.1%,c7c5,5.1%
+800,italian_game,d2d4,8.1%,c4a6,5.1%,f3e5,5.1%,a2a4,5.1%,b2b3,4.0%
+800,queens_gambit,f7f6,8.1%,a7a6,8.1%,g7g6,6.1%,e7e6,6.1%,b7b5,5.1%
