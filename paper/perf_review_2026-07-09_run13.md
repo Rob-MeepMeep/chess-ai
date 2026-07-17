@@ -176,3 +176,91 @@ time to dominate. If they don't, the plan above gets re-ranked before any refact
 
 Success metric: games/hour and GPU utilization/power, tracked in run notes per stage —
 not loss curves, which this work should not affect (except via more games).
+
+---
+
+# Addendum (17 July 2026) — Stage A/B results and revised Stage C design
+
+**Authors:** Rob Kirkland, Ellis Ward
+
+## What Stage A + B actually delivered (measured, run14)
+
+| Metric | Before (run13_retune) | After (run14, lockstep ×16) |
+|---|---|---|
+| GPU utilisation / board power | ~71% / ~72W | 100% / ~150W |
+| CPU | one core flatlined | ~55% package (one Python thread still the wall) |
+| Games/hour | 29–33 | **26–28** |
+
+Verdict: the GPU-starvation diagnosis was correct and is fixed — and it
+**didn't matter for throughput**. The binding constraint was never inference;
+it is leaf *production*: one Python thread walking trees (a `board.copy()`
+per edge), generating legal moves in pure-Python python-chess, and running
+the plane-loop `encode()` per leaf, for all 16 games in rotation. Larger
+inference batches cannot speed up a loop that is CPU-bound between batches.
+Lockstep currently spends ~2× the GPU power to go the same speed; with
+`N_PARALLEL_GAMES = 1` the loop would likely run at similar games/h with
+milder GPU draw and 16× lower per-game latency (worth a one-hour benchmark
+before the next run).
+
+The useful thing lockstep proved: the GPU has enormous headroom. That is
+what makes Lever 1 below safe.
+
+## Revised plan: two independent, multiplying levers
+
+### Lever 1 — process-level parallelism: player/learner split (revised Stage C)
+
+Credit where due: this is Rob's "just run a second instance" idea, with one
+correction — two full training instances would be two diverging models, each
+at half compute. The split that makes extra instances feed **one** model:
+
+- **Learner** (one process — essentially today's train_chess.py):
+  plays, trains, owns the checkpoint, the buffer, and all logging/game
+  numbering. Additionally polls a `shards/` directory each game-completion
+  and ingests any finished-game files it finds (then deletes them).
+- **Players** (1–3 processes): load the learner's latest checkpoint,
+  self-play WITHOUT training, and write each finished game as a shard file —
+  the committed (state, sparse_policy, outcome) list via `torch.save` to a
+  temp name, then `os.replace` (atomic, same trick as the checkpoint saves).
+  Reload the newest checkpoint every ~10 minutes. No logging of their own.
+
+Why file-based handoff: no queues, no shared memory, no `multiprocessing` —
+zero WSL2 deadlock surface, trivially debuggable (a shard is a file you can
+open), and crash-isolated (a dead player loses one game). Self-play on
+minutes-stale weights is standard AlphaZero practice and mildly good for
+diversity.
+
+Realistic ceiling on the 9600X (6C/12T): learner + 2–3 players ≈ **2.5–3×**
+before memory bandwidth and thermals bite. Note the CPU already runs ~82°C
+with one core loaded — case airflow becomes a real constraint for week-long
+multi-player runs. GPU serves all processes comfortably (headroom proven
+above).
+
+### Lever 2 — cheaper simulations (less Python per sim; unchanged structure)
+
+1. **Encoder bitboard vectorisation** — python-chess exposes each piece
+   type's placement as a 64-bit int; `np.unpackbits` over the 8-byte view
+   fills a plane without a Python loop. Runs once per leaf, every leaf —
+   the largest single constant-factor win left (~1.5–2× overall). Must be
+   verified bit-identical against the current encoder before deployment.
+2. **Push/pop selection walk** — replace the per-edge `board.copy()` with
+   one board per search that pushes moves during descent and pops after
+   backup (keeping a small ring of recent positions for the 4-frame
+   encoder). Cuts thousands of full board copies per move to ~zero.
+3. Beyond these lies the language boundary: python-chess itself. C/Rust
+   move generation is how LC0-class engines live, and it is deliberately
+   **out of scope** — a codebase readable end-to-end is a goal of this
+   project, not a nice-to-have.
+
+### Combined expectation
+
+Levers multiply: (2.5–3×) × (1.5–2×) ≈ **4–6×** → roughly 100–150 games/h,
+a 10k-game run in ~2 days instead of ~2 weeks. All in Python.
+
+## Sequencing (subordinate to run14_decision_protocol.md)
+
+Nothing changes while run14 is between gates — game-generation speed and
+provenance are part of the experiment. Build and desktop-verify the player
+script and shard ingest during the Gate 2 → Gate 3 stretch; deploy only at
+a gate boundary or on the next run. Compute is not currently the binding
+constraint on HAL — training-signal quality is (run13_retune bought nothing
+with 5,000 steps). This work pays off the moment the signal is proven fixed.
