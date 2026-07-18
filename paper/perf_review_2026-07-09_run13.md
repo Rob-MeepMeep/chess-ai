@@ -263,7 +263,18 @@ Two design consequences:
    lockstep tried to buy intra-process and mostly lost to orchestration.
    Process-level parallelism attacks the largest bucket in the profile.
 
-Flamegraphs archived in-repo: `pyspy_run14.svg`, `pyspy_run14_2.svg`.
+Flamegraphs archived in-repo: `pyspy_run14.svg`, `pyspy_run14_2.svg`
+(single-game); `pyspy_run14_3.svg`, `pyspy_run14_4.svg` (lockstep ×16).
+
+**Cross-check with the ×16 config**: the lockstep profiles fall inside the
+same ranges as single-game (evaluate 29–47%, copy 16–38%, encode 8–11%
+across all four recordings) — between-recording window variance exceeds any
+between-config difference. The prediction that pooled batches would shrink
+`evaluate`'s share was NOT supported. Conclusion: the time split is a
+property of the workload, not the scheduler, so the Lever 1/Lever 2 gains
+apply equally to either loop style — and the lockstep-vs-single question is
+closed as a preference call (~6% throughput tie, indistinguishable
+profiles).
 
 ## Revised plan: two independent, multiplying levers
 
