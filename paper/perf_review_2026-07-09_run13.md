@@ -187,8 +187,8 @@ not loss curves, which this work should not affect (except via more games).
 
 | Metric | Before (run13_retune) | After (run14, lockstep ×16) |
 |---|---|---|
-| GPU utilisation / board power | ~71% / ~72W | 100% / ~150W |
-| CPU | one core flatlined | ~55% package (one Python thread still the wall) |
+| GPU utilisation / board power | ~71% / ~72W (snapshot) | **43% duty / 85W mean** over 38h; bursts to 100%/155W |
+| CPU | one core flatlined | ~56% package, steady (one Python thread still the serialisation point) |
 | Games/hour | 29–33 | **26–28** |
 
 Verdict: the GPU-starvation diagnosis was correct and is fixed — and it
@@ -197,13 +197,33 @@ it is leaf *production*: one Python thread walking trees (a `board.copy()`
 per edge), generating legal moves in pure-Python python-chess, and running
 the plane-loop `encode()` per leaf, for all 16 games in rotation. Larger
 inference batches cannot speed up a loop that is CPU-bound between batches.
-Lockstep currently spends ~2× the GPU power to go the same speed; with
-`N_PARALLEL_GAMES = 1` the loop would likely run at similar games/h with
-milder GPU draw and 16× lower per-game latency (worth a one-hour benchmark
-before the next run).
+With `N_PARALLEL_GAMES = 1` the loop would likely run at similar games/h
+with 16× lower per-game latency (worth a one-hour benchmark before the
+next run).
 
 The useful thing lockstep proved: the GPU has enormous headroom. That is
 what makes Lever 1 below safe.
+
+## Measured baseline: 38.4h of hardware telemetry (Adrenalin, 2s samples, games 1–1,048)
+
+- **GPU duty cycle ~43%** (mean util 42.8%, mean power 85W): 22% of samples
+  at ≈0% util (CPU phases of the lockstep cycle), only ~10% above 90%.
+  The 100%/150W figure quoted earlier was a burst snapshot, not steady state.
+  Consequence: Lever 2 alone can nearly double throughput before the GPU
+  becomes the constraint.
+- **No CPU throttling in 38h**: frequency flat at 5.2GHz, power steady ~59W,
+  max temp 84.2°C, zero samples ≥90°C. CPU temperature shows an ~11°C daily
+  ambient cycle (≈70°C at 6am → ≈82°C at 4pm) — afternoon is the thermal
+  worst case to budget for.
+- **GPU thermals are a non-issue**: edge ~48°C, hotspot ~52°C, fan median
+  0 RPM (passive fan-stop most of the run).
+- **Memory**: VRAM 7.3–8.8GB of 16GB; system RAM 20→25% as the replay
+  buffer filled (plateaus when the ring caps at 200k, ~game 1,400).
+- **Correction to the "idle cores" model**: package CPU util is a steady
+  ~56% ≈ 6–7 threads — the torch CPU pool, tensor transfers, and (likely a
+  large slice) ROCm/WSL2 runtime busy-waiting already occupy real cores
+  even though one Python thread serialises progress. Free headroom is
+  ~4–5 threads, not 10. A py-spy sample is still wanted to decompose this.
 
 ## Revised plan: two independent, multiplying levers
 
@@ -229,11 +249,15 @@ open), and crash-isolated (a dead player loses one game). Self-play on
 minutes-stale weights is standard AlphaZero practice and mildly good for
 diversity.
 
-Realistic ceiling on the 9600X (6C/12T): learner + 2–3 players ≈ **2.5–3×**
-before memory bandwidth and thermals bite. Note the CPU already runs ~82°C
-with one core loaded — case airflow becomes a real constraint for week-long
-multi-player runs. GPU serves all processes comfortably (headroom proven
-above).
+Realistic ceiling on the 9600X (6C/12T), revised per the 38h telemetry:
+package CPU is already ~56% busy (torch pool + ROCm runtime, not just the
+Python thread), so free headroom is ~4–5 threads. **Start with learner + 2
+players, measure games/h and CPU temp, and only then consider a third.**
+Thermals are more comfortable than first feared — no throttling in 38h,
+max 84°C — but each player adds a hot thread and the afternoon ambient
+peak is the test window. GPU serves all processes comfortably: 43% duty
+cycle, fan-stop thermals, and 7–9GB of 16GB VRAM used leaves room for
+2–3 inference-only processes at ~1–2GB each.
 
 ### Lever 2 — cheaper simulations (less Python per sim; unchanged structure)
 
