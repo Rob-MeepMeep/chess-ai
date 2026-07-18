@@ -45,7 +45,7 @@ from run_config      import RUN_NAME, CKPT_PATH, BUFFER_PATH, LOG_DIR
 
 N_GAMES          = 10_000
 N_SIMULATIONS    = 600
-N_PARALLEL_GAMES = 16       # games sharing each pooled network call (lockstep)
+N_PARALLEL_GAMES = 1       # games sharing each pooled network call (lockstep)
 BATCH_SIZE       = 512
 TRAIN_STEPS      = 5        # gradient updates per game (once buffer is ready)
 MIN_BUFFER       = 500      # don't train until buffer holds this many positions
