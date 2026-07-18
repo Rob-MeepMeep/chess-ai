@@ -225,6 +225,46 @@ what makes Lever 1 below safe.
   even though one Python thread serialises progress. Free headroom is
   ~4–5 threads, not 10. A py-spy sample is still wanted to decompose this.
 
+## Benchmark + profile (18 July): lockstep vs single-game, and where the time really goes
+
+**A/B throughput test** (34 games at `N_PARALLEL_GAMES = 1`, games 1,049–1,082,
+vs the preceding 200 lockstep games), compared on moves/hour to normalise for
+game length:
+
+| Config | games/h | moves/h | sims/s |
+|---|---|---|---|
+| Lockstep ×16 (games 849–1048) | 27.9 | 3,253 | 542 |
+| Single game (games 1049–1082) | 27.3 | 3,073 | 512 |
+
+Verdict: **effectively a tie — lockstep ahead by ~6%, inside the noise of a
+1.2h window.** The pooled-batching gain is real but almost entirely consumed
+by orchestration overhead. Either architecture is acceptable; lockstep stays
+as the incumbent.
+
+**py-spy profile of the single-game loop** (two 2-minute recordings,
+~12k samples each; ranges across the two):
+
+| Bucket | Share | Note |
+|---|---|---|
+| `evaluate` — network call incl. GPU dispatch/sync wait | **36–47%** | at batch ≤32, heavily per-call overhead |
+| `board.copy()` under `_select_to_leaf` | **16–27%** | the single largest pure-CPU item |
+| `encode` (incl. `mirror`) | ~8% | vectorisation target |
+| expansion / backup / UCB | ~5–8% | |
+| legal move generation | **<1%** | exonerated — the python-chess cost is copy(), not movegen |
+
+Two design consequences:
+
+1. **Lever 2 arithmetic, now measured**: eliminating per-edge copies
+   (push/pop) attacks ~20% of runtime; encoder vectorisation another ~5–6%.
+   Realistic Lever 2 gain: **~1.3–1.4×**, not the 1.5–2× guessed earlier.
+2. **Lever 1 is strengthened**: the Python thread spends ~40% of its life
+   *waiting inside network calls*. A second self-play process overlaps its
+   CPU work with the first process's GPU waits — precisely the overlap
+   lockstep tried to buy intra-process and mostly lost to orchestration.
+   Process-level parallelism attacks the largest bucket in the profile.
+
+Flamegraphs archived in-repo: `pyspy_run14.svg`, `pyspy_run14_2.svg`.
+
 ## Revised plan: two independent, multiplying levers
 
 ### Lever 1 — process-level parallelism: player/learner split (revised Stage C)
