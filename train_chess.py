@@ -66,6 +66,16 @@ RESIGN_CONSECUTIVE = 5      # raised from 3 — let positions breathe, force mor
 # The resign signal is the search value; note that a fresh network resigns
 # nothing (value ≈ 0 everywhere), so early games run to the move cap.
 
+# Run 15 intervention ladder, rung 1 (run14_decision_protocol.md): run14's
+# cap-draw share rose 62% -> 77% across the run instead of falling — the
+# move-150 cap was teaching "hold a material lead to move 150 = 0.8 win",
+# rewarding shuffling over converting. Early adjudication scores a big,
+# settled material lead as a win well before move 150, refunding the dead
+# plies and fixing the label semantics.
+MATERIAL_ADJUDICATE_THRESHOLD = 8    # |material| this decisive triggers early adjudication
+MATERIAL_ADJUDICATE_STREAK    = 6    # consecutive plies it must hold (3 full moves) — filters tactical blips mid-trade
+MATERIAL_ADJUDICATE_MIN_MOVE  = 60   # earliest move the check applies from
+
 # CKPT_LOAD: None = load RUN_NAME's own checkpoint; set to a path to seed weights from another run.
 # BUFFER_LOAD: None = load RUN_NAME's own buffer; set to a path to load from another run.
 # RUN_NAME itself lives in run_config.py — shared with eval/watcher/API.
@@ -163,6 +173,7 @@ class SelfPlayGame:
         self.moves         = []
         self.search        = None        # in-progress SearchState, or None
         self.resign_streak = 0
+        self.material_streak = 0         # consecutive plies past move 60 with |material| >= threshold
         self.v             = 0.0         # search value after the latest move
         self.t_start       = time.time()
 
@@ -170,6 +181,7 @@ class SelfPlayGame:
     def over(self) -> bool:
         return (self.board.is_game_over()
                 or self.resign_streak >= RESIGN_CONSECUTIVE
+                or self.material_streak >= MATERIAL_ADJUDICATE_STREAK
                 or len(self.moves) >= MAX_GAME_MOVES)
 
 
@@ -190,6 +202,13 @@ def _finish_game(g: SelfPlayGame) -> tuple:
             winner, end_reason = chess.BLACK, "checkmate"
         else:
             winner, end_reason = None, "rule_draw"   # stalemate, repetition, 50-move, bare kings
+    elif g.material_streak >= MATERIAL_ADJUDICATE_STREAK:
+        # Intervention ladder rung 1: a material lead this large, held this long,
+        # past move 60, is as settled as we need without playing out to mate.
+        mat = _material_balance(g.board)
+        winner        = chess.WHITE if mat > 0 else chess.BLACK
+        outcome_scale = 0.9   # stronger claim than the move-150 cap's 0.8 soft win
+        end_reason    = "material_adjudication"
     elif g.resign_streak >= RESIGN_CONSECUTIVE:
         # Value resignation: winner is whoever the search says is winning.
         # g.v is from the perspective of the player to move after the last push.
@@ -290,6 +309,13 @@ try:
                 g.resign_streak += 1
             else:
                 g.resign_streak = 0
+
+            # Rung 1 material adjudication streak — see MATERIAL_ADJUDICATE_* above.
+            if (len(g.moves) > MATERIAL_ADJUDICATE_MIN_MOVE
+                    and abs(_material_balance(g.board)) >= MATERIAL_ADJUDICATE_THRESHOLD):
+                g.material_streak += 1
+            else:
+                g.material_streak = 0
 
             if g.over:
                 finished.append(g)
