@@ -80,7 +80,7 @@ MATERIAL_ADJUDICATE_MIN_MOVE  = 60   # earliest move the check applies from
 # BUFFER_LOAD: None = load RUN_NAME's own buffer; set to a path to load from another run.
 # RUN_NAME itself lives in run_config.py — shared with eval/watcher/API.
 CKPT_LOAD   = None
-BUFFER_LOAD = "checkpoints/run14_seed_buffer.pt"
+BUFFER_LOAD = "checkpoints/run15_seed_buffer.pt"
 
 # ---------------------------------------------------------------------------
 # Device

@@ -10,10 +10,11 @@ loading a checkpoint name no run ever produced).
 Change RUN_NAME here when starting a new run — nowhere else.
 """
 
-# run14: fresh start on the fixed seed labels + lockstep self-play.
-# run13_retune (1,059 games) is the pre-overhaul baseline — its logs,
-# weights and eval results stay untouched for comparison.
-RUN_NAME = "run14"
+# run15: intervention ladder rung 1 (early material adjudication) on top of
+# run14's fixed labels + lockstep self-play. run14 (3,279 games) hit its
+# Gate 3 hard stop — win rate and cap share both moved the wrong way — and
+# its logs/weights/eval results stay untouched for comparison.
+RUN_NAME = "run15"
 
 CKPT_PATH   = f"checkpoints/{RUN_NAME}_hal_chess.pt"
 BUFFER_PATH = f"checkpoints/{RUN_NAME}_replay_buffer.pt"
