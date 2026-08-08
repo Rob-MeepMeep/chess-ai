@@ -113,3 +113,7 @@ if early numbers look unusual.
 Registered before any meaningful data exists — game 1 was a 7-ply Fool's
 Mate, expected behaviour for fresh, noise-injected weights and uninformative
 at this scale. No status to report yet.
+
+## Pause Note (Game 353)
+
+Training was paused on 2026-08-08 at 07:51:40+01:00 (interrupted at game 353).
