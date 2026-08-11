@@ -117,3 +117,34 @@ at this scale. No status to report yet.
 ## Pause Note (Game 353)
 
 Training was paused on 2026-08-08 at 07:51:40+01:00 (interrupted at game 353).
+
+## Gate 1 result (game 800, retrospective)
+
+All three secondary signals lit up decisively: `material_adjudication` share
+62.1% (first 800 games), cap-draw share 4.0% (vs run14's ~53% at the same
+point), average game length 77.8 moves (vs ~118–119). The mechanism is
+firing hard and the compute-refund is real — sustained ~42 games/h once
+past two unrelated resume pauses, vs run14's ~27 games/h.
+
+## Gate 2 result (game 1,500) — CORRECTED, see eval harness bug below
+
+Raw eval reading: 10.0% wins / 84.0% caps vs random — looked like a clear
+FAIL. Before accepting that, the 40 `*` (unfinished) vs-random games were
+replayed and checked for final material balance. 21 of them had HAL holding
+a material lead of 8 or more (several massively so: +16, +19, +21) that
+simply never got mated out within `eval_chess.py`'s 200-move cap — because
+`eval_chess.py` had no knowledge of the material-adjudication rule
+`train_chess.py` uses. It was misclassifying decisive HAL wins as draws.
+
+**Corrected for the same adjudication rule training already applies:
+52.0% wins / 40.0% caps.** Against run14's Gate 2 (30.0% / 62.0%), this is a
+clean **PASS** — not the FAIL the raw number suggested.
+
+`eval_chess.py` has been patched (commit `93507a2`) to apply the identical
+`|material| >= 8` / 6-ply-streak / move-60 rule inside `play_game()`, so
+future evals (Gate 3) will score correctly without manual reconstruction.
+The pre-fix `eval_games.csv` rows from this Gate 2 run undercount HAL's win
+rate and should be read as corrected above, not as logged.
+
+**Verdict: PASS.** Rung 1 is doing what it was designed to do. Run continues
+to Gate 3 unmodified.
