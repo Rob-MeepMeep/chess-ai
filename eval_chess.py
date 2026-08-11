@@ -50,6 +50,15 @@ SIMS_BY_DEPTH      = {1: 200, 3: 500, 5: 500}
 MAX_GAME_MOVES     = 200   # hard cap — 200 plies is enough; if HAL can't convert by then it's a policy problem
 STOCKFISH_PATH     = "stockfish"   # assumes stockfish is on PATH
 
+# Mirrors train_chess.py's intervention-ladder rung 1 (run15+): without this,
+# a game where HAL builds a winning material lead against Random but can't
+# force mate within MAX_GAME_MOVES was scored as a draw ('*') — silently
+# undercounting HAL's real win rate. Keep these three in sync with
+# train_chess.py's MATERIAL_ADJUDICATE_* constants.
+MATERIAL_ADJUDICATE_THRESHOLD = 8    # |material| this decisive triggers adjudication
+MATERIAL_ADJUDICATE_STREAK    = 6    # consecutive plies it must hold (3 full moves)
+MATERIAL_ADJUDICATE_MIN_MOVE  = 60   # earliest move the check applies from
+
 # ---------------------------------------------------------------------------
 # Arguments — parsed early so --cpu affects device selection
 # ---------------------------------------------------------------------------
@@ -173,14 +182,28 @@ def stockfish_move(engine: chess.engine.SimpleEngine, depth: int):
 # Game runner
 # ---------------------------------------------------------------------------
 
+_PIECE_VALUES = {chess.PAWN: 1, chess.KNIGHT: 3, chess.BISHOP: 3,
+                 chess.ROOK: 5, chess.QUEEN: 9}
+
+def _material_balance(board: chess.Board) -> int:
+    """Positive = white ahead. Same definition as train_chess.py's helper."""
+    score = 0
+    for piece, val in _PIECE_VALUES.items():
+        score += val * len(board.pieces(piece, chess.WHITE))
+        score -= val * len(board.pieces(piece, chess.BLACK))
+    return score
+
+
 def play_game(white_fn, black_fn):
     """
     Play one game. Returns (result, move_list).
-    result is '1-0', '0-1', '1/2-1/2', or '*' (move cap hit).
+    result is '1-0', '0-1', '1/2-1/2', or '*' (move cap hit with no
+    resolution — a genuinely undecided position, not just an unforced mate).
     """
-    board     = chess.Board()
-    history   = []
-    move_list = []
+    board           = chess.Board()
+    history         = []
+    move_list       = []
+    material_streak = 0
 
     while not board.is_game_over() and len(move_list) < MAX_GAME_MOVES:
         if board.turn == chess.WHITE:
@@ -192,7 +215,22 @@ def play_game(white_fn, black_fn):
         board.push_uci(move_uci)
         move_list.append(move_uci)
 
-    result = board.result() if board.is_game_over() else "*"
+        if (len(move_list) > MATERIAL_ADJUDICATE_MIN_MOVE
+                and abs(_material_balance(board)) >= MATERIAL_ADJUDICATE_THRESHOLD):
+            material_streak += 1
+        else:
+            material_streak = 0
+
+        if material_streak >= MATERIAL_ADJUDICATE_STREAK:
+            break
+
+    if board.is_game_over():
+        result = board.result()
+    elif material_streak >= MATERIAL_ADJUDICATE_STREAK:
+        result = "1-0" if _material_balance(board) > 0 else "0-1"
+    else:
+        result = "*"
+
     return result, move_list
 
 # ---------------------------------------------------------------------------
