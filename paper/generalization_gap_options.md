@@ -129,37 +129,112 @@ than Option A is. The "HAL taught itself chess" claim would no longer hold
 for the value head's foundational knowledge, even if the policy head and
 later refinement remained self-play-driven.
 
-## 4. Side-by-side
+## 4. Option C — Relabel self-play positions with Stockfish evaluations
 
-| | Option A — material plane | Option B — Stockfish pretraining |
-|---|---|---|
-| Engineering cost | Hours | Days |
-| Architecture change | Yes (new run, warm-startable) | No (same input shape) |
-| Fixes `missing_queen`? | Likely, directly | Likely, as a side effect of broader fix |
-| Meaningfully closer to beating Stockfish d1? | Uncertain — narrow fix | More plausible — imports real evaluation judgement |
-| Self-play-from-scratch claim | Survives almost entirely intact | Materially compromised for the value head |
-| Reversibility / risk if it doesn't work | Very low — cheap to test and discard | Higher — bigger investment before knowing the outcome |
+**What it is**: the middle path, raised in chat on 13 August. The core
+problem with the self-play value signal isn't just "no material counting"
+— it's that every position in a game trajectory gets the *same* final
+outcome label (z), regardless of whether that position was five moves in
+or fifty. That's inherently noisy for anything but the tail end of a
+decisive game. Instead of importing synthetic or externally-sourced
+positions (Option B), take the positions HAL's own self-play *already*
+produces — nothing invented, nothing sourced elsewhere — and have
+Stockfish evaluate each one individually, at real depth (not the weak
+depth-1 setting used for the eval opponent). Use that per-position
+evaluation as the value target instead of, or alongside, the whole-game
+outcome.
 
-## 5. A sequencing recommendation (not a decision)
+**Scope**:
+- A new script (extends the `curate_buffer.py` pattern rather than
+  replacing it): replay `games.csv` move lists with python-chess, sample
+  positions per game (every Nth ply, or a handful at random — not every
+  ply; that's expensive and the positions within one game are highly
+  correlated), query Stockfish for a centipawn score, convert via
+  `tanh(cp / 400)` to the network's [-1, +1] range.
+- **The real design fork — full replacement vs. blend**:
+  - *Full replacement*: the sampled position's target becomes the
+    Stockfish eval outright, discarding z for that position.
+  - *Blend*: `loss = α · mse(v, z) + (1−α) · mse(v, stockfish_eval)`,
+    letting self-play outcome keep a voice. A refinement worth
+    considering: weight by distance from the game's end — z is reliable
+    near the finish and progressively noisier further back, so early/mid
+    positions could lean more on the Stockfish eval while late positions
+    lean more on z. α becomes a dial, not a switch.
+- **No architecture change** — same 54-plane encoder, same network shape.
+  This is a training-signal change, not a model change, so it can be
+  applied directly to run15's existing checkpoint via continued
+  fine-tuning. No warm-start surgery required, unlike Option A.
 
-Option A is cheap enough to treat as a diagnostic rather than a
-commitment: build it, run it, see what happens to `missing_queen`.
+**Cost**: medium — more than Option A (a new relabeling script, a change
+to how the training loss is computed), less than Option B (no separate
+synthetic-position pipeline, no architecture change, reuses data already
+being generated). The new cost is wall-clock: evaluating a sampled subset
+of positions across thousands of games at real Stockfish depth is real
+compute, though far less than evaluating every ply of every game.
 
-- If it moves sharply toward the expected −0.5 to −0.9 range, that
-  confirms the bottleneck really was pure counting — a small, well-scoped
-  fix solved it, no need for Option B's larger investment or its bigger
-  philosophical cost.
-- If it only partially fixes it, or fixes this specific metric while
-  other blind spots remain, that is real evidence the gap is broader than
-  counting — and would make the case for Option B's larger investment much
-  stronger than it is today, on data rather than a guess.
+**What it plausibly fixes**: broader than Option A. This attacks the root
+noisy-label problem directly, across the entire diversity of positions
+self-play naturally produces — not just material counting. It plausibly
+improves the value head's positional judgement generally (king safety,
+structure, activity — whatever Stockfish's evaluation captures), which
+makes it the strongest of the three candidates for genuinely narrowing the
+gap to beating Stockfish depth 1, while remaining grounded entirely in
+positions HAL's own self-play discovered.
 
-This sequencing doesn't resolve the values question, though, and it isn't
-meant to: **how much the "HAL taught itself chess" narrative matters
-relative to wanting a stronger engine is a call only Rob can make.** If the
-project's identity is genuinely about self-play from first principles, that
-argues for stopping at Option A regardless of whether it fully closes the
-gap to beating Stockfish. If the goal has shifted toward "build something
-that actually plays well," Option B is the more honest bet on getting
-there — at the cost of the purity the project has maintained through
-fifteen runs so far.
+**What it doesn't fix**: still can't produce positions self-play
+structurally cannot reach — the exact `missing_queen` FEN still won't
+arise from real games no matter how good the labels on reachable positions
+get. If `missing_queen` stays the only generalisation probe, it may show
+little movement even if overall judgement improves substantially — this
+is the strongest argument yet for building the diverse held-out test set
+proposed earlier, since a single unreachable position is a poor detector
+of real but partial progress.
+
+**Philosophical cost**: real, but more moderate and more controllable than
+Option B. The *what* — which positions HAL ever learns from — stays 100%
+self-play. The *how* — the value target for some fraction of positions —
+is Stockfish-influenced, and the degree is a tunable dial (α) rather than
+a binary switch. A modest blend favouring self-play (α ≈ 0.7–0.8) is a
+noticeably smaller compromise than full replacement, and arguably smaller
+than it first sounds — it doesn't change what HAL is fed as input at all
+(unlike Option A), only refines the quality of the training signal for
+experience HAL already generated itself.
+
+## 5. Side-by-side
+
+| | A — material plane | B — Stockfish pretraining | C — relabel self-play positions |
+|---|---|---|---|
+| Engineering cost | Hours | Days | Medium — script + loss change |
+| Architecture change | Yes (new run, warm-startable) | No | No — fine-tunes run15 directly |
+| Positions HAL learns from | 100% self-play | Synthetic / external | 100% self-play |
+| Value signal source | Self-play outcome (unchanged) | Stockfish | Stockfish, self-play outcome, or a blend (tunable) |
+| Fixes `missing_queen`? | Likely, directly | Likely, as a side effect | Uncertain on this specific metric — see caveat above |
+| Closer to beating Stockfish d1? | Uncertain — narrow fix | More plausible | Most plausible — fixes the noisy-label problem broadly |
+| Self-play-from-scratch claim | Survives almost intact | Materially compromised | Partially compromised, tunable via α |
+| Reversibility / risk | Very low | Higher — bigger investment before knowing the outcome | Moderate — cheap to try a light blend first |
+
+## 6. A sequencing recommendation (not a decision)
+
+Given the stated goal is genuinely to beat Stockfish, not just to get a
+Lichess number, I'd weight this differently than a pure diagnostic
+ordering:
+
+- **Option A** is still worth doing first and cheaply, purely as a
+  diagnostic — it isolates whether pure counting was ever the issue,
+  in hours, at very low cost either way.
+- **Option C**, specifically a light blend (α favouring self-play), is
+  the strongest candidate for the actual stated goal. It doesn't require
+  throwing away run15's checkpoint or architecture, it's grounded entirely
+  in HAL's own experience, and it directly targets the noisy whole-game-
+  label problem rather than one narrow symptom of it. This is where I'd
+  actually expect the biggest real improvement in playing strength.
+- **Option B** (full synthetic pretraining) becomes worth its larger cost
+  only if C's lighter touch turns out insufficient — i.e., if even
+  Stockfish-grounded self-play positions can't get the value head to a
+  place where HAL competes with a sound opponent.
+
+This still doesn't remove the values question — a light blend in Option C
+is a smaller compromise than full Option B, but it's still real, and it's
+still Rob's call how much of "HAL taught itself chess" is worth preserving
+against wanting to actually beat Stockfish. The sequencing above is about
+cost and evidence order, not about pre-deciding that trade for you.
