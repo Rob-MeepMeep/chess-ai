@@ -148,3 +148,43 @@ rate and should be read as corrected above, not as logged.
 
 **Verdict: PASS.** Rung 1 is doing what it was designed to do. Run continues
 to Gate 3 unmodified.
+
+## Gate 3 result (game ~3,027) — HARD STOP, verdict GREEN
+
+Eval at checkpoint step 14,950, n=100.
+
+| Matchup | Result |
+|---|---|
+| HAL (White) vs Random | 20 W / 4 L / 1 unresolved (n=25) |
+| Random vs HAL (Black) | 25/25 HAL wins (n=25) |
+| **Combined vs random** | **45 wins / 4 losses / 1 draw = 90.0% wins, 2.0% caps** |
+| HAL vs Stockfish depth 1 (both colours) | 0/50 — unchanged |
+
+Against run14's Gate 3 (23.1% wins / 76.9% caps), this is not a marginal
+improvement — it is a different regime. Cap-draw share across the full run
+held at 5–7% for 3,000+ games (vs run14's climb to 77%); average game
+length stayed at ~78–83 moves throughout (vs run14's ~118). Losses to
+random rose from run14's zero to 4/50 here — a real change in kind, not
+just degree: HAL stopped only avoiding losses and started actually playing
+for wins, which can occasionally cost a game it would previously have
+drawn out. Judged a good trade.
+
+**Verdict: GREEN.** Rung 1 (early material adjudication) is confirmed as a
+real, substantial fix for the conversion/cap-draw problem that defined
+run13 and run14.
+
+**No bonus green.** `missing_queen` at game 3,000 read **+0.0592** —
+technically still inside run14's ±0.06 empirical ceiling, and notably the
+*wrong sign* (expected: deeply negative; got: barely positive). This is the
+fourteenth consecutive regression reading, across two full runs, to show
+no meaningful movement. Rung 1 fixed conversion. It did not touch
+generalisation — the two were always separate problems, and Gate 3 is the
+cleanest possible confirmation of that: every headline metric improved
+dramatically while this one didn't move at all.
+
+**Standing question, unresolved by this run**: across the entire project
+(run14 + all three run15 evals), HAL is **0 wins / 0 draws in 200 games
+against Stockfish depth 1** — completely flat across ~15,000 training
+steps, even as the vs-random win rate climbed from ~10% to 90% over the
+same span. Rung 1 will not close this gap; see
+`generalization_gap_options.md` for what might.
