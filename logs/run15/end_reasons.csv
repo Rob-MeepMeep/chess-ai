@@ -124,3 +124,5 @@ game,checkmates,material_resigns,value_resigns,cap_draws,rule_draws
 6150,8,0,0,7,1
 6200,14,0,0,6,1
 6250,8,0,0,6,0
+6300,6,0,0,0,0
+6350,12,0,1,4,0
