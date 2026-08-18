@@ -60,6 +60,13 @@ MILESTONE_EVERY   = 500     # keep an immutable checkpoint copy every N games �
 SNAPSHOT_EVERY    = 50      # log MCTS strategy snapshots every N games
 PRINT_EVERY       = 10      # print progress line every N games
 REGRESSION_EVERY  = 200     # log value head regression to regression.csv
+MATERIAL_PROBE_EVERY = 20   # log the 7-position material diagnostic to
+                            # material_probe.csv — decoupled from
+                            # REGRESSION_EVERY and set much shorter, since
+                            # this is specifically meant to give a faster
+                            # read than the 200-game cadence on whether
+                            # Option A worked. Cheap: 7 forward passes,
+                            # no MCTS, no games played.
 RESIGN_THRESHOLD   = -0.95  # value score below which a position is hopeless
 RESIGN_CONSECUTIVE = 5      # raised from 3 — let positions breathe, force more closing technique
 # RESIGN_MATERIAL removed for Run 12 — Stage 2 resign now active.
@@ -337,6 +344,7 @@ try:
                 logger.record_snapshot(game_num, agent)
             if game_num % REGRESSION_EVERY == 0:
                 logger.record_regression(game_num, agent)
+            if game_num % MATERIAL_PROBE_EVERY == 0:
                 logger.record_material_probe(game_num, agent)
             if game_num % CHECKPOINT_EVERY == 0:
                 agent.save(CKPT_PATH)
