@@ -54,13 +54,18 @@ def main():
     device = torch.device("cpu")   # pure weight surgery, no need for the GPU
 
     print(f"Loading {OLD_CKPT}...")
-    old = ChessAgent(device)
-    old.load(OLD_CKPT)
+    # Load the raw checkpoint dict rather than going through ChessAgent.load() —
+    # ChessAgent builds a ChessNet() internally, which now imports N_PLANES=55
+    # (encoder.py already has the new plane), so there is no way to instantiate
+    # the *old* 54-plane architecture anymore to load run15's weights into.
+    # The state dict itself doesn't care what shape the current code expects;
+    # only load_state_dict()'s shape-checking does, so we bypass that entirely
+    # for the old side and work with its raw tensors directly.
+    old_ckpt = torch.load(OLD_CKPT, map_location=device, weights_only=False)
+    old_sd   = old_ckpt["network"]
 
     print("Building fresh run16 network (55-plane input)...")
     new = ChessAgent(device)
-
-    old_sd = old.network.state_dict()
     new_sd = new.network.state_dict()
 
     if RESIZED_LAYER not in old_sd or RESIZED_LAYER not in new_sd:
