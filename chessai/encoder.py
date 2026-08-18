@@ -1,5 +1,5 @@
 """
-encoder.py — Converts a chess board (+ history) into a (54, 8, 8) tensor.
+encoder.py — Converts a chess board (+ history) into a (55, 8, 8) tensor.
 
 Planes layout:
   0–47  : piece planes for up to 4 history frames (12 planes each)
@@ -12,6 +12,10 @@ Planes layout:
   51    : opponent — queenside castling right
   52    : en passant target square (1 at that square, 0 elsewhere)
   53    : fifty-move counter, normalised to [0, 1] (divide by 100)
+  54    : material balance, current player's perspective, clipped to +-20
+           and scaled to [-1, 1] (run16+, generalisation-gap Option A —
+           see paper/generalization_gap_options.md). A broadcast scalar
+           plane, same pattern as the fifty-move clock.
 
 The board is always encoded from the perspective of the player to move.
 When it's black's turn the board is mirrored vertically and piece colours
@@ -32,7 +36,19 @@ PIECE_TYPES = [
 ]
 
 N_HISTORY = 4               # number of board states to include
-N_PLANES  = 12 * N_HISTORY + 6  # 54 total (no colour plane)
+N_PLANES  = 12 * N_HISTORY + 6 + 1  # 55 total (was 54; +1 material plane, run16+)
+
+_PIECE_VALUES = {chess.PAWN: 1, chess.KNIGHT: 3, chess.BISHOP: 3,
+                 chess.ROOK: 5, chess.QUEEN: 9}
+
+
+def _material_balance(board: chess.Board) -> int:
+    """Positive = white ahead. Same definition as train_chess.py's helper."""
+    score = 0
+    for piece, val in _PIECE_VALUES.items():
+        score += val * len(board.pieces(piece, chess.WHITE))
+        score -= val * len(board.pieces(piece, chess.BLACK))
+    return score
 
 
 def _board_to_planes(board: chess.Board, player: chess.Color) -> np.ndarray:
@@ -88,5 +104,10 @@ def encode(boards: list) -> torch.Tensor:
 
     # Fifty-move clock: counts half-moves since last capture or pawn push
     tensor[53] = current.halfmove_clock / 100.0
+
+    # Material balance (plane 54), current player's perspective — b is
+    # already mirrored to current-player POV, same board used above.
+    mat = _material_balance(b)
+    tensor[54] = max(-1.0, min(1.0, mat / 20.0))
 
     return torch.tensor(tensor)

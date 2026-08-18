@@ -123,7 +123,7 @@ class ReplayBuffer:
 
         states, policies, outcomes = zip(*batch)
         return (
-            torch.stack(states),                                        # (B, 54, 8, 8)
+            torch.stack(states),                                        # (B, 55, 8, 8)
             torch.stack([_densify(p) for p in policies]),               # (B, 4096)
             torch.tensor(outcomes, dtype=torch.float32).unsqueeze(1),  # (B, 1)
         )
