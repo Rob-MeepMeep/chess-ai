@@ -125,3 +125,23 @@ Run16 resumed cleanly after the `material_probe.csv` code landed (game 34,
 steps 165). No signal-bearing data yet — the warm-started weights haven't
 had meaningful gradient exposure to the new channel. First real readings
 expected within the next few dozen games at the 20-game probe cadence.
+
+## Correction: game-40 reading was confounded, not evidence (18 August)
+
+The first `material_probe.csv` row (game 40) read every position except
+`missing_queen` as strongly, uniformly negative — including the two
+positions that should have read positive (`black_missing_queen`,
+`black_missing_rook`), and with `missing_two_pawns` just as saturated as
+`missing_rook` despite the large difference in actual material. Cause:
+six of the seven positions used `-` (no castling rights) while
+`missing_queen` alone kept its established `KQkq`. Self-play games almost
+never retain castling rights past move 60+ — exactly when material
+adjudication fires — so `-` rights very plausibly read as a strong "this
+is a decided, losing endgame" signal that swamped the actual material
+plane, rather than the network's material judgement actually being tested.
+
+Fixed (commit `97642cf`): all seven positions now keep full `KQkq` wherever
+chess rules allow it, dropping only the specific right a removed rook
+genuinely invalidates. The game-40 reading is discounted — it is evidence
+of a flawed diagnostic, not evidence about Option A. First trustworthy
+reading will be the next one logged after the fix.
