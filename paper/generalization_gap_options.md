@@ -9,32 +9,50 @@ comparison to weigh, not a recommendation to act on unread.
 
 ---
 
-## 1. What Gate 3 established
+## 1. What Gate 3 established (updated 18 August, game 6,840)
 
 Run15's intervention (early material adjudication) worked decisively.
-Cap-draw share held at 5–7% across 3,000+ games against run14's climb to
-77%; win rate vs random hit 90.0% against run14's 23.1% at the same
-checkpoint. Full detail in `run15_decision_protocol.md`.
+Cap-draw share held at 5–8% across 6,800+ games against run14's climb to
+77%; win rate vs random hit 90.0% at Gate 3 and has since **reached a
+perfect 100.0% (50/50, zero draws, zero losses)** at the most recent
+checkpoint (step 29,950). There is no headroom left in this benchmark —
+rung 1 has fully saturated what it can teach against a blundering
+opponent. Full detail in `run15_decision_protocol.md`.
 
-Two things did **not** move, across the entire project, and rung 1 was
-never going to touch either of them:
+Two things still have **not** moved, across the entire project, and the
+extra ~4,000 games and doubled training steps since Gate 3 have only
+strengthened the case that rung 1 was never going to touch either of them:
 
-- **`missing_queen` regression**: fourteen readings, two full runs,
-  never once left a ±0.06 noise band. The test position — the standard
-  starting setup with White's queen removed and nothing else touched — is
-  structurally close to unreachable through legal self-play (it would
-  require the queen to vanish before any other move is played anywhere on
-  the board). It has no near neighbour anywhere in the seed buffer or in
-  organic self-play data. The network has never been shown anything shaped
-  like it.
-- **Stockfish depth 1**: **0 wins, 0 draws, in 200 games**, across run14
-  and all three run15 evals, completely flat from step 0 through step
-  14,950 — even as the vs-random win rate climbed from ~10% to 90% over
-  that same span. Random punishes blunders; depth-1 Stockfish makes
-  essentially none. Everything rung 1 fixed was about converting clear
-  advantages faster. Beating a sound (if shallow) opponent requires
-  positional judgement HAL has not demonstrated anywhere in this project's
-  data.
+- **`missing_queen` regression**: nineteen readings now, two full runs,
+  never once left a ±0.06 noise band (latest: +0.0124, +0.0158, −0.0136,
+  +0.0056, +0.0081). The test position — the standard starting setup with
+  White's queen removed and nothing else touched — is structurally close
+  to unreachable through legal self-play (it would require the queen to
+  vanish before any other move is played anywhere on the board). It has no
+  near neighbour anywhere in the seed buffer or in organic self-play data.
+  The network has never been shown anything shaped like it.
+- **Stockfish depth 1**: **0 wins, 0 draws, in 300 games**, across run14
+  and all five run15 evals, completely flat from step 0 through step
+  29,950 — across three widely-spaced checkpoints *after* Gate 3 alone
+  (14,950 → 22,450 → 29,950), with zero trend in either direction, even as
+  the vs-random win rate climbed from ~10% to a perfect 100% over that
+  same span. This is no longer "hasn't moved yet" — it's a flat line
+  sampled five separate times across a doubling of training. Random
+  punishes blunders; depth-1 Stockfish makes essentially none. Everything
+  rung 1 fixed was about converting clear advantages faster. Beating a
+  sound (if shallow) opponent requires positional judgement HAL has not
+  demonstrated anywhere in this project's data.
+
+**One practical consequence of the 100% ceiling**: the case for simply
+letting run15 keep grinding toward its full 10,000-game budget before
+deciding is now much weaker than it was at Gate 3. With conversion against
+random fully maxed out, additional self-play games are likely to look very
+similar to the ones already collected — diminishing returns on exactly the
+axis rung 1 was designed to improve. The seed-buffer argument from earlier
+(more decisive games → a better buffer via `curate_buffer.py`'s move-count
+filter) still holds in principle, but most of its value has probably
+already been banked. This is a reasonable point to start on one of the
+options below rather than wait for game 10,000.
 
 The working diagnosis (see chat log, 13 August): this is very likely a
 **scale and inductive-bias problem**, not a bug. AlphaZero trained on
