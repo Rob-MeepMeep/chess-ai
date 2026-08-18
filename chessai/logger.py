@@ -43,20 +43,26 @@ LENGTH_BUCKETS = [(0, 20), (21, 40), (41, 60), (61, 80), (81, float("inf"))]
 # mechanisms agree. The rest vary which piece is missing and which side is
 # ahead, testing whether the network has generalised "material matters" as
 # a concept rather than just having memorised the answer to one FEN.
-# All positions: standard start, exactly one change. No castling rights
-# (irrelevant to what's being tested, and inconsistent for the ones that
-# remove a rook) — except missing_queen, kept exactly as regression.csv's
-# version for a clean comparison.
+# All positions keep full castling rights wherever legal (dropping only the
+# specific right a removed rook actually invalidates). First-reading data
+# (18 August, game 40) showed every position except missing_queen reading
+# uniformly, saturated-negative regardless of true sign or magnitude — the
+# "-" castling rights on the other six, versus missing_queen's untouched
+# "KQkq", was almost certainly acting as a strong "this is a decided,
+# losing endgame" confound (self-play games rarely retain castling rights
+# past move 60+, exactly when material adjudication fires), swamping the
+# actual material signal. Matching missing_queen's rights as closely as
+# legally possible removes that confound.
 MATERIAL_PROBE_POSITIONS = {
     # White down material, White to move — expect negative
     "missing_queen":      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1",
-    "missing_rook":        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/1NBQKBNR w - - 0 1",
-    "missing_bishop":      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RN1QKBNR w - - 0 1",
-    "missing_knight":      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/R1BQKBNR w - - 0 1",
-    "missing_two_pawns":   "rnbqkbnr/pppppppp/8/8/8/8/1PPPPPP1/RNBQKBNR w - - 0 1",
+    "missing_rook":        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/1NBQKBNR w Kkq - 0 1",
+    "missing_bishop":      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RN1QKBNR w KQkq - 0 1",
+    "missing_knight":      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/R1BQKBNR w KQkq - 0 1",
+    "missing_two_pawns":   "rnbqkbnr/pppppppp/8/8/8/8/1PPPPPP1/RNBQKBNR w KQkq - 0 1",
     # Black down material, White to move — expect positive
-    "black_missing_queen": "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1",
-    "black_missing_rook":  "1nbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1",
+    "black_missing_queen": "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "black_missing_rook":  "1nbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQk - 0 1",
 }
 
 
