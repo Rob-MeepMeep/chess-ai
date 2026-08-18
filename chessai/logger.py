@@ -37,6 +37,28 @@ CANONICAL_POSITIONS = {
 
 LENGTH_BUCKETS = [(0, 20), (21, 40), (41, 60), (61, 80), (81, float("inf"))]
 
+# Diverse material-imbalance probe (run16+, generalisation-gap Option A —
+# see paper/generalization_gap_options.md). "missing_queen" deliberately
+# duplicates regression.csv's position, as a cross-check that the two
+# mechanisms agree. The rest vary which piece is missing and which side is
+# ahead, testing whether the network has generalised "material matters" as
+# a concept rather than just having memorised the answer to one FEN.
+# All positions: standard start, exactly one change. No castling rights
+# (irrelevant to what's being tested, and inconsistent for the ones that
+# remove a rook) — except missing_queen, kept exactly as regression.csv's
+# version for a clean comparison.
+MATERIAL_PROBE_POSITIONS = {
+    # White down material, White to move — expect negative
+    "missing_queen":      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1",
+    "missing_rook":        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/1NBQKBNR w - - 0 1",
+    "missing_bishop":      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RN1QKBNR w - - 0 1",
+    "missing_knight":      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/R1BQKBNR w - - 0 1",
+    "missing_two_pawns":   "rnbqkbnr/pppppppp/8/8/8/8/1PPPPPP1/RNBQKBNR w - - 0 1",
+    # Black down material, White to move — expect positive
+    "black_missing_queen": "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1",
+    "black_missing_rook":  "1nbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w - - 0 1",
+}
+
 
 class Logger:
 
@@ -83,6 +105,10 @@ class Logger:
         self._init_csv(self._regression_path, [
             "game", "start", "w_wins", "b_move", "missing_queen", "timestamp",
         ])
+
+        self._material_probe_path = os.path.join(log_dir, "material_probe.csv")
+        self._init_csv(self._material_probe_path,
+                        ["game"] + list(MATERIAL_PROBE_POSITIONS.keys()) + ["timestamp"])
 
         # Rolling accumulators for the current 100-game window
         self._reset_window()
@@ -199,6 +225,34 @@ class Logger:
             f"{values['missing_queen']:+.4f}",
             time.strftime("%Y-%m-%d %H:%M:%S"),
         ])
+
+    def record_material_probe(self, game_num: int, agent) -> None:
+        """
+        Diagnostic for generalisation-gap Option A (run16+): does the value
+        head respond sensibly to material imbalance across DIFFERENT missing
+        pieces and BOTH sides, not just the single missing_queen FEN
+        regression.csv tracks? A network that has genuinely learned
+        "material matters" as a concept — rather than having memorised one
+        FEN's answer — should read negative for every white-down position
+        and positive for every black-down one, roughly scaled by how much is
+        missing (queen > rook > bishop/knight > two pawns). Several
+        independent positions moving together is a much stronger signal
+        than one number moving.
+
+        Called at the same cadence as record_regression — cheap (plain
+        forward passes, no MCTS), so no reason to wait for eval_watcher's
+        much slower 1,500-game cycle.
+        """
+        agent.network.eval()
+        values = {}
+        for key, fen in MATERIAL_PROBE_POSITIONS.items():
+            board = chess.Board(fen)
+            values[key] = agent.get_value(board, [])
+
+        row = ([game_num]
+               + [f"{values[k]:+.4f}" for k in MATERIAL_PROBE_POSITIONS]
+               + [time.strftime("%Y-%m-%d %H:%M:%S")])
+        self._append(self._material_probe_path, row)
 
     # ------------------------------------------------------------------
     # Internal

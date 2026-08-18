@@ -337,6 +337,7 @@ try:
                 logger.record_snapshot(game_num, agent)
             if game_num % REGRESSION_EVERY == 0:
                 logger.record_regression(game_num, agent)
+                logger.record_material_probe(game_num, agent)
             if game_num % CHECKPOINT_EVERY == 0:
                 agent.save(CKPT_PATH)
             if game_num % BUFFER_SAVE_EVERY == 0:
