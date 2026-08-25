@@ -81,13 +81,31 @@ RESIGN_CONSECUTIVE = 5      # raised from 3 — let positions breathe, force mor
 # plies and fixing the label semantics.
 MATERIAL_ADJUDICATE_THRESHOLD = 8    # |material| this decisive triggers early adjudication
 MATERIAL_ADJUDICATE_STREAK    = 6    # consecutive plies it must hold (3 full moves) — filters tactical blips mid-trade
-MATERIAL_ADJUDICATE_MIN_MOVE  = 60   # earliest move the check applies from
+MATERIAL_ADJUDICATE_MIN_MOVE  = 60   # earliest move either adjudication tier applies from
+
+# Run17 intervention ladder rung 1b (paper/run16_decision_protocol.md,
+# generalization_gap_options.md): run16's material_probe diagnostic showed
+# missing_rook/missing_queen-scale positions genuinely improving but
+# missing_bishop/knight/two_pawns getting WORSE, monotonically, across
+# 2,000+ games. The 8-point threshold above only ever reinforces large
+# imbalances — self-play has no mechanism to teach the network that
+# smaller ones matter, no matter how many more games are played. This
+# second tier catches the 3-7 band (roughly a minor piece up to just under
+# a rook), held for a longer streak since a smaller edge needs more proof
+# before calling it decisive, and scored at lower confidence than the
+# strong tier. Deliberately still self-play only — no external evaluator
+# — the smallest-footprint fix tried before reaching for Stockfish-based
+# options B/C.
+MATERIAL_ADJUDICATE_MODERATE_LOW    = 3     # inclusive lower bound
+MATERIAL_ADJUDICATE_MODERATE_HIGH   = 8     # exclusive upper bound — >= this, the strong tier above already handles it
+MATERIAL_ADJUDICATE_MODERATE_STREAK = 16    # plies (8 full moves) — longer than the strong tier's 6
+MATERIAL_ADJUDICATE_MODERATE_SCALE  = 0.7   # confidence — between a draw and the strong tier's 0.9
 
 # CKPT_LOAD: None = load RUN_NAME's own checkpoint; set to a path to seed weights from another run.
 # BUFFER_LOAD: None = load RUN_NAME's own buffer; set to a path to load from another run.
 # RUN_NAME itself lives in run_config.py — shared with eval/watcher/API.
 CKPT_LOAD   = None
-BUFFER_LOAD = "checkpoints/run16_seed_buffer.pt"
+BUFFER_LOAD = "checkpoints/run17_seed_buffer.pt"
 
 # ---------------------------------------------------------------------------
 # Device
@@ -180,7 +198,8 @@ class SelfPlayGame:
         self.moves         = []
         self.search        = None        # in-progress SearchState, or None
         self.resign_streak = 0
-        self.material_streak = 0         # consecutive plies past move 60 with |material| >= threshold
+        self.material_streak = 0         # consecutive plies past move 60 with |material| >= strong threshold
+        self.material_streak_moderate = 0  # consecutive plies past move 60 with |material| in the moderate band
         self.v             = 0.0         # search value after the latest move
         self.t_start       = time.time()
 
@@ -189,6 +208,7 @@ class SelfPlayGame:
         return (self.board.is_game_over()
                 or self.resign_streak >= RESIGN_CONSECUTIVE
                 or self.material_streak >= MATERIAL_ADJUDICATE_STREAK
+                or self.material_streak_moderate >= MATERIAL_ADJUDICATE_MODERATE_STREAK
                 or len(self.moves) >= MAX_GAME_MOVES)
 
 
@@ -216,6 +236,13 @@ def _finish_game(g: SelfPlayGame) -> tuple:
         winner        = chess.WHITE if mat > 0 else chess.BLACK
         outcome_scale = 0.9   # stronger claim than the move-150 cap's 0.8 soft win
         end_reason    = "material_adjudication"
+    elif g.material_streak_moderate >= MATERIAL_ADJUDICATE_MODERATE_STREAK:
+        # Rung 1b: a smaller (3-7) lead, held for much longer (16 plies vs
+        # the strong tier's 6) as extra proof before calling it decisive.
+        mat = _material_balance(g.board)
+        winner        = chess.WHITE if mat > 0 else chess.BLACK
+        outcome_scale = MATERIAL_ADJUDICATE_MODERATE_SCALE
+        end_reason    = "material_adjudication_moderate"
     elif g.resign_streak >= RESIGN_CONSECUTIVE:
         # Value resignation: winner is whoever the search says is winning.
         # g.v is from the perspective of the player to move after the last push.
@@ -317,12 +344,23 @@ try:
             else:
                 g.resign_streak = 0
 
-            # Rung 1 material adjudication streak — see MATERIAL_ADJUDICATE_* above.
-            if (len(g.moves) > MATERIAL_ADJUDICATE_MIN_MOVE
-                    and abs(_material_balance(g.board)) >= MATERIAL_ADJUDICATE_THRESHOLD):
+            # Rung 1 / 1b material adjudication streaks — see MATERIAL_ADJUDICATE_* above.
+            # One balance computation shared by both tiers — the two bands are
+            # disjoint by construction, so each streak resets on its own
+            # whenever the current ply's magnitude falls outside its band.
+            past_min_move = len(g.moves) > MATERIAL_ADJUDICATE_MIN_MOVE
+            mat_abs       = abs(_material_balance(g.board))
+
+            if past_min_move and mat_abs >= MATERIAL_ADJUDICATE_THRESHOLD:
                 g.material_streak += 1
             else:
                 g.material_streak = 0
+
+            if (past_min_move
+                    and MATERIAL_ADJUDICATE_MODERATE_LOW <= mat_abs < MATERIAL_ADJUDICATE_MODERATE_HIGH):
+                g.material_streak_moderate += 1
+            else:
+                g.material_streak_moderate = 0
 
             if g.over:
                 finished.append(g)

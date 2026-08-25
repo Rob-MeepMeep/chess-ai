@@ -53,11 +53,19 @@ STOCKFISH_PATH     = "stockfish"   # assumes stockfish is on PATH
 # Mirrors train_chess.py's intervention-ladder rung 1 (run15+): without this,
 # a game where HAL builds a winning material lead against Random but can't
 # force mate within MAX_GAME_MOVES was scored as a draw ('*') — silently
-# undercounting HAL's real win rate. Keep these three in sync with
+# undercounting HAL's real win rate. Keep these in sync with
 # train_chess.py's MATERIAL_ADJUDICATE_* constants.
 MATERIAL_ADJUDICATE_THRESHOLD = 8    # |material| this decisive triggers adjudication
 MATERIAL_ADJUDICATE_STREAK    = 6    # consecutive plies it must hold (3 full moves)
-MATERIAL_ADJUDICATE_MIN_MOVE  = 60   # earliest move the check applies from
+MATERIAL_ADJUDICATE_MIN_MOVE  = 60   # earliest move either tier applies from
+
+# Rung 1b (run17+) — second, lower-confidence tier. Kept in sync with
+# train_chess.py's MATERIAL_ADJUDICATE_MODERATE_* constants for the same
+# reason as above: eval must adjudicate identically to training, or its
+# win-rate numbers silently undercount again.
+MATERIAL_ADJUDICATE_MODERATE_LOW    = 3
+MATERIAL_ADJUDICATE_MODERATE_HIGH   = 8
+MATERIAL_ADJUDICATE_MODERATE_STREAK = 16
 
 # ---------------------------------------------------------------------------
 # Arguments — parsed early so --cpu affects device selection
@@ -200,10 +208,11 @@ def play_game(white_fn, black_fn):
     result is '1-0', '0-1', '1/2-1/2', or '*' (move cap hit with no
     resolution — a genuinely undecided position, not just an unforced mate).
     """
-    board           = chess.Board()
-    history         = []
-    move_list       = []
-    material_streak = 0
+    board                    = chess.Board()
+    history                  = []
+    move_list                = []
+    material_streak          = 0
+    material_streak_moderate = 0
 
     while not board.is_game_over() and len(move_list) < MAX_GAME_MOVES:
         if board.turn == chess.WHITE:
@@ -215,18 +224,27 @@ def play_game(white_fn, black_fn):
         board.push_uci(move_uci)
         move_list.append(move_uci)
 
-        if (len(move_list) > MATERIAL_ADJUDICATE_MIN_MOVE
-                and abs(_material_balance(board)) >= MATERIAL_ADJUDICATE_THRESHOLD):
+        past_min_move = len(move_list) > MATERIAL_ADJUDICATE_MIN_MOVE
+        mat_abs       = abs(_material_balance(board))
+
+        if past_min_move and mat_abs >= MATERIAL_ADJUDICATE_THRESHOLD:
             material_streak += 1
         else:
             material_streak = 0
 
-        if material_streak >= MATERIAL_ADJUDICATE_STREAK:
+        if (past_min_move
+                and MATERIAL_ADJUDICATE_MODERATE_LOW <= mat_abs < MATERIAL_ADJUDICATE_MODERATE_HIGH):
+            material_streak_moderate += 1
+        else:
+            material_streak_moderate = 0
+
+        if (material_streak >= MATERIAL_ADJUDICATE_STREAK
+                or material_streak_moderate >= MATERIAL_ADJUDICATE_MODERATE_STREAK):
             break
 
     if board.is_game_over():
         result = board.result()
-    elif material_streak >= MATERIAL_ADJUDICATE_STREAK:
+    elif material_streak >= MATERIAL_ADJUDICATE_STREAK or material_streak_moderate >= MATERIAL_ADJUDICATE_MODERATE_STREAK:
         result = "1-0" if _material_balance(board) > 0 else "0-1"
     else:
         result = "*"

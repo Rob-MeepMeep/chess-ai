@@ -10,15 +10,19 @@ loading a checkpoint name no run ever produced).
 Change RUN_NAME here when starting a new run — nowhere else.
 """
 
-# run16: generalisation-gap Option A (material-count input plane) on top of
-# run15's rung-1 intervention. run15's Gate 3 was GREEN (90.0% wins vs
-# random, later reaching a perfect 100.0%) but missing_queen never moved
-# and Stockfish depth 1 stayed 0/300 across the whole project — rung 1
-# fixed conversion, not generalisation. See paper/generalization_gap_options.md.
-# run16 warm-starts from run15's checkpoint (warm_start_run16.py) rather
-# than training from scratch a fourth time; its logs/weights/eval results
-# stay untouched for comparison.
-RUN_NAME = "run16"
+# run17: intervention ladder rung 1b -- a second, lower-confidence material
+# adjudication tier (3-7 imbalance, 16-ply streak, 0.7 scale) alongside
+# run16's existing 8+ tier. run16's material_probe diagnostic showed
+# queen/rook-scale positions genuinely improving but bishop/knight/two_pawns
+# getting WORSE, monotonically, over 2,000+ games -- the 8-point threshold
+# only ever reinforces large imbalances, so self-play had no mechanism to
+# teach it smaller ones matter. See paper/run16_decision_protocol.md and
+# paper/run17_decision_protocol.md. run17 warm-starts from run16's
+# checkpoint (warm_start_run17.py) -- no architecture change this time,
+# so it's a straight weight copy with a fresh optimizer/step count, not
+# the weight surgery run16 needed. run16's logs/weights/eval results stay
+# untouched for comparison.
+RUN_NAME = "run17"
 
 CKPT_PATH   = f"checkpoints/{RUN_NAME}_hal_chess.pt"
 BUFFER_PATH = f"checkpoints/{RUN_NAME}_replay_buffer.pt"

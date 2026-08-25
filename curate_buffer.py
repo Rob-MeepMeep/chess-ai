@@ -34,7 +34,7 @@ Usage:
   venv/bin/python3 curate_buffer.py
 
 Output:
-  checkpoints/run16_seed_buffer.pt
+  checkpoints/run17_seed_buffer.pt
 """
 
 import csv
@@ -54,22 +54,25 @@ from chessai.replay   import ReplayBuffer
 # Configuration
 # ---------------------------------------------------------------------------
 
-GAMES_CSV      = "logs/run15/games.csv"
-OUTPUT_PATH    = "checkpoints/run16_seed_buffer.pt"
+GAMES_CSV      = "logs/run16/games.csv"
+OUTPUT_PATH    = "checkpoints/run17_seed_buffer.pt"
 
 # Mid-game material positions reviewed by external agent (Run 11 addition)
 REVIEWED_JSON  = "paper/buffer_candidates_reviewed.json"
 CANDIDATES_JSON = "paper/buffer_candidates.json"
 
 # Game quality filters
-MIN_GAME       = 300     # run15 also started from FRESH weights (CKPT_LOAD=None)
-                         # — same pool-fill warmup reasoning as the run14->run15
-                         # build. run15 has ~6,800+ games available (vs run14's
-                         # 3,279), so there's no need to raise this further —
-                         # plenty of post-warmup data either way.
+MIN_GAME       = 20      # unlike run14->run15, run16 was WARM-STARTED from
+                         # run15's checkpoint, not trained from scratch — it
+                         # played competently from game 1 (confirmed: no
+                         # Fool's-Mate-family blundering, 39-105 move games
+                         # immediately). No real warmup period to skip here,
+                         # so this only guards against the very first couple
+                         # of games rather than a genuine pool-fill window.
 MIN_MOVES      = 20      # skip overconfident short games
 MAX_MOVES      = 100     # skip very long games that may be random shuffling
-GOOD_REASONS   = {"material_resign", "checkmate", "value_resign", "material_adjudication"}  # decisive outcomes
+GOOD_REASONS   = {"material_resign", "checkmate", "value_resign",
+                  "material_adjudication", "material_adjudication_moderate"}  # decisive outcomes
 
 # Canonical positions: (FEN, outcome from current player's perspective).
 # The winning piece is kept far from the enemy king so no label can be
