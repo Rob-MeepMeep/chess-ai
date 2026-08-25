@@ -145,3 +145,46 @@ chess rules allow it, dropping only the specific right a removed rook
 genuinely invalidates. The game-40 reading is discounted — it is evidence
 of a flawed diagnostic, not evidence about Option A. First trustworthy
 reading will be the next one logged after the fix.
+
+## Final result (22 August, game 2,120 — run16 stopped here)
+
+104 clean readings (post-confound-fix), split into four consecutive time
+windows for trend analysis rather than eyeballed row by row:
+
+| Position | Early (60–500) | Mid (520–1000) | Late (1020–1560) | Final (1580–2120) |
+|---|---|---|---|---|
+| `missing_queen` | 30% | 35% | 48% | 37% |
+| `missing_rook` | 43% | 77% | 77% | 63% |
+| `missing_bishop` | 26% | 23% | 6% | **0%** |
+| `missing_knight` | 26% | 19% | 6% | **0%** |
+| `missing_two_pawns` | 39% | 42% | 10% | 7% |
+| `black_missing_queen` | 83% | 88% | 87% | **96%** |
+| `black_missing_rook` | 0% | 4% | 29% | 56% |
+
+(% = fraction of readings with the theoretically correct sign in that
+window.)
+
+**Verdict: neither clean GREEN nor clean RED — a genuine, informative
+split.** `black_missing_queen` is a robust, steadily strengthening
+success. `black_missing_rook` recovered from confidently wrong to a
+coin-flip. `missing_rook` improved sharply then partially backslid. But
+`missing_bishop`, `missing_knight`, and `missing_two_pawns` didn't merely
+fail to improve — they got **monotonically worse across all four
+windows**, ruling out "just needs more time." That specific, ruled-in
+failure mode is itself the finding: material adjudication only fires at
+`|material| ≥ 8`, so self-play never generates reinforced training signal
+for smaller imbalances, no matter how many games are played. Queen/rook-
+scale material generalised because the training data actually contains
+it; bishop/knight/pawn-scale material didn't, because it structurally
+doesn't.
+
+**Decision**: don't run to the full 10,000-game budget — the cause is
+data-composition, not data-volume, so more of the same games won't fix
+it. Stopped at game 2,120. Intervention ladder rung 1b (a second,
+lower-confidence adjudication tier for the 3–7 band) tests whether this
+specific, diagnosed gap is fixable cheaply within self-play before
+reaching for Option B or C. See `run17_decision_protocol.md`.
+
+The material-count input plane itself is kept, not reverted — it
+demonstrably works for the material ranges self-play actually reinforces.
+run17 warm-starts directly from this run's final checkpoint.
