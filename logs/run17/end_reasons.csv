@@ -1,2 +1,7 @@
 game,checkmates,material_resigns,value_resigns,cap_draws,rule_draws
 50,8,0,35,0,1
+100,5,0,43,0,0
+150,6,0,39,0,2
+200,5,0,42,0,0
+250,3,0,40,1,0
+300,4,0,38,0,0
