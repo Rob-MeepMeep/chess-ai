@@ -105,3 +105,46 @@ Stockfish depth 1 stays at 0/50.
 
 Registered before `warm_start_run17.py` has been run or any run17 game has
 been played. No data yet.
+
+## Final result (27 August, game ~1,780 — run17 stopped here)
+
+89 `material_probe.csv` readings split into three ~30-reading windows —
+large and well-separated enough to distinguish a real trend from noise,
+the same standard that let run16's result be called with confidence:
+
+| Position | Early (20–600) | Mid (620–1200) | Late (1220–1780) |
+|---|---|---|---|
+| `missing_queen` | 97% | 90% | 93% |
+| `missing_rook` | 100% | 97% | 90% |
+| `missing_bishop` | 43% | 10% | **3%** |
+| `missing_knight` | 27% | 10% | **3%** |
+| `missing_two_pawns` | 57% | 37% | 24% |
+| `black_missing_queen` | 80% | 30% | 72% |
+| `black_missing_rook` | 47% | 30% | **10%** |
+
+(% = fraction of readings with the theoretically correct sign in that
+window.) Eval unchanged throughout: 100% vs random (matching run16's
+ceiling), 0/50 vs Stockfish depth 1 at every checkpoint.
+
+**Verdict: RED, per the pre-registered criteria.** `missing_bishop` and
+`missing_knight` did not merely fail to improve — across three large,
+well-separated windows they declined from modest early promise to
+essentially never correct (3%), a worse relative state than even run16's
+terminal 0%. `missing_two_pawns` and `black_missing_rook` show the same
+steady decline. `missing_queen` and `missing_rook` held strong throughout,
+but that reflects run16's inherited gains, not new learning from rung 1b
+— those two were already strong before this run started.
+
+**Conclusion**: self-play-only fixes have now been tried twice (rung 1,
+rung 1b) and the second, cheaper one did not close the gap it targeted.
+Per the protocol, proceed to Option C — relabelling self-play positions
+with real Stockfish evaluations — since it does not depend on any
+adjudication threshold to generate signal for small material differences,
+which is exactly the mechanism that has now failed twice on its own.
+
+What survives regardless: rung 1's conversion fix (run15, 100% vs random,
+unchanged since), and the material plane's genuine, durable generalisation
+for large material (`missing_queen`/`missing_rook`, holding at 90%+ across
+run16 and all of run17). Option C builds on top of both, not instead of
+them. The `material_probe.csv` instrumentation and windowed-trend method
+built for this diagnostic carry forward directly to evaluating Option C.
