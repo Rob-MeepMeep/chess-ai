@@ -10,19 +10,20 @@ loading a checkpoint name no run ever produced).
 Change RUN_NAME here when starting a new run — nowhere else.
 """
 
-# run17: intervention ladder rung 1b -- a second, lower-confidence material
-# adjudication tier (3-7 imbalance, 16-ply streak, 0.7 scale) alongside
-# run16's existing 8+ tier. run16's material_probe diagnostic showed
-# queen/rook-scale positions genuinely improving but bishop/knight/two_pawns
-# getting WORSE, monotonically, over 2,000+ games -- the 8-point threshold
-# only ever reinforces large imbalances, so self-play had no mechanism to
-# teach it smaller ones matter. See paper/run16_decision_protocol.md and
-# paper/run17_decision_protocol.md. run17 warm-starts from run16's
-# checkpoint (warm_start_run17.py) -- no architecture change this time,
-# so it's a straight weight copy with a fresh optimizer/step count, not
-# the weight surgery run16 needed. run16's logs/weights/eval results stay
-# untouched for comparison.
-RUN_NAME = "run17"
+# run18: generalisation-gap Option C -- self-play positions in the 1-7
+# material band relabelled with real Stockfish evaluations
+# (relabel_with_stockfish.py), folded into the permanent partition
+# alongside the canonical positions. Both self-play adjudication attempts
+# (rung 1 in run15, rung 1b in run17) proved unable to generate training
+# signal for material imbalances below 8 -- run17's material_probe
+# diagnostic showed missing_bishop/knight declining to essentially never
+# correct (3%) across three large windows, worse in relative terms than
+# run16's terminal state. See paper/run17_decision_protocol.md and
+# paper/generalization_gap_options.md. run18 warm-starts from run17's
+# checkpoint (warm_start_run18.py) -- no architecture change, straight
+# weight copy. run17's logs/weights/eval results stay untouched for
+# comparison.
+RUN_NAME = "run18"
 
 CKPT_PATH   = f"checkpoints/{RUN_NAME}_hal_chess.pt"
 BUFFER_PATH = f"checkpoints/{RUN_NAME}_replay_buffer.pt"
