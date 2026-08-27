@@ -1,1 +1,6 @@
 game,position,move1,pct1,move2,pct2,move3,pct3,move4,pct4,move5,pct5
+50,start,a2a4,19.2%,b2b4,15.2%,b2b3,9.1%,g1f3,6.1%,c2c4,5.1%
+50,after_e4,a7a5,14.1%,b7b6,14.1%,b7b5,12.1%,g7g6,6.1%,c7c5,5.1%
+50,after_d4,g8f6,12.1%,a7a5,11.1%,b7b6,10.1%,b8c6,9.1%,b7b5,8.1%
+50,italian_game,b2b3,17.2%,g2g4,9.1%,b2b4,6.1%,d2d3,5.1%,d1e2,5.1%
+50,queens_gambit,c7c5,9.1%,c7c6,8.1%,b7b6,8.1%,g8h6,7.1%,g7g6,7.1%
