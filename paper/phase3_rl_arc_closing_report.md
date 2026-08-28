@@ -35,7 +35,7 @@ this pulls the throughline out of them.
 | run15 | 6,840 | 153.3h | Rung 1: early material adjudication | Gate 3 GREEN — 100% wins vs random, cap share collapsed |
 | run16 | 2,493 | 42.6h | Option A: material-count input plane | Partial — large material generalised, small material got worse |
 | run17 | 1,788 | 26.7h | Rung 1b: second adjudication tier (3–7 band) | RED — small-piece positions declined further, self-play-only exhausted |
-| run18 | 1,280+ | 19.6h+ | Option C: Stockfish-relabelled positions | Partial — queen/rook solved decisively, bishop/knight/pawns still fail |
+| run18 | 1,280 | 19.6h | Option C: Stockfish-relabelled positions | Partial — queen/rook solved decisively, bishop/knight/pawns still fail |
 
 **Total: 17,010 games, ~408 active hours (17 days), across six runs.**
 
@@ -105,7 +105,8 @@ permanent training partition (~9,000 positions, deliberately large and
 diverse to avoid the small-permanent-partition memorisation trap that
 caused the original run13 bug).
 
-The result, over 64 readings across three windows (1,280+ games):
+The result, over 64 readings across three windows (1,280 games, the
+run's full and final length):
 `missing_queen` reached **100% correct across every single window**,
 independently cross-verified by `regression.csv` to four decimal places.
 `missing_rook` held 76–95% correct throughout. Both `black_missing_queen`
@@ -261,7 +262,7 @@ measured in this project's history.**
 | run15 | 6,840 | 153.3h |
 | run16 | 2,493 | 42.6h |
 | run17 | 1,788 | 26.7h |
-| run18 (partial, still running) | 1,280+ | 19.6h+ |
+| run18 | 1,280 | 19.6h |
 
 **Total: 17,010 games, ~408.2 active hours (~17.0 days) of continuous
 GPU training across the arc.**
