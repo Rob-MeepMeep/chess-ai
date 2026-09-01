@@ -10,20 +10,23 @@ loading a checkpoint name no run ever produced).
 Change RUN_NAME here when starting a new run — nowhere else.
 """
 
-# run18: generalisation-gap Option C -- self-play positions in the 1-7
-# material band relabelled with real Stockfish evaluations
-# (relabel_with_stockfish.py), folded into the permanent partition
-# alongside the canonical positions. Both self-play adjudication attempts
-# (rung 1 in run15, rung 1b in run17) proved unable to generate training
-# signal for material imbalances below 8 -- run17's material_probe
-# diagnostic showed missing_bishop/knight declining to essentially never
-# correct (3%) across three large windows, worse in relative terms than
-# run16's terminal state. See paper/run17_decision_protocol.md and
-# paper/generalization_gap_options.md. run18 warm-starts from run17's
-# checkpoint (warm_start_run18.py) -- no architecture change, straight
-# weight copy. run17's logs/weights/eval results stay untouched for
-# comparison.
-RUN_NAME = "run18"
+# run19: Option C, escalated. run18's material_probe result (64 readings,
+# three windows) showed missing_queen solved decisively (100% correct
+# every window, cross-verified by regression.csv) and missing_rook strong
+# (76-95%), but missing_bishop/knight/two_pawns declined the same way
+# rung 1b's self-play-only attempt did -- the alpha=0.2 blend used in
+# run18 was likely too weak at smaller material magnitudes, where
+# Stockfish's evaluation is a softer signal (rarely forcing/mate-adjacent)
+# competing against the +-1.0 character of self-play outcomes elsewhere
+# in the batch. run19 escalates to alpha=0.05 (95% Stockfish trust) via
+# curate_buffer.py's STOCKFISH_ALPHA -- cheap this time, since
+# relabel_with_stockfish.py now saves raw (self-play outcome, Stockfish
+# eval) pairs instead of a pre-blended value, so no Stockfish re-run was
+# needed. See paper/run18_decision_protocol.md and
+# paper/phase3_rl_arc_closing_report.md. run19 warm-starts from run18's
+# checkpoint (warm_start_run19.py) -- no architecture change. run18's
+# logs/weights/eval results stay untouched for comparison.
+RUN_NAME = "run19"
 
 CKPT_PATH   = f"checkpoints/{RUN_NAME}_hal_chess.pt"
 BUFFER_PATH = f"checkpoints/{RUN_NAME}_replay_buffer.pt"

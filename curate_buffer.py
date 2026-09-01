@@ -32,18 +32,25 @@ it feeds a third of every training batch, forever.
 
 STOCKFISH-RELABELLED POSITIONS (generalization-gap Option C, run18+): if
 relabel_with_stockfish.py has been run and its output exists at
-STOCKFISH_POSITIONS_PATH, those positions are loaded and folded into the
-permanent partition alongside the canonical/generated ones. See that
-script's docstring and paper/run17_decision_protocol.md for why — self-play
-adjudication (rungs 1 and 1b) proved unable to generate training signal
-for material imbalances below 8, so this replaces that self-play-derived
-signal with real Stockfish evaluations for exactly that range.
+STOCKFISH_RAW_PATH, those positions are loaded, blended at STOCKFISH_ALPHA,
+and folded into the permanent partition alongside the canonical/generated
+ones. See that script's docstring and paper/run17_decision_protocol.md for
+why — self-play adjudication (rungs 1 and 1b) proved unable to generate
+training signal for material imbalances below 8, so this replaces that
+self-play-derived signal with real Stockfish evaluations for exactly that
+range.
+
+The blend is applied HERE, not in relabel_with_stockfish.py, specifically
+so alpha can be retuned by editing one constant and re-running this
+script — no Stockfish required. (run18 originally baked the blend into
+the relabelling script itself, which meant every alpha test needed a full
+~1h Stockfish re-run; fixed 28 August.)
 
 Usage:
   venv/bin/python3 curate_buffer.py
 
 Output:
-  checkpoints/run18_seed_buffer.pt
+  checkpoints/run19_seed_buffer.pt
 """
 
 import csv
@@ -63,18 +70,30 @@ from chessai.replay   import ReplayBuffer
 # Configuration
 # ---------------------------------------------------------------------------
 
-GAMES_CSV      = "logs/run17/games.csv"
-OUTPUT_PATH    = "checkpoints/run18_seed_buffer.pt"
-STOCKFISH_POSITIONS_PATH = "checkpoints/run18_stockfish_positions.pt"
+GAMES_CSV      = "logs/run18/games.csv"
+OUTPUT_PATH    = "checkpoints/run19_seed_buffer.pt"
+STOCKFISH_RAW_PATH = "checkpoints/stockfish_relabeled_raw.pt"
+
+# Escalated from run18's 0.2 (80% Stockfish trust) — run18's material_probe
+# result showed queen/rook-scale material solved decisively (100%/76-95%
+# correct across three windows) while bishop/knight/pawns declined the
+# same way rung 1b's self-play-only attempt did. Hypothesis: Stockfish's
+# evaluation is often forcing (mate lines) at queen scale, producing a
+# loud target similar in character to self-play's +-1.0 outcomes; at
+# smaller scales it's a softer centipawn-derived value getting
+# outcompeted by that dominant pattern elsewhere in the batch. A small
+# self-play floor (0.05) is kept rather than 0.0 -- a safety net against
+# an occasional misleading Stockfish read, not a meaningful dilution.
+STOCKFISH_ALPHA = 0.05   # self-play weight; (1 - alpha) = 0.95 on Stockfish
 
 # Mid-game material positions reviewed by external agent (Run 11 addition)
 REVIEWED_JSON  = "paper/buffer_candidates_reviewed.json"
 CANDIDATES_JSON = "paper/buffer_candidates.json"
 
 # Game quality filters
-MIN_GAME       = 20      # run17 was also warm-started (from run16), not
+MIN_GAME       = 20      # run18 was also warm-started (from run17), not
                          # trained from scratch — same no-real-warmup
-                         # reasoning as the run16->run17 build.
+                         # reasoning as every warm-started build since run16.
 MIN_MOVES      = 20      # skip overconfident short games
 MAX_MOVES      = 100     # skip very long games that may be random shuffling
 GOOD_REASONS   = {"material_resign", "checkmate", "value_resign",
@@ -356,15 +375,19 @@ def main():
         canonical_batch.append((state, policy, float(outcome)))
 
     # Stockfish-relabelled positions (Option C, run18+) — see module docstring.
-    # Loaded as-is: relabel_with_stockfish.py already produces
-    # (state, policy, value) tuples in add_permanent()'s expected format.
+    # relabel_with_stockfish.py saves raw (state, policy, z, sf_value)
+    # tuples; the alpha blend is applied HERE so alpha can be retuned by
+    # editing STOCKFISH_ALPHA and re-running this script, no Stockfish
+    # required.
     stockfish_count = 0
-    if os.path.exists(STOCKFISH_POSITIONS_PATH):
-        stockfish_positions = torch.load(STOCKFISH_POSITIONS_PATH, weights_only=False)
-        canonical_batch.extend(stockfish_positions)
-        stockfish_count = len(stockfish_positions)
+    if os.path.exists(STOCKFISH_RAW_PATH):
+        raw = torch.load(STOCKFISH_RAW_PATH, weights_only=False)
+        for state, policy, z, sf_value in raw:
+            blended = STOCKFISH_ALPHA * z + (1 - STOCKFISH_ALPHA) * sf_value
+            canonical_batch.append((state, policy, float(blended)))
+        stockfish_count = len(raw)
     else:
-        print(f"  Note: {STOCKFISH_POSITIONS_PATH} not found — run "
+        print(f"  Note: {STOCKFISH_RAW_PATH} not found — run "
               f"relabel_with_stockfish.py first if this run is meant to "
               f"include Option C. Continuing without it.")
 
@@ -374,7 +397,9 @@ def main():
     print(f"  {len(midgame_positions):,} mid-game material-imbalanced positions "
           f"(Run 10, agent-reviewed)")
     if stockfish_count:
-        print(f"  {stockfish_count:,} Stockfish-relabelled positions (Option C)")
+        print(f"  {stockfish_count:,} Stockfish-relabelled positions "
+              f"(Option C, alpha={STOCKFISH_ALPHA} self-play / "
+              f"{1-STOCKFISH_ALPHA:.2f} Stockfish)")
 
     # --- Save ---
     print(f"\nFinal buffer: {len(buf):,} rolling / {len(buf._permanent):,} permanent "

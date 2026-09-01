@@ -1,7 +1,7 @@
 """
-relabel_with_stockfish.py — Build a large, diverse set of positions labelled
-with real Stockfish evaluations, targeting the specific material range
-self-play has now failed twice to teach on its own.
+relabel_with_stockfish.py — Build a large, diverse set of positions with
+their raw self-play outcome AND a real Stockfish evaluation, targeting the
+specific material range self-play has now failed twice to teach on its own.
 
 Why: rung 1 (run15) and rung 1b (run17) both showed self-play can only ever
 reinforce large (8+) material imbalances — the adjudication threshold
@@ -12,6 +12,15 @@ positions from HAL's own self-play (nothing invented, nothing externally
 sourced) specifically in the range that's been failing, and label each one
 with a real Stockfish evaluation instead of relying on the noisy
 whole-game outcome.
+
+CHANGED after run18 (28 August): this used to compute and save the
+alpha-blended value directly, which meant re-testing a different alpha
+required re-running the entire ~1h Stockfish pass. That defeated the
+"escalating alpha is a cheap follow-up" plan from run18_decision_protocol.md.
+Now saves the raw (self-play outcome, Stockfish evaluation) pair
+separately — curate_buffer.py applies the blend at buffer-build time
+instead, so changing alpha is now genuinely just editing one constant and
+re-running curate_buffer.py, no Stockfish required.
 
 Design choices, and why (see chat, 27 August, and
 paper/run17_decision_protocol.md for the diagnosis this responds to):
@@ -25,10 +34,6 @@ paper/run17_decision_protocol.md for the diagnosis this responds to):
     partition getting memorised rather than teaching a general rule.
     Avoid repeating that failure mode with Stockfish labels instead of
     hand labels.
-  - SELF_PLAY_WEIGHT is low (0.2): rung 1b showed a weak/absent signal
-    doesn't move these positions, so this test should give Stockfish's
-    judgement a strong, largely undiluted voice rather than a diluted one
-    that risks another ambiguous result.
   - Output feeds curate_buffer.py's permanent partition, not the rolling
     buffer — the same mechanism that already successfully teaches the
     canonical K+Q vs K endgames, for repeated (not one-time) exposure.
@@ -39,7 +44,8 @@ Usage:
 Requires Stockfish on PATH. One-time offline cost, not part of the
 training loop — do not call this from train_chess.py; Stockfish evaluation
 takes real wall-clock time per position and would wreck the lockstep
-loop's throughput.
+loop's throughput. Not run-specific — the output is a reusable asset any
+future run can re-blend at a different alpha without regenerating it.
 """
 
 import os
@@ -59,8 +65,8 @@ from chessai.encoder import encode
 # Configuration
 # ---------------------------------------------------------------------------
 
-GAMES_CSVS       = ["logs/run16/games.csv", "logs/run17/games.csv"]
-OUTPUT_PATH      = "checkpoints/run18_stockfish_positions.pt"
+GAMES_CSVS       = ["logs/run16/games.csv", "logs/run17/games.csv", "logs/run18/games.csv"]
+OUTPUT_PATH      = "checkpoints/stockfish_relabeled_raw.pt"   # run-agnostic — reusable across runs
 STOCKFISH_PATH   = "stockfish"
 STOCKFISH_DEPTH  = 16   # deeper than eval_chess.py's deliberately-weak depth-1
                         # eval opponent — this is a one-time labelling cost,
@@ -72,9 +78,6 @@ MIN_MOVE_PLY          = 20  # skip pure opening theory
 MAX_SAMPLES_PER_GAME  = 4   # cap so no single game dominates the set
 BALANCED_SAMPLE_RATE  = 0.15  # also sample some near-even positions, so the
                               # network doesn't learn "nonzero plane = decisive"
-
-SELF_PLAY_WEIGHT = 0.2   # alpha — blend weight on the position's own game
-                         # outcome; (1 - alpha) on the Stockfish evaluation.
 
 TARGET_POSITIONS = 9_000
 
@@ -179,9 +182,11 @@ def main():
 
                 z = 1.0 if mover == winner else -1.0
                 sf_value = _stockfish_value(engine, pos_board, STOCKFISH_DEPTH)
-                blended = SELF_PLAY_WEIGHT * z + (1 - SELF_PLAY_WEIGHT) * sf_value
 
-                positions.append((state, policy, float(blended), mat_abs))
+                # Raw components, NOT blended — see module docstring. Blending
+                # happens in curate_buffer.py at buffer-build time so alpha
+                # can be retuned without re-running Stockfish.
+                positions.append((state, policy, z, sf_value, mat_abs))
                 evaluated += 1
                 if evaluated % 200 == 0:
                     print(f"  {evaluated:,} positions evaluated "
@@ -194,18 +199,18 @@ def main():
 
     print(f"\nFinal set: {len(positions):,} positions")
     from collections import Counter
-    band_counts = Counter(mat_abs for _, _, _, mat_abs in positions)
+    band_counts = Counter(mat_abs for _, _, _, _, mat_abs in positions)
     print("Material-magnitude coverage:")
     for mat_abs in sorted(band_counts):
         print(f"  |material|={mat_abs}: {band_counts[mat_abs]:,}")
 
-    # Strip the diagnostic mat_abs column before saving — downstream
-    # (curate_buffer.py, add_permanent) expects plain (state, policy, value)
-    save_positions = [(s, p, v) for s, p, v, _ in positions]
+    # Save the full (state, policy, z, sf_value) tuple — mat_abs was only
+    # for this print, not needed downstream.
+    save_positions = [(s, p, z, sf) for s, p, z, sf, _ in positions]
     torch.save(save_positions, OUTPUT_PATH)
     print(f"\nSaved to {OUTPUT_PATH}")
-    print(f"Run curate_buffer.py next — it will pick this file up automatically "
-          f"if present at {OUTPUT_PATH}.")
+    print(f"Run curate_buffer.py next — it applies the alpha blend and picks "
+          f"this file up automatically if present at {OUTPUT_PATH}.")
 
 
 if __name__ == "__main__":

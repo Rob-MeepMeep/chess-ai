@@ -105,7 +105,7 @@ MATERIAL_ADJUDICATE_MODERATE_SCALE  = 0.7   # confidence — between a draw and 
 # BUFFER_LOAD: None = load RUN_NAME's own buffer; set to a path to load from another run.
 # RUN_NAME itself lives in run_config.py — shared with eval/watcher/API.
 CKPT_LOAD   = None
-BUFFER_LOAD = "checkpoints/run18_seed_buffer.pt"
+BUFFER_LOAD = "checkpoints/run19_seed_buffer.pt"
 
 # ---------------------------------------------------------------------------
 # Device
