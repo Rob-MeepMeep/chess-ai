@@ -7,6 +7,19 @@
 **Status:** Closing report. Marks the end of the initial self-play
 reinforcement learning arc — not the end of the project.
 
+> **Addendum, 3 September 2026:** the "small-piece positions still
+> failing" verdicts below for run16/17/18, and this document's framing of
+> the whole arc as chasing that gap, were measured with a `material_probe`
+> that turned out to be structurally broken (synthetic zero-history test
+> positions, never seen in training). The current checkpoint (run19,
+> step 5,950) already handles bishop/knight/two-pawn deficits correctly
+> once measured on real positions instead. Full diagnosis:
+> `material_probe_correction.md`. The rows below are left as written —
+> they're an accurate record of what the probe reported and how the
+> project responded at the time — but should be read as **probe
+> readings, not confirmed capability**, unless independently
+> re-verified against a given run's actual checkpoint.
+
 ---
 
 ## 1. Why this document exists

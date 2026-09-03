@@ -105,7 +105,10 @@ MATERIAL_ADJUDICATE_MODERATE_SCALE  = 0.7   # confidence — between a draw and 
 # BUFFER_LOAD: None = load RUN_NAME's own buffer; set to a path to load from another run.
 # RUN_NAME itself lives in run_config.py — shared with eval/watcher/API.
 CKPT_LOAD   = None
-BUFFER_LOAD = "checkpoints/run19_seed_buffer.pt"
+# run20 continues run19's own accumulated buffer (not the original curated
+# seed) -- nothing about the data pipeline changed, so there's no reason
+# to throw away run19's ~1,190 games of self-play. See run_config.py.
+BUFFER_LOAD = "checkpoints/run19_replay_buffer.pt"
 
 # ---------------------------------------------------------------------------
 # Device

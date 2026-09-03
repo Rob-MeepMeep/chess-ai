@@ -78,3 +78,28 @@ settings (0.2, 0.05) without success.
 
 Registered before `warm_start_run19.py` has been run or any run19 game has
 been played. No data yet.
+
+## Resolution (3 September 2026, game ~1190, step 5,950)
+
+Neither GREEN nor RED, as written. Through game 1190, `missing_bishop`/
+`missing_knight`/`missing_two_pawns` were reading flat-to-declining
+against `material_probe.csv` — trending toward the RED criterion above.
+Investigating why turned up a construction bug in the probe itself, not a
+training failure: `MATERIAL_PROBE_POSITIONS` (`chessai/logger.py`) tested
+the starting position with one piece deleted, zero moves played, empty
+history — a shape that cannot occur in a legal game once material has
+changed, and one the network had never been trained on. On the same
+checkpoint, real in-context positions at the identical magnitudes read a
+clean, correctly-signed -0.30 to -0.37, consistent with a smooth,
+monotonic material-sensitivity curve across the entire ±1 to ±20+ range.
+
+Full diagnosis, evidence, and disposition: `material_probe_correction.md`.
+
+This run is marked **resolved, not RED**. The data that would have
+supported either verdict was measuring the wrong thing throughout, so the
+pre-registered decision can't be made from it either way. No further
+alpha tuning is planned as a result of this run specifically — not
+because escalating α was vindicated, but because the flat/declining
+signal that would have justified continuing to escalate it was never
+real. `run20` continues from this checkpoint with the corrected probe
+in place; see `material_probe_correction.md` §7 for what that changes.
