@@ -25,6 +25,16 @@ If (b) reads strongly negative/positive where (a) reads near zero, at the
 same nominal magnitude, that confirms the gap is in how material_probe
 constructs its test positions, not a training failure.
 
+RESULT (3 Sept, run19 game ~1190): confirmed. missing_bishop/knight/
+two_pawns all read near zero (or wrong-signed) on the old synthetic FENs
+but clearly, correctly negative on real positions at the same magnitude.
+chessai/logger.py's MATERIAL_PROBE_POSITIONS has since been replaced with
+real move-sequences (see generate_material_probe_positions.py), so it no
+longer holds the old FEN dict this script originally imported — the seven
+FENs are kept here as a literal, standalone historical snapshot so this
+comparison stays runnable without depending on logger.py's current
+(fixed) internals.
+
 Usage:
   venv/bin/python3 diagnose_probe_construction.py
 """
@@ -42,7 +52,19 @@ import torch
 
 from chessai.model   import ChessNet
 from chessai.encoder import encode
-from chessai.logger  import MATERIAL_PROBE_POSITIONS
+
+# The original run16-19 synthetic probe FENs, preserved here verbatim as a
+# historical snapshot -- no longer live in chessai/logger.py, see the
+# module docstring above.
+MATERIAL_PROBE_POSITIONS = {
+    "missing_queen":      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1",
+    "missing_rook":        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/1NBQKBNR w Kkq - 0 1",
+    "missing_bishop":      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RN1QKBNR w KQkq - 0 1",
+    "missing_knight":      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/R1BQKBNR w KQkq - 0 1",
+    "missing_two_pawns":   "rnbqkbnr/pppppppp/8/8/8/8/1PPPPPP1/RNBQKBNR w KQkq - 0 1",
+    "black_missing_queen": "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "black_missing_rook":  "1nbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQk - 0 1",
+}
 
 CKPT_PATH   = "checkpoints/run19_hal_chess.pt"
 GAMES_CSV   = "logs/run19/games.csv"

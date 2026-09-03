@@ -19,6 +19,7 @@ means confident exploitation. A flat one means still exploring.
 
 import os
 import csv
+import json
 import time
 import chess
 import torch
@@ -38,32 +39,37 @@ CANONICAL_POSITIONS = {
 LENGTH_BUCKETS = [(0, 20), (21, 40), (41, 60), (61, 80), (81, float("inf"))]
 
 # Diverse material-imbalance probe (run16+, generalisation-gap Option A —
-# see paper/generalization_gap_options.md). "missing_queen" deliberately
-# duplicates regression.csv's position, as a cross-check that the two
-# mechanisms agree. The rest vary which piece is missing and which side is
-# ahead, testing whether the network has generalised "material matters" as
-# a concept rather than just having memorised the answer to one FEN.
-# All positions keep full castling rights wherever legal (dropping only the
-# specific right a removed rook actually invalidates). First-reading data
-# (18 August, game 40) showed every position except missing_queen reading
-# uniformly, saturated-negative regardless of true sign or magnitude — the
-# "-" castling rights on the other six, versus missing_queen's untouched
-# "KQkq", was almost certainly acting as a strong "this is a decided,
-# losing endgame" confound (self-play games rarely retain castling rights
-# past move 60+, exactly when material adjudication fires), swamping the
-# actual material signal. Matching missing_queen's rights as closely as
-# legally possible removes that confound.
-MATERIAL_PROBE_POSITIONS = {
-    # White down material, White to move — expect negative
-    "missing_queen":      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNB1KBNR w KQkq - 0 1",
-    "missing_rook":        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/1NBQKBNR w Kkq - 0 1",
-    "missing_bishop":      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RN1QKBNR w KQkq - 0 1",
-    "missing_knight":      "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/R1BQKBNR w KQkq - 0 1",
-    "missing_two_pawns":   "rnbqkbnr/pppppppp/8/8/8/8/1PPPPPP1/RNBQKBNR w KQkq - 0 1",
-    # Black down material, White to move — expect positive
-    "black_missing_queen": "rnb1kbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-    "black_missing_rook":  "1nbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQk - 0 1",
-}
+# see paper/generalization_gap_options.md). Originally seven single FENs:
+# the starting position with one piece deleted, zero moves played, empty
+# history. That construction cannot occur naturally — removing a piece
+# requires a capture, which requires history — and the run16-19 arc
+# (rung 1b, run17's Stockfish relabelling, run18/run19's alpha tuning) was
+# chasing what turned out to be a probe-construction artifact, not a real
+# training gap: diagnose_network_output.py and diagnose_probe_construction.py
+# (3 Sept, run19 game ~1190) showed the checkpoint tracks Stockfish's
+# material judgement well (corr 0.90-0.96) on real in-context positions at
+# every magnitude, including bishop/knight/two-pawns — it just couldn't
+# read the synthetic zero-history FENs, which it had never seen paired
+# with a material deficit in any form.
+#
+# Fixed by replacing each single FEN with 30 real move-sequences per
+# category, sampled once from run19's own games.csv (see
+# generate_material_probe_positions.py) — positions where exactly one
+# piece type differs by the category's amount and every other piece count
+# matches, "White to move" enforced the same way the original FENs were.
+# record_material_probe() replays each sequence to reconstruct real board
+# history (matching relabel_with_stockfish.py's convention exactly) and
+# averages the 30 predictions, instead of reading one FEN. Averaging also
+# damps the higher variance real positions carry (std ~0.6-0.9, vs a
+# single point estimate) into a stable per-checkpoint reading.
+#
+# NOTE for anyone reading material_probe.csv across this change: rows
+# before this fix measured the old synthetic construction; rows after
+# measure real in-context positions. The two are not directly comparable
+# — expect a visible discontinuity at the game number this landed on.
+with open(os.path.join(os.path.dirname(__file__),
+                        "material_probe_positions.json")) as _f:
+    MATERIAL_PROBE_POSITIONS = json.load(_f)
 
 
 class Logger:
@@ -239,11 +245,16 @@ class Logger:
         pieces and BOTH sides, not just the single missing_queen FEN
         regression.csv tracks? A network that has genuinely learned
         "material matters" as a concept — rather than having memorised one
-        FEN's answer — should read negative for every white-down position
+        FEN's answer — should read negative for every white-down category
         and positive for every black-down one, roughly scaled by how much is
         missing (queen > rook > bishop/knight > two pawns). Several
         independent positions moving together is a much stronger signal
         than one number moving.
+
+        Each category is 30 real move-sequences (see the comment above
+        MATERIAL_PROBE_POSITIONS) rather than one synthetic FEN — replay
+        each to reconstruct real board history, then average the 30
+        predictions per category.
 
         Called at the same cadence as record_regression — cheap (plain
         forward passes, no MCTS), so no reason to wait for eval_watcher's
@@ -251,9 +262,18 @@ class Logger:
         """
         agent.network.eval()
         values = {}
-        for key, fen in MATERIAL_PROBE_POSITIONS.items():
-            board = chess.Board(fen)
-            values[key] = agent.get_value(board, [])
+        for key, sequences in MATERIAL_PROBE_POSITIONS.items():
+            preds = []
+            for seq in sequences:
+                board = chess.Board()
+                history = []
+                for move_uci in seq:
+                    # prepend BEFORE pushing — matches
+                    # relabel_with_stockfish.py's history convention exactly
+                    history = ([board.copy()] + history)[:3]
+                    board.push_uci(move_uci)
+                preds.append(agent.get_value(board, history))
+            values[key] = sum(preds) / len(preds)
 
         row = ([game_num]
                + [f"{values[k]:+.4f}" for k in MATERIAL_PROBE_POSITIONS]
