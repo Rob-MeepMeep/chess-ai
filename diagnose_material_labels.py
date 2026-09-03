@@ -46,13 +46,15 @@ def main():
     by_mag = defaultdict(lambda: {"z": [], "sf": []})
 
     for state, _policy, z, sf_value in raw:
-        # plane 54 is a broadcast scalar plane -- any cell holds the value
+        # plane 54 is a broadcast scalar plane -- any cell holds the value.
+        # Signed, not abs() -- "mover is down a bishop" and "mover is up a
+        # bishop" are opposite targets and must not be averaged together.
         mat_scaled = state[54, 0, 0].item()
-        mat_abs = round(abs(mat_scaled) * 20)
-        by_mag[mat_abs]["z"].append(z)
-        by_mag[mat_abs]["sf"].append(sf_value)
+        mat_signed = round(mat_scaled * 20)
+        by_mag[mat_signed]["z"].append(z)
+        by_mag[mat_signed]["sf"].append(sf_value)
 
-    header = (f"{'|mat|':>6} {'n':>6}  {'z mean':>8} {'z std':>7}  "
+    header = (f"{'mat':>6} {'n':>6}  {'z mean':>8} {'z std':>7}  "
               f"{'sf mean':>8} {'sf std':>7}  {'blended mean':>13}")
     print(header)
     print("-" * len(header))
