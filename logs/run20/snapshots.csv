@@ -49,3 +49,13 @@ game,position,move1,pct1,move2,pct2,move3,pct3,move4,pct4,move5,pct5
 500,after_d4,a7a6,13.1%,e7e6,12.1%,a7a5,11.1%,h7h5,9.1%,g7g5,8.1%
 500,italian_game,b1a3,10.1%,b2b3,8.1%,g2g4,8.1%,a2a3,6.1%,b1c3,6.1%
 500,queens_gambit,e7e6,13.1%,h7h5,8.1%,g7g5,8.1%,e7e5,7.1%,a7a6,4.0%
+550,start,e2e3,26.3%,h2h4,13.1%,b1a3,9.1%,a2a3,5.1%,d2d4,4.0%
+550,after_e4,b8c6,17.2%,e7e6,13.1%,e7e5,11.1%,b8a6,10.1%,h7h5,7.1%
+550,after_d4,e7e6,16.2%,a7a6,14.1%,h7h5,10.1%,g7g5,8.1%,a7a5,8.1%
+550,italian_game,g2g4,8.1%,b1c3,6.1%,b1a3,6.1%,f3e5,5.1%,h2h4,5.1%
+550,queens_gambit,e7e6,21.2%,h7h5,7.1%,f7f5,5.1%,e7e5,5.1%,f7f6,5.1%
+600,start,e2e3,25.3%,h2h4,13.1%,a2a3,8.1%,b1a3,7.1%,a2a4,6.1%
+600,after_e4,b8a6,20.2%,e7e6,12.1%,h7h5,11.1%,e7e5,8.1%,a7a5,6.1%
+600,after_d4,h7h5,15.2%,e7e6,12.1%,a7a6,10.1%,g7g5,9.1%,e7e5,6.1%
+600,italian_game,b1a3,9.1%,b2b3,7.1%,g2g4,6.1%,b1c3,6.1%,c2c3,5.1%
+600,queens_gambit,h7h5,15.2%,g7g6,6.1%,h7h6,6.1%,e7e5,6.1%,e7e6,5.1%
