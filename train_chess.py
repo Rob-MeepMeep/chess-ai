@@ -283,6 +283,8 @@ game_num      = start_game               # completed-game counter (log numbering
 games_started = start_game
 active: list  = []
 loss          = 0.0
+policy_loss   = 0.0
+value_loss    = 0.0
 mcts          = agent.mcts
 
 try:
@@ -376,10 +378,11 @@ try:
 
             if replay.ready(MIN_BUFFER):
                 for _ in range(TRAIN_STEPS):
-                    loss = agent.train(replay.sample(BATCH_SIZE))
+                    loss, policy_loss, value_loss = agent.train(replay.sample(BATCH_SIZE))
 
             logger.record_game(game_num, winner, g.moves, loss, end_reason,
-                               steps=agent.steps)
+                               steps=agent.steps,
+                               policy_loss=policy_loss, value_loss=value_loss)
 
             if game_num % SNAPSHOT_EVERY == 0:
                 logger.record_snapshot(game_num, agent)

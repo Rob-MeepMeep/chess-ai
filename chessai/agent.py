@@ -114,7 +114,7 @@ class ChessAgent:
     # Learning
     # ------------------------------------------------------------------
 
-    def train(self, batch: tuple) -> float:
+    def train(self, batch: tuple) -> tuple:
         """
         One gradient update on a sampled batch.
 
@@ -123,7 +123,13 @@ class ChessAgent:
           policies: (B, 4096)   — MCTS visit-count targets
           outcomes: (B, 1)      — game result from each position's perspective
 
-        Returns the scalar loss value for logging.
+        Returns (total_loss, policy_loss, value_loss) for logging — kept
+        separate so a climbing avg_loss can be attributed to one or the
+        other (run19/run20, avg_loss climbed the entire run and it was
+        never clear from the combined number alone whether that's the
+        value head failing to fit, or the policy head just getting more
+        confident/lower-entropy as play improves, which looks the same
+        in the sum).
         """
         states, target_policies, target_values = batch
         states          = states.to(self.device)
@@ -151,7 +157,7 @@ class ChessAgent:
         self.steps += 1
         self.network.eval()
 
-        return loss.item()
+        return loss.item(), policy_loss.item(), value_loss.item()
 
     # ------------------------------------------------------------------
     # Checkpoint

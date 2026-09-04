@@ -122,6 +122,20 @@ class Logger:
         self._init_csv(self._material_probe_path,
                         ["game"] + list(MATERIAL_PROBE_POSITIONS.keys()) + ["timestamp"])
 
+        # avg_loss (training.csv) is policy_loss + value_loss summed before
+        # logging (agent.py's train()), which can't distinguish "value head
+        # not converging" from "policy head getting more confident/lower-
+        # entropy as play improves" -- both look like a climbing number.
+        # Split out separately here so a future climb is diagnosable. New
+        # file rather than a new training.csv column: _init_csv only writes
+        # a header if the file doesn't exist yet, so an in-progress run's
+        # existing training.csv keeps its old header on resume, same issue
+        # as material_probe.csv's fix (see material_probe_correction.md).
+        self._loss_breakdown_path = os.path.join(log_dir, "loss_breakdown.csv")
+        self._init_csv(self._loss_breakdown_path, [
+            "game", "avg_policy_loss", "avg_value_loss", "steps", "timestamp",
+        ])
+
         # Rolling accumulators for the current 100-game window
         self._reset_window()
 
@@ -132,16 +146,20 @@ class Logger:
     def record_game(self, game_num: int, winner,
                     moves: list, loss: float,
                     end_reason: str = "unknown",
-                    steps: int = 0) -> None:
+                    steps: int = 0,
+                    policy_loss: float = 0.0, value_loss: float = 0.0) -> None:
         """
         Call after every completed game.
 
-        winner     : chess.WHITE, chess.BLACK, or None for draw
-        moves      : list of UCI strings played in the game
-        loss       : training loss for this game's batch (0.0 if no training step yet)
-        end_reason : one of "checkmate", "material_resign", "value_resign",
-                     "cap_draw", "rule_draw"
-        steps      : agent.steps at game completion — enables elapsed-time accounting
+        winner      : chess.WHITE, chess.BLACK, or None for draw
+        moves       : list of UCI strings played in the game
+        loss        : training loss for this game's batch (0.0 if no training step yet)
+        end_reason  : one of "checkmate", "material_resign", "value_resign",
+                      "cap_draw", "rule_draw"
+        steps       : agent.steps at game completion — enables elapsed-time accounting
+        policy_loss, value_loss : loss's two components (0.0 if no training
+                      step yet) — accumulated into loss_breakdown.csv,
+                      separately from games.csv/training.csv's combined loss
         """
         ts = time.strftime("%Y-%m-%d %H:%M:%S")
         outcome_str = "W" if winner == chess.WHITE else "B" if winner == chess.BLACK else "D"
@@ -170,6 +188,8 @@ class Logger:
             self._window[key] += 1
 
         self._window["losses"].append(loss)
+        self._window["policy_losses"].append(policy_loss)
+        self._window["value_losses"].append(value_loss)
         game_length = len(moves)
         self._window["lengths"].append(game_length)
 
@@ -288,6 +308,7 @@ class Logger:
         self._window = {
             "white_wins": 0, "black_wins": 0, "draws": 0,
             "losses": [], "lengths": [],
+            "policy_losses": [], "value_losses": [],
             # Keys match end_reason strings from train_chess.py exactly
             "checkmate": 0, "material_resign": 0,
             "value_resign": 0, "cap_draw": 0, "rule_draw": 0,
@@ -323,6 +344,14 @@ class Logger:
             game_num,
             w["checkmate"], w["material_resign"], w["value_resign"],
             w["cap_draw"], w["rule_draw"],
+        ])
+
+        avg_policy_loss = sum(w["policy_losses"]) / n
+        avg_value_loss  = sum(w["value_losses"])  / n
+        self._append(self._loss_breakdown_path, [
+            game_num,
+            f"{avg_policy_loss:.6f}", f"{avg_value_loss:.6f}",
+            w["steps"], time.strftime("%Y-%m-%d %H:%M:%S"),
         ])
         self._reset_window()
 
