@@ -271,6 +271,19 @@ class MCTS:
         legal = list(board.legal_moves)
         idxs  = np.fromiter((move_to_index(m) for m in legal),
                             dtype=np.int64, count=len(legal))
+
+        # Promotions collapse to one index -- move_to_index only encodes
+        # from/to squares, not the promotion piece, and index_to_move
+        # always resolves back to queen regardless (moves.py's own
+        # documented simplification, unaffected by this fix). Without
+        # deduplicating here, e.g. a7a8=Q/R/B/N all reuse the same index;
+        # each still gets its own softmax-normalised prior computed from
+        # the identical logit, and the dict write below silently discards
+        # all but one -- leaving child priors that don't sum to 1
+        # (reproduced: 0.677 for a simple promotion position, 10 Sept
+        # 2026 assessment). Dedupe before softmax, not after, so the
+        # normalisation itself is correct rather than just the dict keys.
+        idxs  = np.unique(idxs)
         take  = get_mirror_indices_np()[idxs] if board.turn == chess.BLACK else idxs
 
         lg = logits[take]
