@@ -35,11 +35,18 @@ else:
 agent = ChessAgent(device, n_simulations=50)
 
 CKPT = CKPT_PATH
+checkpoint_loaded = False   # exposed via /health -- a missing checkpoint
+                           # used to still report "ok" (10 Sept 2026 assessment)
 try:
     agent.load(CKPT)
+    checkpoint_loaded = True
     print(f"HAL-4000 loaded from {CKPT} ({agent.steps:,} training steps)")
 except FileNotFoundError:
     print(f"WARNING: no checkpoint at {CKPT} — HAL will play randomly via untrained network")
+
+MAX_SIMULATIONS = 1000   # bounds request.n_simulations -- unbounded before this
+                        # (10 Sept 2026 assessment), a client could request an
+                        # arbitrarily large or non-positive simulation count
 
 app = FastAPI(title="HAL-4000 Chess Service", version="1.0.0")
 
@@ -84,16 +91,40 @@ def replay_moves(moves: List[str]) -> tuple:
 @app.get("/health")
 def health():
     return {
-        "status": "ok",
-        "model":  "HAL-4000",
-        "steps":  agent.steps,
-        "device": str(device),
+        "status":            "ok" if checkpoint_loaded else "degraded",
+        "model":             "HAL-4000",
+        "checkpoint_loaded": checkpoint_loaded,   # False = playing on an untrained network
+        "steps":             agent.steps,
+        "device":            str(device),
     }
 
 @app.post("/move", response_model=MoveResponse)
 def get_move(request: MoveRequest):
     try:
         board, history = replay_moves(request.moves)
+
+        # request.fen is documented as "used as a sanity check" but was
+        # never actually checked against anything -- a desync between the
+        # client's tracked position and its move list would silently make
+        # HAL move on the wrong board (10 Sept 2026 assessment). epd()
+        # ignores halfmove/fullmove counters, comparing only what actually
+        # defines "the same position" (pieces, turn, castling, en passant).
+        expected = chess.Board(request.fen)
+        if board.epd() != expected.epd():
+            raise ValueError(
+                f"fen does not match replayed moves — client thinks the "
+                f"position is {request.fen!r}, but replaying moves gives "
+                f"{board.fen()!r}"
+            )
+
+        if board.is_game_over():
+            raise ValueError(f"Position is already game over: {board.result()}")
+
+        if not (1 <= request.n_simulations <= MAX_SIMULATIONS):
+            raise ValueError(
+                f"n_simulations must be between 1 and {MAX_SIMULATIONS}, "
+                f"got {request.n_simulations}"
+            )
 
         move_uci, _, _ = agent.choose_move(
             board, history,
