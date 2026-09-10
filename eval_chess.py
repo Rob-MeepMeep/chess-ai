@@ -442,88 +442,102 @@ def evaluate(label: str, white_fn, black_fn, n: int, no_adjudication: bool = Fal
 # Run all matchups
 # ---------------------------------------------------------------------------
 
-if args.regression_only:
+def run_evaluation_suite() -> None:
+    """
+    Runs Tiers 1-3 (or just the regression printout if --regression-only).
+    Guarded behind __main__ (10 Sept 2026 test-suite work) so `import
+    eval_chess` defines everything -- agent, play_game, evaluate,
+    hal_move, the CSV helpers -- without kicking off the full (slow,
+    Stockfish-dependent) suite. Previously this whole section ran at
+    plain-import time regardless of --regression-only, which is why
+    testing anything here needed a sys.argv + importlib workaround.
+    """
+    if args.regression_only:
+        print("=" * 60)
+        print("Done.")
+        return
+
+    _init_eval_log()
     print("=" * 60)
-    print("Done.")
-    exit(0)
+    print(f"Eval games logged to: {_EVAL_LOG_PATH}\n")
+    if args.no_adjudication:
+        print(f"--no-adjudication: playing to real checkmate/draw or a "
+              f"{MAX_GAME_MOVES_NO_ADJUDICATION}-ply "
+              f"({MAX_GAME_MOVES_NO_ADJUDICATION // 2} full moves) cap, not the "
+              f"material-adjudication shortcut. Slower; expect this to take a while.\n")
 
-_init_eval_log()
-print("=" * 60)
-print(f"Eval games logged to: {_EVAL_LOG_PATH}\n")
-if args.no_adjudication:
-    print(f"--no-adjudication: playing to real checkmate/draw or a "
-          f"{MAX_GAME_MOVES_NO_ADJUDICATION}-ply "
-          f"({MAX_GAME_MOVES_NO_ADJUDICATION // 2} full moves) cap, not the "
-          f"material-adjudication shortcut. Slower; expect this to take a while.\n")
+    # --- Tier 1: vs Random ---
+    print("── Tier 1: HAL vs Random ──────────────────────────────────\n")
+    r1 = evaluate("1. HAL (White) vs Random (Black)",
+                  hal_move, random_move, N_GAMES_RANDOM, no_adjudication=args.no_adjudication)
+    r2 = evaluate("2. Random (White) vs HAL (Black)",
+                  random_move, hal_move, N_GAMES_RANDOM, no_adjudication=args.no_adjudication)
 
-# --- Tier 1: vs Random ---
-print("── Tier 1: HAL vs Random ──────────────────────────────────\n")
-r1 = evaluate("1. HAL (White) vs Random (Black)",
-              hal_move, random_move, N_GAMES_RANDOM, no_adjudication=args.no_adjudication)
-r2 = evaluate("2. Random (White) vs HAL (Black)",
-              random_move, hal_move, N_GAMES_RANDOM, no_adjudication=args.no_adjudication)
+    hal_vs_random = (r1["white_wins"] + r2["black_wins"]) / (N_GAMES_RANDOM * 2) * 100
+    hal_checkmates_vs_random = r1["white_checkmates"] + r2["black_checkmates"]
+    print(f"Overall HAL win rate vs random (material-adjudication inclusive): "
+          f"{hal_vs_random:.1f}%")
+    print(f"  Of which actual checkmates: {hal_checkmates_vs_random}/{N_GAMES_RANDOM * 2}\n")
 
-hal_vs_random = (r1["white_wins"] + r2["black_wins"]) / (N_GAMES_RANDOM * 2) * 100
-hal_checkmates_vs_random = r1["white_checkmates"] + r2["black_checkmates"]
-print(f"Overall HAL win rate vs random (material-adjudication inclusive): "
-      f"{hal_vs_random:.1f}%")
-print(f"  Of which actual checkmates: {hal_checkmates_vs_random}/{N_GAMES_RANDOM * 2}\n")
+    # --- Tier 2: vs Stockfish ---
+    print("── Tier 2: HAL vs Stockfish ───────────────────────────────\n")
 
-# --- Tier 2: vs Stockfish ---
-print("── Tier 2: HAL vs Stockfish ───────────────────────────────\n")
-
-try:
-    engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
-    engine.configure({"Threads": 1, "Hash": 16})   # 1 thread, 16MB hash — prevent unified memory bloat
-
-    for depth in [1]:   # depth 3/5 re-enable when HAL reaches 20% W/D vs depth 1
-        n_sims = SIMS_BY_DEPTH.get(depth, 200)
-        hal_sf = hal_move_noisy_at(n_sims)   # noise breaks determinism; greedy selection preserved
-        sf_move = stockfish_move(engine, depth)
-        print(f"  (HAL using {n_sims} simulations at depth {depth})\n")
-        evaluate(f"3. HAL (White) vs Stockfish depth {depth}",
-                 hal_sf, sf_move, N_GAMES_STOCKFISH, no_adjudication=args.no_adjudication)
-        evaluate(f"4. Stockfish depth {depth} (White) vs HAL (Black)",
-                 sf_move, hal_sf, N_GAMES_STOCKFISH, no_adjudication=args.no_adjudication)
-
-    engine.quit()
-
-except FileNotFoundError:
-    print("Stockfish not found — skipping Tier 2.")
-    print("Install with: brew install stockfish\n")
-
-# --- Tier 3: vs previous checkpoint (optional) ---
-
-if args.prev:
-    print("── Tier 3: HAL vs Previous Checkpoint ────────────────────\n")
     try:
-        # (was N_SIMULATIONS — a name this file never defined; every --prev
-        # run died with a NameError the except below didn't catch)
-        hal_prev = ChessAgent(device, n_simulations=N_SIMS_PREV)
-        hal_prev.load(args.prev)
-        print(f"Previous checkpoint steps: {hal_prev.steps:,}\n")
+        engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
+        engine.configure({"Threads": 1, "Hash": 16})   # 1 thread, 16MB hash — prevent unified memory bloat
 
-        def hal_prev_move(board, history):
-            move_uci, _, _ = hal_prev.choose_move(board, history, greedy=True)
-            return move_uci
+        for depth in [1]:   # depth 3/5 re-enable when HAL reaches 20% W/D vs depth 1
+            n_sims = SIMS_BY_DEPTH.get(depth, 200)
+            hal_sf = hal_move_noisy_at(n_sims)   # noise breaks determinism; greedy selection preserved
+            sf_move = stockfish_move(engine, depth)
+            print(f"  (HAL using {n_sims} simulations at depth {depth})\n")
+            evaluate(f"3. HAL (White) vs Stockfish depth {depth}",
+                     hal_sf, sf_move, N_GAMES_STOCKFISH, no_adjudication=args.no_adjudication)
+            evaluate(f"4. Stockfish depth {depth} (White) vs HAL (Black)",
+                     sf_move, hal_sf, N_GAMES_STOCKFISH, no_adjudication=args.no_adjudication)
 
-        # hal_move (used elsewhere for the cheap vs-random tier) runs at
-        # whatever hal.n_simulations currently is -- N_SIMS_RANDOM (50),
-        # not N_SIMS_PREV (100). Using it here gave the current checkpoint
-        # half the search budget of the previous one in every --prev run
-        # (10 Sept 2026 assessment). hal_move_at() explicitly sets the
-        # budget per call, same pattern Tier 2 already uses correctly.
-        hal_move_prev_tier = hal_move_at(N_SIMS_PREV)
-
-        evaluate("5. HAL current (White) vs HAL previous (Black)",
-                 hal_move_prev_tier, hal_prev_move, N_GAMES_PREV,
-                 no_adjudication=args.no_adjudication)
-        evaluate("6. HAL previous (White) vs HAL current (Black)",
-                 hal_prev_move, hal_move_prev_tier, N_GAMES_PREV,
-                 no_adjudication=args.no_adjudication)
+        engine.quit()
 
     except FileNotFoundError:
-        print(f"Previous checkpoint not found: {args.prev}\n")
+        print("Stockfish not found — skipping Tier 2.")
+        print("Install with: brew install stockfish\n")
 
-print("=" * 60)
-print("Done.")
+    # --- Tier 3: vs previous checkpoint (optional) ---
+
+    if args.prev:
+        print("── Tier 3: HAL vs Previous Checkpoint ────────────────────\n")
+        try:
+            # (was N_SIMULATIONS — a name this file never defined; every --prev
+            # run died with a NameError the except below didn't catch)
+            hal_prev = ChessAgent(device, n_simulations=N_SIMS_PREV)
+            hal_prev.load(args.prev)
+            print(f"Previous checkpoint steps: {hal_prev.steps:,}\n")
+
+            def hal_prev_move(board, history):
+                move_uci, _, _ = hal_prev.choose_move(board, history, greedy=True)
+                return move_uci
+
+            # hal_move (used elsewhere for the cheap vs-random tier) runs at
+            # whatever hal.n_simulations currently is -- N_SIMS_RANDOM (50),
+            # not N_SIMS_PREV (100). Using it here gave the current checkpoint
+            # half the search budget of the previous one in every --prev run
+            # (10 Sept 2026 assessment). hal_move_at() explicitly sets the
+            # budget per call, same pattern Tier 2 already uses correctly.
+            hal_move_prev_tier = hal_move_at(N_SIMS_PREV)
+
+            evaluate("5. HAL current (White) vs HAL previous (Black)",
+                     hal_move_prev_tier, hal_prev_move, N_GAMES_PREV,
+                     no_adjudication=args.no_adjudication)
+            evaluate("6. HAL previous (White) vs HAL current (Black)",
+                     hal_prev_move, hal_move_prev_tier, N_GAMES_PREV,
+                     no_adjudication=args.no_adjudication)
+
+        except FileNotFoundError:
+            print(f"Previous checkpoint not found: {args.prev}\n")
+
+    print("=" * 60)
+    print("Done.")
+
+
+if __name__ == "__main__":
+    run_evaluation_suite()
