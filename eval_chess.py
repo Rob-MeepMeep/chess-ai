@@ -369,10 +369,18 @@ if args.prev:
             move_uci, _, _ = hal_prev.choose_move(board, history, greedy=True)
             return move_uci
 
+        # hal_move (used elsewhere for the cheap vs-random tier) runs at
+        # whatever hal.n_simulations currently is -- N_SIMS_RANDOM (50),
+        # not N_SIMS_PREV (100). Using it here gave the current checkpoint
+        # half the search budget of the previous one in every --prev run
+        # (10 Sept 2026 assessment). hal_move_at() explicitly sets the
+        # budget per call, same pattern Tier 2 already uses correctly.
+        hal_move_prev_tier = hal_move_at(N_SIMS_PREV)
+
         evaluate("5. HAL current (White) vs HAL previous (Black)",
-                 hal_move, hal_prev_move, N_GAMES_PREV)
+                 hal_move_prev_tier, hal_prev_move, N_GAMES_PREV)
         evaluate("6. HAL previous (White) vs HAL current (Black)",
-                 hal_prev_move, hal_move, N_GAMES_PREV)
+                 hal_prev_move, hal_move_prev_tier, N_GAMES_PREV)
 
     except FileNotFoundError:
         print(f"Previous checkpoint not found: {args.prev}\n")
