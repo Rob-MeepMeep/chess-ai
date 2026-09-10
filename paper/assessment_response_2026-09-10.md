@@ -78,19 +78,21 @@ same bug that the report itself didn't flag (noted below).
 None of these are implemented. This is the order we intend to tackle
 them in, and why.
 
-**1. Automated test suite, first.** Cheapest and highest-leverage of what's
-left: most of the verification work already happened informally this
-session (isolated reproductions for the replay buffer, MCTS priors, and
-the streak state machine; a live functional test for the API; a full
-random-vs-random run for the new eval end-reasons). Converting those into
-a checked-in `tests/` suite (plain `pytest`, no CI infrastructure planned
-yet — a single-developer project doesn't need much more than "run this
-before you trust a change") directly protects everything just fixed from
-silently regressing, which is a better first move than building new
-things on top of possibly-fragile ground. Planned coverage matches the
-report's list: perspective/mirroring (`encoder.py`), mate selection and
-promotion (`moves.py`, `mcts.py`), history reconstruction, adjudication
-(the streak logic), replay persistence, and evaluation fairness.
+**1. Automated test suite — done (`ff3dfc6`).** 42 tests across 7 files,
+covering the report's own list: perspective/mirroring, mate selection and
+promotion, history reconstruction, adjudication (the streak logic),
+replay persistence, and evaluation fairness. All call the real production
+code, not reimplementations of it — `train_chess.py` and `eval_chess.py`
+each needed a small prior refactor (wrapping runtime execution behind
+`if __name__ == "__main__"`) to become safely importable at all, since
+both previously started real work (a training loop; a live, Stockfish-
+dependent eval suite) at plain import time. One real bug surfaced writing
+this suite itself: a draft `/health` test asserted `checkpoint_loaded is
+False` by relying on this Mac's actual disk state (no checkpoint present)
+rather than testing the logic — would have silently broken on any machine
+that does have one. Rewritten to drive the state directly instead. No CI
+infrastructure yet — `pytest` from the repo root before trusting a change
+is the current bar for a single-developer project.
 
 **2. Tactical benchmark suite, second.** A small, fixed set of *hand-curated*
 positions — not sampled from self-play, deliberately, to avoid repeating
