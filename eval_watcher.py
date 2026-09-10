@@ -5,8 +5,9 @@ eval_watcher.py — Auto-trigger eval_chess.py every EVAL_INTERVAL games.
 Run in a second terminal alongside train_chess.py:
   venv/bin/python3 eval_watcher.py
 
-Watches logs/run12/games.csv and fires a full eval whenever a new
-EVAL_INTERVAL boundary is crossed. Eval output prints to this terminal.
+Watches <run_config.LOG_DIR>/games.csv (the active run, followed
+automatically) and fires a full eval whenever a new EVAL_INTERVAL
+boundary is crossed. Eval output prints to this terminal.
 Stops cleanly with Ctrl+C.
 """
 

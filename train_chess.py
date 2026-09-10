@@ -29,6 +29,7 @@ os.environ["HSA_ENABLE_DXG_DETECTION"] = "1"
 
 import csv
 import time
+from collections import deque
 import chess
 import torch
 
@@ -37,7 +38,7 @@ from chessai.encoder import encode
 from chessai.moves   import mirror_policy
 from chessai.logger  import Logger
 from chessai.replay  import ReplayBuffer, GameBuffer
-from run_config      import RUN_NAME, CKPT_PATH, BUFFER_PATH, LOG_DIR
+from run_config      import CKPT_PATH, BUFFER_PATH, LOG_DIR
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -279,7 +280,15 @@ def _finish_game(g: SelfPlayGame) -> tuple:
 # ---------------------------------------------------------------------------
 
 _t_run_start  = time.time()
-_game_times: list = []                   # per-game durations (overlapping wall time)
+# Timestamps of the last 20 game completions, not durations -- games run
+# concurrently in the lockstep pool (N_PARALLEL_GAMES at once), so
+# per-game "time.time() - g.t_start" durations overlap and don't sum to
+# a valid rate. Completion timestamps do: (count-1) completions happened
+# in (newest - oldest) wall-clock seconds, which is a real throughput
+# figure regardless of how many games were in flight at once. This
+# replaces a rolling list of durations that was tracked every game but
+# never actually read anywhere (10 Sept 2026 audit).
+_recent_completions: deque = deque(maxlen=20)
 _tally_w, _tally_b, _tally_d = 0, 0, 0   # W/B/D counts since last tally reset
 
 game_num      = start_game               # completed-game counter (log numbering)
@@ -430,9 +439,7 @@ try:
                 agent.save(CKPT_PATH.replace(".pt", f"_g{game_num:05d}.pt"))
 
             # --- Terminal progress ---
-            _game_times.append(time.time() - g.t_start)
-            if len(_game_times) > 20:
-                _game_times.pop(0)
+            _recent_completions.append(time.time())
 
             if winner == chess.WHITE:
                 _tally_w += 1
@@ -445,9 +452,19 @@ try:
                 w_str     = "W" if winner == chess.WHITE else "B" if winner == chess.BLACK else "D"
                 elapsed_h = (time.time() - _t_run_start) / 3600
                 done_n    = game_num - start_game
-                # Throughput, not per-game time — games overlap in the lockstep pool
+                # Throughput, not per-game time — games overlap in the lockstep pool.
+                # ETA uses the whole-run average (rate) since it's the more stable
+                # figure for a long-horizon projection; recent_rate is shown
+                # alongside as a more responsive "how fast right now" figure that
+                # would actually catch a mid-run slowdown (thermal throttling, GPU
+                # contention) the whole-run average dilutes away.
                 rate      = done_n / elapsed_h if elapsed_h > 0 else 0.0
                 eta_h     = (N_GAMES - game_num) / rate if rate > 0 else float("inf")
+                if len(_recent_completions) >= 2:
+                    span_h      = (_recent_completions[-1] - _recent_completions[0]) / 3600
+                    recent_rate = (len(_recent_completions) - 1) / span_h if span_h > 0 else 0.0
+                else:
+                    recent_rate = 0.0
                 tally_str = f"W{_tally_w}/B{_tally_b}/D{_tally_d}"
                 print(
                     f"Game {game_num:>5} | {w_str} | "
@@ -456,7 +473,7 @@ try:
                     f"[{tally_str}] | "
                     f"buffer: {len(replay):>6} | "
                     f"steps: {agent.steps:>6} | "
-                    f"{rate:.1f} games/h | "
+                    f"{rate:.1f} games/h (avg) | {recent_rate:.1f} games/h (recent) | "
                     f"elapsed: {elapsed_h:.1f}h | "
                     f"ETA: {eta_h:.1f}h"
                 )
