@@ -55,6 +55,12 @@ N_SIMS_PREV        = 100   # sims for the checkpoint-vs-checkpoint improvement t
 # Per-depth sim counts — higher depths warrant more search to have any chance
 SIMS_BY_DEPTH      = {1: 200, 3: 500, 5: 500}
 MAX_GAME_MOVES     = 200   # hard cap — 200 plies is enough; if HAL can't convert by then it's a policy problem
+# Used only with --no-adjudication: real games without the early-stop
+# streaks need more headroom to reach an actual conclusion. Still a
+# cap, not infinite -- reported as its own distinct "unresolved" bucket
+# (10 Sept 2026 assessment: "training and evaluation do not need
+# identical stopping rules").
+MAX_GAME_MOVES_NO_ADJUDICATION = 400
 STOCKFISH_PATH     = "stockfish"   # assumes stockfish is on PATH
 
 # Mirrors train_chess.py's intervention-ladder rung 1 (run15+): without this,
@@ -87,6 +93,11 @@ parser.add_argument("--regression-only", action="store_true",
                     help="Run value head regression test only — ~5s, safe during active training")
 parser.add_argument("--cpu", action="store_true",
                     help="Force CPU device — keeps MPS free when running alongside a training loop")
+parser.add_argument("--no-adjudication", action="store_true",
+                    help="Disable material-adjudication early stopping — play to real "
+                         "checkmate/draw or a much larger move cap instead. Slower, but "
+                         "gives a genuine (not adjudicated) conversion rate. Intended for "
+                         "the paper benchmark, not routine evals alongside training.")
 args, _ = parser.parse_known_args()
 
 # ---------------------------------------------------------------------------
@@ -209,11 +220,27 @@ def _material_balance(board: chess.Board) -> int:
     return score
 
 
-def play_game(white_fn, black_fn):
+def play_game(white_fn, black_fn, no_adjudication: bool = False):
     """
-    Play one game. Returns (result, move_list).
+    Play one game. Returns (result, end_reason, move_list).
+
     result is '1-0', '0-1', '1/2-1/2', or '*' (move cap hit with no
     resolution — a genuinely undecided position, not just an unforced mate).
+
+    end_reason is one of "checkmate", "rule_draw" (real legal termination —
+    stalemate, repetition, 50-move, insufficient material), "material_
+    adjudication"/"material_adjudication_moderate" (stopped early on a
+    sustained lead, mirroring train_chess.py's own rules), or "move_cap"
+    (hit the ply limit with nothing resolved). Distinguishing these matters:
+    an "adjudicated win" and an actual checkmate are not the same claim
+    (10 Sept 2026 assessment — "keep the existing metric as an explicitly
+    named material-adjudication score").
+
+    no_adjudication=True disables the material-adjudication early stop
+    entirely and raises the move cap to MAX_GAME_MOVES_NO_ADJUDICATION —
+    training and evaluation don't need identical stopping rules, and eval
+    can afford to play real games out instead of using training's
+    throughput-driven shortcut.
     """
     board                          = chess.Board()
     history                        = []
@@ -222,8 +249,9 @@ def play_game(white_fn, black_fn):
     material_streak_side           = None
     material_streak_moderate       = 0
     material_streak_moderate_side  = None
+    max_moves = MAX_GAME_MOVES_NO_ADJUDICATION if no_adjudication else MAX_GAME_MOVES
 
-    while not board.is_game_over() and len(move_list) < MAX_GAME_MOVES:
+    while not board.is_game_over() and len(move_list) < max_moves:
         if board.turn == chess.WHITE:
             move_uci = white_fn(board, history)
         else:
@@ -232,6 +260,9 @@ def play_game(white_fn, black_fn):
         history = ([board.copy()] + history)[:3]
         board.push_uci(move_uci)
         move_list.append(move_uci)
+
+        if no_adjudication:
+            continue   # real games only — never break early on a material streak
 
         # Mirrors train_chess.py's SelfPlayGame streak logic exactly,
         # including the same-side check -- magnitude alone doesn't mean
@@ -270,12 +301,18 @@ def play_game(white_fn, black_fn):
 
     if board.is_game_over():
         result = board.result()
-    elif material_streak >= MATERIAL_ADJUDICATE_STREAK or material_streak_moderate >= MATERIAL_ADJUDICATE_MODERATE_STREAK:
-        result = "1-0" if _material_balance(board) > 0 else "0-1"
+        end_reason = "checkmate" if result in ("1-0", "0-1") else "rule_draw"
+    elif material_streak >= MATERIAL_ADJUDICATE_STREAK:
+        result     = "1-0" if _material_balance(board) > 0 else "0-1"
+        end_reason = "material_adjudication"
+    elif material_streak_moderate >= MATERIAL_ADJUDICATE_MODERATE_STREAK:
+        result     = "1-0" if _material_balance(board) > 0 else "0-1"
+        end_reason = "material_adjudication_moderate"
     else:
-        result = "*"
+        result     = "*"
+        end_reason = "move_cap"
 
-    return result, move_list
+    return result, end_reason, move_list
 
 # ---------------------------------------------------------------------------
 # Eval game log — one row per game, written to <LOG_DIR>/eval_games.csv
@@ -283,22 +320,48 @@ def play_game(white_fn, black_fn):
 
 _EVAL_LOG_PATH = os.path.join(LOG_DIR, "eval_games.csv")
 _eval_game_num = 0   # sequential across the whole eval run
+_EVAL_LOG_HEADER = [
+    "eval_game", "matchup", "result", "end_reason", "n_moves",
+    "hal_steps", "timestamp", "moves",
+]
 
 def _init_eval_log() -> None:
     os.makedirs(os.path.dirname(_EVAL_LOG_PATH), exist_ok=True)
     if not os.path.exists(_EVAL_LOG_PATH):
         with open(_EVAL_LOG_PATH, "w", newline="") as f:
-            csv.writer(f).writerow([
-                "eval_game", "matchup", "result", "n_moves",
-                "hal_steps", "timestamp", "moves",
-            ])
+            csv.writer(f).writerow(_EVAL_LOG_HEADER)
+        return
 
-def _log_eval_game(matchup: str, result: str, move_list: list) -> None:
+    # Migrate an older-format file (no end_reason column) in place, rather
+    # than either breaking the column count for new rows or silently
+    # inventing history for old ones. Added 10 Sept 2026 so per-game end
+    # reason (real checkmate vs material adjudication vs an unresolved
+    # move-cap) is queryable directly instead of needing to replay every
+    # game's moves after the fact -- exactly what the independent Codex
+    # assessment had to do to produce this same breakdown.
+    with open(_EVAL_LOG_PATH, newline="") as f:
+        rows = list(csv.reader(f))
+    if rows and rows[0] == _EVAL_LOG_HEADER:
+        return   # already current format
+
+    print(f"  Migrating {_EVAL_LOG_PATH} to add end_reason "
+          f"(existing rows backfilled as 'unknown', not replayed)...")
+    old_header, old_rows = rows[0], rows[1:]
+    result_pos = old_header.index("result")
+    migrated = [row[:result_pos + 1] + ["unknown"] + row[result_pos + 1:]
+                for row in old_rows]
+
+    with open(_EVAL_LOG_PATH, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(_EVAL_LOG_HEADER)
+        w.writerows(migrated)
+
+def _log_eval_game(matchup: str, result: str, end_reason: str, move_list: list) -> None:
     global _eval_game_num
     _eval_game_num += 1
     with open(_EVAL_LOG_PATH, "a", newline="") as f:
         csv.writer(f).writerow([
-            _eval_game_num, matchup, result, len(move_list),
+            _eval_game_num, matchup, result, end_reason, len(move_list),
             hal.steps, time.strftime("%Y-%m-%d %H:%M:%S"),
             " ".join(move_list),
         ])
@@ -307,32 +370,60 @@ def _log_eval_game(matchup: str, result: str, move_list: list) -> None:
 # Evaluation runner
 # ---------------------------------------------------------------------------
 
-def evaluate(label: str, white_fn, black_fn, n: int) -> dict:
-    """Run n games, print results, return stats dict."""
+def evaluate(label: str, white_fn, black_fn, n: int, no_adjudication: bool = False) -> dict:
+    """
+    Run n games, print results, return stats dict.
+
+    Breaks wins and draws down by how the game actually ended — a real
+    checkmate and a material-adjudicated "win" are not the same claim,
+    and an unresolved move-cap is not the same as a genuine draw (10 Sept
+    2026 assessment: "keep the existing metric as an explicitly named
+    material-adjudication score"). See play_game()'s end_reason values.
+    """
     white_wins = black_wins = draws = 0
+    white_checkmates = white_adjudicated = 0
+    black_checkmates = black_adjudicated = 0
+    real_draws = unresolved = 0
 
     for i in range(n):
-        result, move_list = play_game(white_fn, black_fn)
-        _log_eval_game(label, result, move_list)
+        result, end_reason, move_list = play_game(white_fn, black_fn,
+                                                   no_adjudication=no_adjudication)
+        _log_eval_game(label, result, end_reason, move_list)
+
+        adjudicated = end_reason in ("material_adjudication", "material_adjudication_moderate")
 
         if result == "1-0":
             white_wins += 1
+            white_checkmates  += end_reason == "checkmate"
+            white_adjudicated += adjudicated
         elif result == "0-1":
             black_wins += 1
+            black_checkmates  += end_reason == "checkmate"
+            black_adjudicated += adjudicated
         else:
             draws += 1
+            real_draws += end_reason == "rule_draw"
+            unresolved += end_reason == "move_cap"
 
         # Progress dot every 10 games
         if (i + 1) % 10 == 0:
             print(f"  {i+1}/{n}...", end="\r")
 
     print(f"{label}")
-    print(f"  White wins: {white_wins:>4} ({white_wins/n*100:5.1f}%)")
-    print(f"  Black wins: {black_wins:>4} ({black_wins/n*100:5.1f}%)")
-    print(f"  Draws:      {draws:>4} ({draws/n*100:5.1f}%)")
+    print(f"  White wins: {white_wins:>4} ({white_wins/n*100:5.1f}%)"
+          f"  [checkmate: {white_checkmates}, adjudicated: {white_adjudicated}]")
+    print(f"  Black wins: {black_wins:>4} ({black_wins/n*100:5.1f}%)"
+          f"  [checkmate: {black_checkmates}, adjudicated: {black_adjudicated}]")
+    print(f"  Draws:      {draws:>4} ({draws/n*100:5.1f}%)"
+          f"  [real: {real_draws}, unresolved move-cap: {unresolved}]")
     print()
 
-    return {"white_wins": white_wins, "black_wins": black_wins, "draws": draws, "n": n}
+    return {
+        "white_wins": white_wins, "black_wins": black_wins, "draws": draws, "n": n,
+        "white_checkmates": white_checkmates, "white_adjudicated": white_adjudicated,
+        "black_checkmates": black_checkmates, "black_adjudicated": black_adjudicated,
+        "real_draws": real_draws, "unresolved": unresolved,
+    }
 
 # ---------------------------------------------------------------------------
 # Run all matchups
@@ -346,16 +437,23 @@ if args.regression_only:
 _init_eval_log()
 print("=" * 60)
 print(f"Eval games logged to: {_EVAL_LOG_PATH}\n")
+if args.no_adjudication:
+    print(f"--no-adjudication: playing to real checkmate/draw or a "
+          f"{MAX_GAME_MOVES_NO_ADJUDICATION}-move cap, not the material-"
+          f"adjudication shortcut. Slower; expect this to take a while.\n")
 
 # --- Tier 1: vs Random ---
 print("── Tier 1: HAL vs Random ──────────────────────────────────\n")
 r1 = evaluate("1. HAL (White) vs Random (Black)",
-              hal_move, random_move, N_GAMES_RANDOM)
+              hal_move, random_move, N_GAMES_RANDOM, no_adjudication=args.no_adjudication)
 r2 = evaluate("2. Random (White) vs HAL (Black)",
-              random_move, hal_move, N_GAMES_RANDOM)
+              random_move, hal_move, N_GAMES_RANDOM, no_adjudication=args.no_adjudication)
 
 hal_vs_random = (r1["white_wins"] + r2["black_wins"]) / (N_GAMES_RANDOM * 2) * 100
-print(f"Overall HAL win rate vs random: {hal_vs_random:.1f}%\n")
+hal_checkmates_vs_random = r1["white_checkmates"] + r2["black_checkmates"]
+print(f"Overall HAL win rate vs random (material-adjudication inclusive): "
+      f"{hal_vs_random:.1f}%")
+print(f"  Of which actual checkmates: {hal_checkmates_vs_random}/{N_GAMES_RANDOM * 2}\n")
 
 # --- Tier 2: vs Stockfish ---
 print("── Tier 2: HAL vs Stockfish ───────────────────────────────\n")
@@ -370,9 +468,9 @@ try:
         sf_move = stockfish_move(engine, depth)
         print(f"  (HAL using {n_sims} simulations at depth {depth})\n")
         evaluate(f"3. HAL (White) vs Stockfish depth {depth}",
-                 hal_sf, sf_move, N_GAMES_STOCKFISH)
+                 hal_sf, sf_move, N_GAMES_STOCKFISH, no_adjudication=args.no_adjudication)
         evaluate(f"4. Stockfish depth {depth} (White) vs HAL (Black)",
-                 sf_move, hal_sf, N_GAMES_STOCKFISH)
+                 sf_move, hal_sf, N_GAMES_STOCKFISH, no_adjudication=args.no_adjudication)
 
     engine.quit()
 
@@ -404,9 +502,11 @@ if args.prev:
         hal_move_prev_tier = hal_move_at(N_SIMS_PREV)
 
         evaluate("5. HAL current (White) vs HAL previous (Black)",
-                 hal_move_prev_tier, hal_prev_move, N_GAMES_PREV)
+                 hal_move_prev_tier, hal_prev_move, N_GAMES_PREV,
+                 no_adjudication=args.no_adjudication)
         evaluate("6. HAL previous (White) vs HAL current (Black)",
-                 hal_prev_move, hal_move_prev_tier, N_GAMES_PREV)
+                 hal_prev_move, hal_move_prev_tier, N_GAMES_PREV,
+                 no_adjudication=args.no_adjudication)
 
     except FileNotFoundError:
         print(f"Previous checkpoint not found: {args.prev}\n")

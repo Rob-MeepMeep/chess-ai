@@ -544,6 +544,8 @@ if "eval" in dfs:
     df["_outcome"] = df.apply(outcome_label, axis=1)
 
     matchups = sorted(df["matchup"].unique())
+    has_end_reason = "end_reason" in df.columns   # absent until eval_chess.py
+                                                   # re-runs and migrates the file
 
     summary_rows = []
     for matchup in matchups:
@@ -554,7 +556,7 @@ if "eval" in dfs:
         draws  = (sub["_outcome"] == "Draw").sum()
         caps   = (sub["_outcome"] == "Cap draw").sum()
         wd = (wins + draws + caps) / total * 100
-        summary_rows.append({
+        row = {
             "Matchup":      matchup,
             "Games":        total,
             "HAL wins":     wins,
@@ -562,7 +564,17 @@ if "eval" in dfs:
             "Formal draws": draws,
             "Cap draws":    caps,
             "W/D %":        f"{wd:.0f}%",
-        })
+        }
+        # A "win" via material adjudication and a real checkmate are not
+        # the same claim (10 Sept 2026 assessment) -- break it down where
+        # end_reason is available. "unknown" covers rows logged before
+        # this column existed (migrated in place, not replayed).
+        if has_end_reason:
+            win_rows = sub[sub["_outcome"] == "HAL win"]
+            row["  of which checkmate"]   = (win_rows["end_reason"] == "checkmate").sum()
+            row["  of which adjudicated"] = win_rows["end_reason"].isin(
+                ["material_adjudication", "material_adjudication_moderate"]).sum()
+        summary_rows.append(row)
 
     st.dataframe(pd.DataFrame(summary_rows), width="stretch", hide_index=True)
 
