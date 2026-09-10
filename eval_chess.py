@@ -4,8 +4,15 @@ eval_chess.py — Evaluate HAL-4000's chess performance.
 Three tiers of evaluation:
 
   1. HAL vs Random (both colours) — sanity check, should win 80%+
-  2. HAL vs Stockfish depth 1, 3, 5 — real benchmark against known-strength opponent
-     depth 1 ≈ 1000–1200 ELO, depth 3 ≈ 1500–1800, depth 5 ≈ 2000+
+  2. HAL vs Stockfish depth 1, 3, 5 — a fixed, repeatable opponent at a fixed
+     search depth. NOT a calibrated ELO benchmark -- Stockfish's own strength
+     at low fixed depths varies with hardware and version and doesn't map
+     cleanly to a rating figure (an earlier depth->ELO guess here was removed
+     10 Sept 2026, per an independent assessment: "no defensible Elo estimate
+     follows from these results... HAL's rating must come from an actual
+     calibrated competition protocol"). Useful as a consistent, comparable
+     opponent across checkpoints; not useful as a rating number. A real
+     rating requires actual rated games (see Phase 4 / Lichess bot plan).
   3. HAL vs previous checkpoint — measures improvement between training runs
      (skipped if only one checkpoint exists)
 

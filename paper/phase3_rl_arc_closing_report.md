@@ -20,6 +20,21 @@ reinforcement learning arc — not the end of the project.
 > readings, not confirmed capability**, unless independently
 > re-verified against a given run's actual checkpoint.
 
+> **Addendum, 10 September 2026:** §4's table and Annex B both claim
+> "0 wins, 0 draws... across the entire project" / "every checkpoint
+> measured in this project's history." That's an overclaim — this
+> report's own scope is runs 13-18 (see the title), and Annex B's table
+> only actually tabulates run14/15/17. `run_notes.md` documents real,
+> specific draws well before that window: Run 10, eval at game ~5960
+> (44,805 steps, 10 June 2026) records **HAL's first-ever draw as White
+> vs Stockfish depth 1** — game 59, 174 moves (`f2f3 e7e5 e2e4 g8e7 c2c4
+> e7c6 d2d3 f8b4`) — and the eval immediately before it (game ~5400)
+> recorded 3 draws total in one batch. Caught by an independent "Codex"
+> assessment (`assessment/project_assessment_2026-09-10.md`). The
+> "0 draws" claim is accurate for the runs this report actually measured
+> (14/15/17) and should be read as scoped to those, not as "no draw has
+> ever happened anywhere in this project."
+
 ---
 
 ## 1. Why this document exists
