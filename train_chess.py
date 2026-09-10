@@ -201,8 +201,11 @@ class SelfPlayGame:
         self.moves         = []
         self.search        = None        # in-progress SearchState, or None
         self.resign_streak = 0
+        self.resign_streak_side = None   # which side the streak currently favours (chess.WHITE/BLACK/None)
         self.material_streak = 0         # consecutive plies past move 60 with |material| >= strong threshold
+        self.material_streak_side = None
         self.material_streak_moderate = 0  # consecutive plies past move 60 with |material| in the moderate band
+        self.material_streak_moderate_side = None
         self.v             = 0.0         # search value after the latest move
         self.t_start       = time.time()
 
@@ -343,29 +346,56 @@ try:
             g.board.push_uci(move_uci)
 
             # Stage 2 resign: the search value is the sole resign signal.
-            # abs() — resign regardless of which side is hopeless.
-            if abs(v) > abs(RESIGN_THRESHOLD):
+            # abs() checks MAGNITUDE only — we want to resign regardless of
+            # which side is hopeless. But the STREAK must be the same side
+            # staying hopeless every ply, not two different sides each
+            # contributing a few qualifying plies that happen to add up to
+            # the threshold (10 Sept 2026 assessment: streaks tracked
+            # magnitude but never verified the favoured side stayed the
+            # same). A flip resets to a fresh streak of 1 for the new side,
+            # not to 0 — this ply still qualifies on its own.
+            resign_favoured = (g.board.turn if v > 0 else
+                               (chess.WHITE if g.board.turn == chess.BLACK else chess.BLACK))
+            if abs(v) > abs(RESIGN_THRESHOLD) and resign_favoured == g.resign_streak_side:
                 g.resign_streak += 1
+            elif abs(v) > abs(RESIGN_THRESHOLD):
+                g.resign_streak = 1
+                g.resign_streak_side = resign_favoured
             else:
                 g.resign_streak = 0
+                g.resign_streak_side = None
 
             # Rung 1 / 1b material adjudication streaks — see MATERIAL_ADJUDICATE_* above.
             # One balance computation shared by both tiers — the two bands are
             # disjoint by construction, so each streak resets on its own
-            # whenever the current ply's magnitude falls outside its band.
+            # whenever the current ply's magnitude falls outside its band —
+            # and now also whenever the favoured side flips, same reasoning
+            # as the resign streak above.
             past_min_move = len(g.moves) > MATERIAL_ADJUDICATE_MIN_MOVE
-            mat_abs       = abs(_material_balance(g.board))
+            mat           = _material_balance(g.board)
+            mat_abs       = abs(mat)
+            mat_favoured  = chess.WHITE if mat > 0 else chess.BLACK
 
-            if past_min_move and mat_abs >= MATERIAL_ADJUDICATE_THRESHOLD:
+            if (past_min_move and mat_abs >= MATERIAL_ADJUDICATE_THRESHOLD
+                    and mat_favoured == g.material_streak_side):
                 g.material_streak += 1
+            elif past_min_move and mat_abs >= MATERIAL_ADJUDICATE_THRESHOLD:
+                g.material_streak = 1
+                g.material_streak_side = mat_favoured
             else:
                 g.material_streak = 0
+                g.material_streak_side = None
 
-            if (past_min_move
-                    and MATERIAL_ADJUDICATE_MODERATE_LOW <= mat_abs < MATERIAL_ADJUDICATE_MODERATE_HIGH):
+            in_moderate_band = (past_min_move
+                                and MATERIAL_ADJUDICATE_MODERATE_LOW <= mat_abs < MATERIAL_ADJUDICATE_MODERATE_HIGH)
+            if in_moderate_band and mat_favoured == g.material_streak_moderate_side:
                 g.material_streak_moderate += 1
+            elif in_moderate_band:
+                g.material_streak_moderate = 1
+                g.material_streak_moderate_side = mat_favoured
             else:
                 g.material_streak_moderate = 0
+                g.material_streak_moderate_side = None
 
             if g.over:
                 finished.append(g)

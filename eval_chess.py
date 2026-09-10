@@ -208,11 +208,13 @@ def play_game(white_fn, black_fn):
     result is '1-0', '0-1', '1/2-1/2', or '*' (move cap hit with no
     resolution — a genuinely undecided position, not just an unforced mate).
     """
-    board                    = chess.Board()
-    history                  = []
-    move_list                = []
-    material_streak          = 0
-    material_streak_moderate = 0
+    board                          = chess.Board()
+    history                        = []
+    move_list                      = []
+    material_streak                = 0
+    material_streak_side           = None
+    material_streak_moderate       = 0
+    material_streak_moderate_side  = None
 
     while not board.is_game_over() and len(move_list) < MAX_GAME_MOVES:
         if board.turn == chess.WHITE:
@@ -224,19 +226,36 @@ def play_game(white_fn, black_fn):
         board.push_uci(move_uci)
         move_list.append(move_uci)
 
+        # Mirrors train_chess.py's SelfPlayGame streak logic exactly,
+        # including the same-side check -- magnitude alone doesn't mean
+        # one side has held the lead the whole streak; it could be two
+        # different sides each holding it for a few plies either side of
+        # a swing (10 Sept 2026 assessment, same bug duplicated here).
         past_min_move = len(move_list) > MATERIAL_ADJUDICATE_MIN_MOVE
-        mat_abs       = abs(_material_balance(board))
+        mat           = _material_balance(board)
+        mat_abs       = abs(mat)
+        mat_favoured  = chess.WHITE if mat > 0 else chess.BLACK
 
-        if past_min_move and mat_abs >= MATERIAL_ADJUDICATE_THRESHOLD:
+        if (past_min_move and mat_abs >= MATERIAL_ADJUDICATE_THRESHOLD
+                and mat_favoured == material_streak_side):
             material_streak += 1
+        elif past_min_move and mat_abs >= MATERIAL_ADJUDICATE_THRESHOLD:
+            material_streak = 1
+            material_streak_side = mat_favoured
         else:
             material_streak = 0
+            material_streak_side = None
 
-        if (past_min_move
-                and MATERIAL_ADJUDICATE_MODERATE_LOW <= mat_abs < MATERIAL_ADJUDICATE_MODERATE_HIGH):
+        in_moderate_band = (past_min_move
+                            and MATERIAL_ADJUDICATE_MODERATE_LOW <= mat_abs < MATERIAL_ADJUDICATE_MODERATE_HIGH)
+        if in_moderate_band and mat_favoured == material_streak_moderate_side:
             material_streak_moderate += 1
+        elif in_moderate_band:
+            material_streak_moderate = 1
+            material_streak_moderate_side = mat_favoured
         else:
             material_streak_moderate = 0
+            material_streak_moderate_side = None
 
         if (material_streak >= MATERIAL_ADJUDICATE_STREAK
                 or material_streak_moderate >= MATERIAL_ADJUDICATE_MODERATE_STREAK):
