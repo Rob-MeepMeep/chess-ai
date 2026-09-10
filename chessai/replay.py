@@ -133,11 +133,26 @@ class ReplayBuffer:
         return len(self._buffer) >= batch_size
 
     def save(self, path: str) -> None:
-        """Persist both partitions to disk (sparse policies — format 2)."""
+        """Persist both partitions to disk (sparse policies — format 2).
+
+        _buffer is physical ring-slot order, not chronological, once the
+        ring has wrapped (self._pos > 0) -- e.g. capacity 3 after inserting
+        1..5 physically holds [4, 5, 3], oldest-surviving entry (3) is NOT
+        at index 0. load() resets the cursor to 0 and assumes the saved
+        list IS oldest-to-newest (its own comment says so) -- true only
+        pre-wrap. Rotating here before writing makes that assumption
+        actually correct instead of merely documented, so load() needs no
+        changes: 10 Sept 2026 assessment caught this via a reproduced
+        capacity-3 case (see tests this fix was verified against).
+        """
+        rolling = self._buffer
+        if self._pos != 0:   # ring has wrapped; physical order != chronological
+            rolling = self._buffer[self._pos:] + self._buffer[:self._pos]
+
         tmp = path + ".tmp"
         torch.save({
             'format':    _SAVE_FORMAT,
-            'rolling':   self._buffer,
+            'rolling':   rolling,
             'permanent': self._permanent,
         }, tmp)
         os.replace(tmp, path)
