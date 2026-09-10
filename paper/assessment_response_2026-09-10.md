@@ -94,39 +94,33 @@ that does have one. Rewritten to drive the state directly instead. No CI
 infrastructure yet — `pytest` from the repo root before trusting a change
 is the current bar for a single-developer project.
 
-**2. Tactical benchmark suite, second.** A small, fixed set of *hand-curated*
-positions — not sampled from self-play, deliberately, to avoid repeating
-the same kind of sample-composition issue the assessment found in
-`material_probe`'s positions (drawn from run19's own games, so not a
-clean unseen test set). Covering: a hanging piece (is a free capture
-taken), mate-in-1 (find it), mate-in-1 defence (prevent it — the
-`Qxf7#` pattern the assessment found is exactly this category), and
-elementary K+Q/K+R vs K conversion.
+**2. Tactical benchmark suite — done (`4f8421d`).** 7 hand-authored
+positions (2 hanging_piece, 2 mate_in_1, 1 defend_mate_in_1, 2
+conversion), each reached by a real, legal move sequence from the game
+start — not an end-state FEN with no history, which would have recreated
+`material_probe`'s original defect regardless of what the position was
+testing. Checked directly against `curate_buffer.py`'s fixed
+`CANONICAL_POSITIONS` for overlap (none) rather than reusing its
+generators, since generated output already in the training buffer would
+measure fit to training data, not generalisation.
 
-Two corrections to that plan from a second review pass, both real gaps
-in what was written above, not just style notes:
+Every "correct answer" is verified programmatically, not asserted by
+hand — and that check earned its keep immediately: one hand-calculated
+hanging-piece line turned out to have the attacking side one ply away
+from actually being able to capture, and both original conversion
+candidates weren't clearly winning at all once actually checked with
+Stockfish. Ended up smaller than hoped — a genuine bare-kings K+Q/K+R vs
+K reduction via realistic play proved harder to hand-author reliably
+than expected, so the conversion category is honestly named "decisive
+material advantage reached through real play" rather than overclaiming
+literal K+Q/K+R vs K.
 
-- **Hand-curated still needs realistic history, or this recreates the
-  exact problem it's meant to avoid.** A hand-built FEN with no move
-  history behind it is precisely `material_probe`'s original defect —
-  encoder.py fills 48 of 55 input planes from history, and HAL has never
-  seen a position with real tactics paired with an empty history any more
-  than it saw a missing queen that way. Every benchmark position needs an
-  actual move sequence reaching it (played out, e.g., from a real or
-  synthetic game opening), not just an end-state FEN.
-- **Reusing `curate_buffer.py`'s canonical-position generators isn't
-  automatically an unseen test set.** Those exact positions (or the same
-  generator's output) are already in the training buffer's permanent
-  partition — evaluating on them would be measuring fit to training data,
-  not generalisation. If we reuse that infrastructure at all, it has to
-  generate a *disjoint* set (different squares, different generator seed,
-  explicitly diffed against what's actually in the current buffer), not
-  the same positions HAL trains on directly.
-
-We'll also validate the position set's own "correct answers" against
-Stockfish before trusting it as a benchmark — the `material_probe` lesson
-this whole assessment is built on is that an unvalidated test can be
-wrong in ways nobody notices for a long time.
+`run_tactical_benchmark.py` scores a checkpoint two ways, per the
+report's own suggestion: the raw policy prior (no search at all) and a
+fixed search budget, specifically to separate "the prior doesn't know"
+from "the search didn't look." A `tests/test_tactical_benchmark.py`
+guard (python-chess only, no engine) protects the JSON's own integrity
+against a future hand-edit or regeneration bug.
 
 **3. Paired LR experiment, third — after the benchmark exists.** The
 existing `lr_schedule_design.md` proposal needs revising before it's run,
