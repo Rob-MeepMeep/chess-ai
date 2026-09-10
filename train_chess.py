@@ -21,6 +21,10 @@ Once the buffer is large enough, run a batch of training steps.
 The resign check now reuses the search's own value estimate (the chosen
 child's Q) instead of a separate network call per move — a whole search is a
 strictly better estimate than one raw forward pass, and it's free.
+
+Runtime code lives in main(), guarded by if __name__ == "__main__" (10 Sept
+2026 test-suite work) so tests can import SelfPlayGame/_finish_game/
+_material_balance without kicking off an actual training run.
 """
 
 import os
@@ -112,69 +116,6 @@ CKPT_LOAD   = None
 BUFFER_LOAD = "checkpoints/run19_replay_buffer.pt"
 
 # ---------------------------------------------------------------------------
-# Device
-# ---------------------------------------------------------------------------
-
-if torch.cuda.is_available():       # NVIDIA CUDA or AMD ROCm (appears as "cuda" under ROCm)
-    device = torch.device("cuda")
-elif torch.backends.mps.is_available():
-    device = torch.device("mps")
-else:
-    device = torch.device("cpu")
-
-print(f"Device: {device}")
-
-# ---------------------------------------------------------------------------
-# Initialise or resume
-# ---------------------------------------------------------------------------
-
-os.makedirs("checkpoints", exist_ok=True)
-
-agent  = ChessAgent(device, n_simulations=N_SIMULATIONS)
-replay = ReplayBuffer(capacity=200_000)
-logger = Logger(log_dir=LOG_DIR, snapshot_interval=SNAPSHOT_EVERY)
-
-start_game = 0
-# Prefer the run's own checkpoint on resume; fall back to CKPT_LOAD for a fresh start.
-# Mirrors the buffer logic — CKPT_LOAD is only used when no own checkpoint exists yet.
-if os.path.exists(CKPT_PATH):
-    _ckpt_to_load = CKPT_PATH
-    if CKPT_LOAD and CKPT_LOAD != CKPT_PATH:
-        print(f"  Note: CKPT_LOAD ignored — own checkpoint found at {CKPT_PATH}")
-else:
-    _ckpt_to_load = CKPT_LOAD or CKPT_PATH
-if os.path.exists(_ckpt_to_load):
-    agent.load(_ckpt_to_load)
-    if _ckpt_to_load == CKPT_PATH:
-        openings_path = os.path.join(LOG_DIR, "openings.csv")
-        if os.path.exists(openings_path):
-            with open(openings_path) as f:
-                rows = list(csv.reader(f))
-            if len(rows) > 1:
-                start_game = int(rows[-1][0])
-    print(f"Loaded weights from {_ckpt_to_load} — starting at game {start_game + 1}")
-    print(f"  Trained steps so far: {agent.steps:,}")
-else:
-    print("Starting fresh training run.")
-
-# Prefer the run's own accumulated buffer on resume; fall back to seed buffer
-# for a fresh start. BUFFER_LOAD is only used when no accumulated buffer exists yet.
-if os.path.exists(BUFFER_PATH):
-    _buf_to_load = BUFFER_PATH
-    if BUFFER_LOAD and BUFFER_LOAD != BUFFER_PATH:
-        print(f"  Note: BUFFER_LOAD ignored — accumulated buffer found at {BUFFER_PATH}")
-else:
-    _buf_to_load = BUFFER_LOAD or BUFFER_PATH
-if os.path.exists(_buf_to_load):
-    replay.load(_buf_to_load)
-    perm_n = len(replay._permanent)
-    perm_str = f" + {perm_n:,} permanent" if perm_n else ""
-    print(f"  Replay buffer loaded: {len(replay):,} rolling{perm_str} ({_buf_to_load})")
-
-print(f"N_SIMULATIONS = {N_SIMULATIONS} | N_PARALLEL_GAMES = {N_PARALLEL_GAMES} "
-      f"| N_GAMES = {N_GAMES:,}\n")
-
-# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -218,13 +159,79 @@ class SelfPlayGame:
                 or self.material_streak_moderate >= MATERIAL_ADJUDICATE_MODERATE_STREAK
                 or len(self.moves) >= MAX_GAME_MOVES)
 
+    def update_streaks(self, v: float) -> None:
+        """
+        Call once per ply, after the move has been pushed to self.board.
+        Updates resign_streak, material_streak, and material_streak_moderate
+        (each paired with a _side field tracking which colour the streak
+        currently favours).
 
-def _finish_game(g: SelfPlayGame) -> tuple:
+        abs() checks MAGNITUDE only — we want to resign/adjudicate
+        regardless of which side is hopeless/ahead. But the STREAK must be
+        the same side staying hopeless/ahead every ply, not two different
+        sides each contributing a few qualifying plies that happen to add
+        up to the threshold (10 Sept 2026 assessment: streaks tracked
+        magnitude but never verified the favoured side stayed the same).
+        A flip resets to a fresh streak of 1 for the new side, not to 0 —
+        this ply still qualifies on its own.
+
+        v: the search value after the latest move, from the perspective of
+        the player now to move (self.board.turn after the push).
+        """
+        resign_favoured = (self.board.turn if v > 0 else
+                           (chess.WHITE if self.board.turn == chess.BLACK else chess.BLACK))
+        if abs(v) > abs(RESIGN_THRESHOLD) and resign_favoured == self.resign_streak_side:
+            self.resign_streak += 1
+        elif abs(v) > abs(RESIGN_THRESHOLD):
+            self.resign_streak = 1
+            self.resign_streak_side = resign_favoured
+        else:
+            self.resign_streak = 0
+            self.resign_streak_side = None
+
+        # Rung 1 / 1b material adjudication streaks — see MATERIAL_ADJUDICATE_*
+        # above. One balance computation shared by both tiers — the two
+        # bands are disjoint by construction, so each streak resets on its
+        # own whenever the current ply's magnitude falls outside its band —
+        # and also whenever the favoured side flips, same reasoning as the
+        # resign streak above.
+        past_min_move = len(self.moves) > MATERIAL_ADJUDICATE_MIN_MOVE
+        mat           = _material_balance(self.board)
+        mat_abs       = abs(mat)
+        mat_favoured  = chess.WHITE if mat > 0 else chess.BLACK
+
+        if (past_min_move and mat_abs >= MATERIAL_ADJUDICATE_THRESHOLD
+                and mat_favoured == self.material_streak_side):
+            self.material_streak += 1
+        elif past_min_move and mat_abs >= MATERIAL_ADJUDICATE_THRESHOLD:
+            self.material_streak = 1
+            self.material_streak_side = mat_favoured
+        else:
+            self.material_streak = 0
+            self.material_streak_side = None
+
+        in_moderate_band = (past_min_move
+                            and MATERIAL_ADJUDICATE_MODERATE_LOW <= mat_abs < MATERIAL_ADJUDICATE_MODERATE_HIGH)
+        if in_moderate_band and mat_favoured == self.material_streak_moderate_side:
+            self.material_streak_moderate += 1
+        elif in_moderate_band:
+            self.material_streak_moderate = 1
+            self.material_streak_moderate_side = mat_favoured
+        else:
+            self.material_streak_moderate = 0
+            self.material_streak_moderate_side = None
+
+
+def _finish_game(g: SelfPlayGame, replay: ReplayBuffer) -> tuple:
     """
     Determine winner and end reason, commit the game to the replay buffer.
     A real board result always outranks resignation: if checkmate landed on
     the same ply the resign streak filled, the board is the truth — the old
     order let the value head's opinion overwrite an actual mate.
+
+    replay is passed explicitly (not read off a module global) so this
+    function has no hidden dependency on main()'s local state and can be
+    tested in isolation with a throwaway ReplayBuffer.
     """
     outcome_scale = 1.0
 
@@ -275,228 +282,251 @@ def _finish_game(g: SelfPlayGame) -> tuple:
     return winner, end_reason
 
 
-# ---------------------------------------------------------------------------
-# Lockstep training loop
-# ---------------------------------------------------------------------------
+def main() -> None:
+    """Run one full training session: initialise/resume, then the lockstep loop."""
 
-_t_run_start  = time.time()
-# Timestamps of the last 20 game completions, not durations -- games run
-# concurrently in the lockstep pool (N_PARALLEL_GAMES at once), so
-# per-game "time.time() - g.t_start" durations overlap and don't sum to
-# a valid rate. Completion timestamps do: (count-1) completions happened
-# in (newest - oldest) wall-clock seconds, which is a real throughput
-# figure regardless of how many games were in flight at once. This
-# replaces a rolling list of durations that was tracked every game but
-# never actually read anywhere (10 Sept 2026 audit).
-_recent_completions: deque = deque(maxlen=20)
-_tally_w, _tally_b, _tally_d = 0, 0, 0   # W/B/D counts since last tally reset
+    # -----------------------------------------------------------------------
+    # Device
+    # -----------------------------------------------------------------------
 
-game_num      = start_game               # completed-game counter (log numbering)
-games_started = start_game
-active: list  = []
-loss          = 0.0
-policy_loss   = 0.0
-value_loss    = 0.0
-mcts          = agent.mcts
+    if torch.cuda.is_available():       # NVIDIA CUDA or AMD ROCm (appears as "cuda" under ROCm)
+        device = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
 
-try:
-    while game_num < N_GAMES:
+    print(f"Device: {device}")
 
-        # Keep the pool full while there are games left to schedule
-        while len(active) < N_PARALLEL_GAMES and games_started < N_GAMES:
-            active.append(SelfPlayGame())
-            games_started += 1
-        if not active:
-            break
+    # -----------------------------------------------------------------------
+    # Initialise or resume
+    # -----------------------------------------------------------------------
 
-        # --- 1. Every game needs a search in progress ---
-        for g in active:
-            if g.search is None:
-                g.search = mcts.begin_search(g.board, g.history,
-                                             N_SIMULATIONS, add_noise=True)
+    os.makedirs("checkpoints", exist_ok=True)
 
-        # --- 2. Pool every game's leaf wave into ONE network call ---
-        batches = [mcts.gather_leaves(g.search) for g in active]
-        tensors = [b for b in batches if b is not None]
-        if tensors:
-            logits, values = mcts.evaluate(torch.cat(tensors))
-        off = 0
-        for g, b in zip(active, batches):
-            if b is None:
-                mcts.apply_results(g.search, None, None)   # all-terminal wave: backup only
-            else:
-                n = b.shape[0]
-                mcts.apply_results(g.search, logits[off:off + n], values[off:off + n])
-                off += n
+    agent  = ChessAgent(device, n_simulations=N_SIMULATIONS)
+    replay = ReplayBuffer(capacity=200_000)
+    logger = Logger(log_dir=LOG_DIR, snapshot_interval=SNAPSHOT_EVERY)
 
-        # --- 3. Finished searches become moves; finished games get replaced ---
-        finished = []
-        for g in active:
-            if not g.search.done:
-                continue
+    start_game = 0
+    # Prefer the run's own checkpoint on resume; fall back to CKPT_LOAD for a fresh start.
+    # Mirrors the buffer logic — CKPT_LOAD is only used when no own checkpoint exists yet.
+    if os.path.exists(CKPT_PATH):
+        _ckpt_to_load = CKPT_PATH
+        if CKPT_LOAD and CKPT_LOAD != CKPT_PATH:
+            print(f"  Note: CKPT_LOAD ignored — own checkpoint found at {CKPT_PATH}")
+    else:
+        _ckpt_to_load = CKPT_LOAD or CKPT_PATH
+    if os.path.exists(_ckpt_to_load):
+        agent.load(_ckpt_to_load)
+        if _ckpt_to_load == CKPT_PATH:
+            openings_path = os.path.join(LOG_DIR, "openings.csv")
+            if os.path.exists(openings_path):
+                with open(openings_path) as f:
+                    rows = list(csv.reader(f))
+                if len(rows) > 1:
+                    start_game = int(rows[-1][0])
+        print(f"Loaded weights from {_ckpt_to_load} — starting at game {start_game + 1}")
+        print(f"  Trained steps so far: {agent.steps:,}")
+    else:
+        print("Starting fresh training run.")
 
-            # Encode current position BEFORE making the move
-            state = encode([g.board] + g.history)
+    # Prefer the run's own accumulated buffer on resume; fall back to seed buffer
+    # for a fresh start. BUFFER_LOAD is only used when no accumulated buffer exists yet.
+    if os.path.exists(BUFFER_PATH):
+        _buf_to_load = BUFFER_PATH
+        if BUFFER_LOAD and BUFFER_LOAD != BUFFER_PATH:
+            print(f"  Note: BUFFER_LOAD ignored — accumulated buffer found at {BUFFER_PATH}")
+    else:
+        _buf_to_load = BUFFER_LOAD or BUFFER_PATH
+    if os.path.exists(_buf_to_load):
+        replay.load(_buf_to_load)
+        perm_n = len(replay._permanent)
+        perm_str = f" + {perm_n:,} permanent" if perm_n else ""
+        print(f"  Replay buffer loaded: {len(replay):,} rolling{perm_str} ({_buf_to_load})")
 
-            policy = mcts.extract_policy(g.search)
-            move_uci, policy, v = agent.pick_move(g.board, policy, g.search.root,
-                                                  greedy=False)
-            g.search = None
-            g.v      = v
+    print(f"N_SIMULATIONS = {N_SIMULATIONS} | N_PARALLEL_GAMES = {N_PARALLEL_GAMES} "
+          f"| N_GAMES = {N_GAMES:,}\n")
 
-            # Policy targets are stored in the network's frame of reference —
-            # mirrored when it was black to move, matching the encoded state
-            stored_policy = mirror_policy(policy) if g.board.turn == chess.BLACK else policy
-            g.buf.push(state, stored_policy, g.board.turn)
-            g.moves.append(move_uci)
+    # -----------------------------------------------------------------------
+    # Lockstep training loop
+    # -----------------------------------------------------------------------
 
-            # Keep only the last 3 boards — encoder uses current + 3 history = 4 total
-            g.history = ([g.board.copy()] + g.history)[:3]
-            g.board.push_uci(move_uci)
+    _t_run_start  = time.time()
+    # Timestamps of the last 20 game completions, not durations -- games run
+    # concurrently in the lockstep pool (N_PARALLEL_GAMES at once), so
+    # per-game "time.time() - g.t_start" durations overlap and don't sum to
+    # a valid rate. Completion timestamps do: (count-1) completions happened
+    # in (newest - oldest) wall-clock seconds, which is a real throughput
+    # figure regardless of how many games were in flight at once. This
+    # replaces a rolling list of durations that was tracked every game but
+    # never actually read anywhere (10 Sept 2026 audit).
+    _recent_completions: deque = deque(maxlen=20)
+    _tally_w, _tally_b, _tally_d = 0, 0, 0   # W/B/D counts since last tally reset
 
-            # Stage 2 resign: the search value is the sole resign signal.
-            # abs() checks MAGNITUDE only — we want to resign regardless of
-            # which side is hopeless. But the STREAK must be the same side
-            # staying hopeless every ply, not two different sides each
-            # contributing a few qualifying plies that happen to add up to
-            # the threshold (10 Sept 2026 assessment: streaks tracked
-            # magnitude but never verified the favoured side stayed the
-            # same). A flip resets to a fresh streak of 1 for the new side,
-            # not to 0 — this ply still qualifies on its own.
-            resign_favoured = (g.board.turn if v > 0 else
-                               (chess.WHITE if g.board.turn == chess.BLACK else chess.BLACK))
-            if abs(v) > abs(RESIGN_THRESHOLD) and resign_favoured == g.resign_streak_side:
-                g.resign_streak += 1
-            elif abs(v) > abs(RESIGN_THRESHOLD):
-                g.resign_streak = 1
-                g.resign_streak_side = resign_favoured
-            else:
-                g.resign_streak = 0
-                g.resign_streak_side = None
+    game_num      = start_game               # completed-game counter (log numbering)
+    games_started = start_game
+    active: list  = []
+    loss          = 0.0
+    policy_loss   = 0.0
+    value_loss    = 0.0
+    mcts          = agent.mcts
 
-            # Rung 1 / 1b material adjudication streaks — see MATERIAL_ADJUDICATE_* above.
-            # One balance computation shared by both tiers — the two bands are
-            # disjoint by construction, so each streak resets on its own
-            # whenever the current ply's magnitude falls outside its band —
-            # and now also whenever the favoured side flips, same reasoning
-            # as the resign streak above.
-            past_min_move = len(g.moves) > MATERIAL_ADJUDICATE_MIN_MOVE
-            mat           = _material_balance(g.board)
-            mat_abs       = abs(mat)
-            mat_favoured  = chess.WHITE if mat > 0 else chess.BLACK
+    try:
+        while game_num < N_GAMES:
 
-            if (past_min_move and mat_abs >= MATERIAL_ADJUDICATE_THRESHOLD
-                    and mat_favoured == g.material_streak_side):
-                g.material_streak += 1
-            elif past_min_move and mat_abs >= MATERIAL_ADJUDICATE_THRESHOLD:
-                g.material_streak = 1
-                g.material_streak_side = mat_favoured
-            else:
-                g.material_streak = 0
-                g.material_streak_side = None
+            # Keep the pool full while there are games left to schedule
+            while len(active) < N_PARALLEL_GAMES and games_started < N_GAMES:
+                active.append(SelfPlayGame())
+                games_started += 1
+            if not active:
+                break
 
-            in_moderate_band = (past_min_move
-                                and MATERIAL_ADJUDICATE_MODERATE_LOW <= mat_abs < MATERIAL_ADJUDICATE_MODERATE_HIGH)
-            if in_moderate_band and mat_favoured == g.material_streak_moderate_side:
-                g.material_streak_moderate += 1
-            elif in_moderate_band:
-                g.material_streak_moderate = 1
-                g.material_streak_moderate_side = mat_favoured
-            else:
-                g.material_streak_moderate = 0
-                g.material_streak_moderate_side = None
+            # --- 1. Every game needs a search in progress ---
+            for g in active:
+                if g.search is None:
+                    g.search = mcts.begin_search(g.board, g.history,
+                                                 N_SIMULATIONS, add_noise=True)
 
-            if g.over:
-                finished.append(g)
-
-        # --- 4. Commit finished games: outcomes, training, logging, checkpoints ---
-        for g in finished:
-            active.remove(g)
-            game_num += 1
-            winner, end_reason = _finish_game(g)
-
-            if replay.ready(MIN_BUFFER):
-                for _ in range(TRAIN_STEPS):
-                    loss, policy_loss, value_loss = agent.train(replay.sample(BATCH_SIZE))
-
-            logger.record_game(game_num, winner, g.moves, loss, end_reason,
-                               steps=agent.steps,
-                               policy_loss=policy_loss, value_loss=value_loss)
-
-            if game_num % SNAPSHOT_EVERY == 0:
-                logger.record_snapshot(game_num, agent)
-            if game_num % REGRESSION_EVERY == 0:
-                logger.record_regression(game_num, agent)
-            if game_num % MATERIAL_PROBE_EVERY == 0:
-                logger.record_material_probe(game_num, agent)
-            if game_num % CHECKPOINT_EVERY == 0:
-                agent.save(CKPT_PATH)
-            if game_num % BUFFER_SAVE_EVERY == 0:
-                replay.save(BUFFER_PATH)
-                agent.save(CKPT_PATH)   # keep weights in sync with buffer
-            if game_num % MILESTONE_EVERY == 0:
-                # Immutable snapshot — never overwritten, ~290MB each
-                agent.save(CKPT_PATH.replace(".pt", f"_g{game_num:05d}.pt"))
-
-            # --- Terminal progress ---
-            _recent_completions.append(time.time())
-
-            if winner == chess.WHITE:
-                _tally_w += 1
-            elif winner == chess.BLACK:
-                _tally_b += 1
-            else:
-                _tally_d += 1
-
-            if game_num % PRINT_EVERY == 0 or game_num <= 5:
-                w_str     = "W" if winner == chess.WHITE else "B" if winner == chess.BLACK else "D"
-                elapsed_h = (time.time() - _t_run_start) / 3600
-                done_n    = game_num - start_game
-                # Throughput, not per-game time — games overlap in the lockstep pool.
-                # ETA uses the whole-run average (rate) since it's the more stable
-                # figure for a long-horizon projection; recent_rate is shown
-                # alongside as a more responsive "how fast right now" figure that
-                # would actually catch a mid-run slowdown (thermal throttling, GPU
-                # contention) the whole-run average dilutes away.
-                rate      = done_n / elapsed_h if elapsed_h > 0 else 0.0
-                eta_h     = (N_GAMES - game_num) / rate if rate > 0 else float("inf")
-                if len(_recent_completions) >= 2:
-                    span_h      = (_recent_completions[-1] - _recent_completions[0]) / 3600
-                    recent_rate = (len(_recent_completions) - 1) / span_h if span_h > 0 else 0.0
+            # --- 2. Pool every game's leaf wave into ONE network call ---
+            batches = [mcts.gather_leaves(g.search) for g in active]
+            tensors = [b for b in batches if b is not None]
+            if tensors:
+                logits, values = mcts.evaluate(torch.cat(tensors))
+            off = 0
+            for g, b in zip(active, batches):
+                if b is None:
+                    mcts.apply_results(g.search, None, None)   # all-terminal wave: backup only
                 else:
-                    recent_rate = 0.0
-                tally_str = f"W{_tally_w}/B{_tally_b}/D{_tally_d}"
-                print(
-                    f"Game {game_num:>5} | {w_str} | "
-                    f"moves: {len(g.moves):>3} | "
-                    f"loss: {loss:.4f} | "
-                    f"[{tally_str}] | "
-                    f"buffer: {len(replay):>6} | "
-                    f"steps: {agent.steps:>6} | "
-                    f"{rate:.1f} games/h (avg) | {recent_rate:.1f} games/h (recent) | "
-                    f"elapsed: {elapsed_h:.1f}h | "
-                    f"ETA: {eta_h:.1f}h"
-                )
+                    n = b.shape[0]
+                    mcts.apply_results(g.search, logits[off:off + n], values[off:off + n])
+                    off += n
 
-            # Reset tally every 50 games so it stays readable
-            if game_num % 50 == 0:
-                _tally_w, _tally_b, _tally_d = 0, 0, 0
+            # --- 3. Finished searches become moves; finished games get replaced ---
+            finished = []
+            for g in active:
+                if not g.search.done:
+                    continue
+
+                # Encode current position BEFORE making the move
+                state = encode([g.board] + g.history)
+
+                policy = mcts.extract_policy(g.search)
+                move_uci, policy, v = agent.pick_move(g.board, policy, g.search.root,
+                                                      greedy=False)
+                g.search = None
+                g.v      = v
+
+                # Policy targets are stored in the network's frame of reference —
+                # mirrored when it was black to move, matching the encoded state
+                stored_policy = mirror_policy(policy) if g.board.turn == chess.BLACK else policy
+                g.buf.push(state, stored_policy, g.board.turn)
+                g.moves.append(move_uci)
+
+                # Keep only the last 3 boards — encoder uses current + 3 history = 4 total
+                g.history = ([g.board.copy()] + g.history)[:3]
+                g.board.push_uci(move_uci)
+
+                # Stage 2 resign + Rung 1/1b material adjudication streaks —
+                # see SelfPlayGame.update_streaks() for the logic, and
+                # MATERIAL_ADJUDICATE_* above for the thresholds.
+                g.update_streaks(v)
+
+                if g.over:
+                    finished.append(g)
+
+            # --- 4. Commit finished games: outcomes, training, logging, checkpoints ---
+            for g in finished:
+                active.remove(g)
+                game_num += 1
+                winner, end_reason = _finish_game(g, replay)
+
+                if replay.ready(MIN_BUFFER):
+                    for _ in range(TRAIN_STEPS):
+                        loss, policy_loss, value_loss = agent.train(replay.sample(BATCH_SIZE))
+
+                logger.record_game(game_num, winner, g.moves, loss, end_reason,
+                                   steps=agent.steps,
+                                   policy_loss=policy_loss, value_loss=value_loss)
+
+                if game_num % SNAPSHOT_EVERY == 0:
+                    logger.record_snapshot(game_num, agent)
+                if game_num % REGRESSION_EVERY == 0:
+                    logger.record_regression(game_num, agent)
+                if game_num % MATERIAL_PROBE_EVERY == 0:
+                    logger.record_material_probe(game_num, agent)
+                if game_num % CHECKPOINT_EVERY == 0:
+                    agent.save(CKPT_PATH)
+                if game_num % BUFFER_SAVE_EVERY == 0:
+                    replay.save(BUFFER_PATH)
+                    agent.save(CKPT_PATH)   # keep weights in sync with buffer
+                if game_num % MILESTONE_EVERY == 0:
+                    # Immutable snapshot — never overwritten, ~290MB each
+                    agent.save(CKPT_PATH.replace(".pt", f"_g{game_num:05d}.pt"))
+
+                # --- Terminal progress ---
+                _recent_completions.append(time.time())
+
+                if winner == chess.WHITE:
+                    _tally_w += 1
+                elif winner == chess.BLACK:
+                    _tally_b += 1
+                else:
+                    _tally_d += 1
+
+                if game_num % PRINT_EVERY == 0 or game_num <= 5:
+                    w_str     = "W" if winner == chess.WHITE else "B" if winner == chess.BLACK else "D"
+                    elapsed_h = (time.time() - _t_run_start) / 3600
+                    done_n    = game_num - start_game
+                    # Throughput, not per-game time — games overlap in the lockstep pool.
+                    # ETA uses the whole-run average (rate) since it's the more stable
+                    # figure for a long-horizon projection; recent_rate is shown
+                    # alongside as a more responsive "how fast right now" figure that
+                    # would actually catch a mid-run slowdown (thermal throttling, GPU
+                    # contention) the whole-run average dilutes away.
+                    rate      = done_n / elapsed_h if elapsed_h > 0 else 0.0
+                    eta_h     = (N_GAMES - game_num) / rate if rate > 0 else float("inf")
+                    if len(_recent_completions) >= 2:
+                        span_h      = (_recent_completions[-1] - _recent_completions[0]) / 3600
+                        recent_rate = (len(_recent_completions) - 1) / span_h if span_h > 0 else 0.0
+                    else:
+                        recent_rate = 0.0
+                    tally_str = f"W{_tally_w}/B{_tally_b}/D{_tally_d}"
+                    print(
+                        f"Game {game_num:>5} | {w_str} | "
+                        f"moves: {len(g.moves):>3} | "
+                        f"loss: {loss:.4f} | "
+                        f"[{tally_str}] | "
+                        f"buffer: {len(replay):>6} | "
+                        f"steps: {agent.steps:>6} | "
+                        f"{rate:.1f} games/h (avg) | {recent_rate:.1f} games/h (recent) | "
+                        f"elapsed: {elapsed_h:.1f}h | "
+                        f"ETA: {eta_h:.1f}h"
+                    )
+
+                # Reset tally every 50 games so it stays readable
+                if game_num % 50 == 0:
+                    _tally_w, _tally_b, _tally_d = 0, 0, 0
 
 
-except KeyboardInterrupt:
-    print(f"\n{'='*60}")
-    print(f"Interrupted at game {game_num} — saving checkpoint and buffer...")
-    agent.save(CKPT_PATH)
-    replay.save(BUFFER_PATH)
-    print(f"  Checkpoint: {CKPT_PATH}")
-    print(f"  Buffer:     {BUFFER_PATH}  ({len(replay):,} rolling + {len(replay._permanent):,} permanent)")
-    print(f"  Resume will start at game {game_num + 1}")
-    print(f"{'='*60}")
+    except KeyboardInterrupt:
+        print(f"\n{'='*60}")
+        print(f"Interrupted at game {game_num} — saving checkpoint and buffer...")
+        agent.save(CKPT_PATH)
+        replay.save(BUFFER_PATH)
+        print(f"  Checkpoint: {CKPT_PATH}")
+        print(f"  Buffer:     {BUFFER_PATH}  ({len(replay):,} rolling + {len(replay._permanent):,} permanent)")
+        print(f"  Resume will start at game {game_num + 1}")
+        print(f"{'='*60}")
 
-else:
-    # Natural completion — no interrupt
-    agent.save(CKPT_PATH)
-    replay.save(BUFFER_PATH)
-    print(f"\nTraining complete — {game_num:,} games, {agent.steps:,} training steps.")
-    print(f"Checkpoint: {CKPT_PATH}")
-    print(f"Logs:       {LOG_DIR}/")
+    else:
+        # Natural completion — no interrupt
+        agent.save(CKPT_PATH)
+        replay.save(BUFFER_PATH)
+        print(f"\nTraining complete — {game_num:,} games, {agent.steps:,} training steps.")
+        print(f"Checkpoint: {CKPT_PATH}")
+        print(f"Logs:       {LOG_DIR}/")
+
+
+if __name__ == "__main__":
+    main()
