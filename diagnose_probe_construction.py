@@ -28,6 +28,27 @@ constructs its test positions, not a training failure.
 RESULT (3 Sept, run19 game ~1190): confirmed. missing_bishop/knight/
 two_pawns all read near zero (or wrong-signed) on the old synthetic FENs
 but clearly, correctly negative on real positions at the same magnitude.
+
+CORRECTION (10 Sept 2026, independent Codex assessment): missing_bishop
+and missing_knight below are NOT two independent findings. PROBE_MAGNITUDE
+maps both to the same |material|=3, and sample_real_positions() buckets
+purely by signed material magnitude, not by which piece is actually
+missing -- so both rows' "real" column reads off the identical pooled
+bucket (any |mat|=3 position: down a minor piece, or three pawns with no
+compensation, or any other combination summing to 3). This script never
+separately measured "the network handles a missing knight" -- only that
+the general |mat|=3 magnitude reads correctly, which is consistent with
+either bishop or knight (or neither) working specifically. The later
+fix (generate_material_probe_positions.py's exact-piece-count-difference
+filter) is what actually distinguishes them, and it's what revealed
+missing_knight staying flat while missing_bishop recovered (see
+run20's material_probe.csv from game ~1800 on) -- a real, separate
+result this script's pooled-bucket design could never have shown either
+way. Left as originally written below, not rewritten, since the
+pooled-bucket result was still a correct and useful finding about
+magnitude 3 in general; it just isn't the bishop-specific and
+knight-specific evidence it reads like at a glance.
+
 chessai/logger.py's MATERIAL_PROBE_POSITIONS has since been replaced with
 real move-sequences (see generate_material_probe_positions.py), so it no
 longer holds the old FEN dict this script originally imported — the seven
@@ -76,7 +97,12 @@ _PIECE_VALUES = {chess.PAWN: 1, chess.KNIGHT: 3, chess.BISHOP: 3,
                  chess.ROOK: 5, chess.QUEEN: 9}
 
 # which material magnitude each synthetic probe category corresponds to,
-# for lining the two methods up side by side
+# for lining the two methods up side by side. NOTE: missing_bishop and
+# missing_knight share the same magnitude (3) on purpose -- but that also
+# means their "real" column below comes from the same pooled |mat|=3
+# bucket in sample_real_positions(), not separately-sampled bishop-only
+# vs knight-only positions. See the module docstring's 10 Sept 2026
+# correction.
 PROBE_MAGNITUDE = {
     "missing_queen": 9, "missing_rook": 5, "missing_bishop": 3,
     "missing_knight": 3, "missing_two_pawns": 2,

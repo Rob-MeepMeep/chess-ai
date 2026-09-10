@@ -59,7 +59,11 @@ MAX_GAME_MOVES     = 200   # hard cap — 200 plies is enough; if HAL can't conv
 # streaks need more headroom to reach an actual conclusion. Still a
 # cap, not infinite -- reported as its own distinct "unresolved" bucket
 # (10 Sept 2026 assessment: "training and evaluation do not need
-# identical stopping rules").
+# identical stopping rules"). 400 PLIES (200 full moves) -- move_list
+# counts one entry per ply, like MAX_GAME_MOVES above; naming this
+# "moves" when it counts plies is this project's existing convention
+# (train_chess.py's MAX_GAME_MOVES does the same), not something to
+# perpetuate in prose describing it.
 MAX_GAME_MOVES_NO_ADJUDICATION = 400
 STOCKFISH_PATH     = "stockfish"   # assumes stockfish is on PATH
 
@@ -95,9 +99,10 @@ parser.add_argument("--cpu", action="store_true",
                     help="Force CPU device — keeps MPS free when running alongside a training loop")
 parser.add_argument("--no-adjudication", action="store_true",
                     help="Disable material-adjudication early stopping — play to real "
-                         "checkmate/draw or a much larger move cap instead. Slower, but "
-                         "gives a genuine (not adjudicated) conversion rate. Intended for "
-                         "the paper benchmark, not routine evals alongside training.")
+                         f"checkmate/draw or a {MAX_GAME_MOVES_NO_ADJUDICATION}-ply "
+                         f"({MAX_GAME_MOVES_NO_ADJUDICATION // 2} full moves) cap instead. "
+                         "Slower, but gives a genuine (not adjudicated) conversion rate. "
+                         "Intended for the paper benchmark, not routine evals alongside training.")
 args, _ = parser.parse_known_args()
 
 # ---------------------------------------------------------------------------
@@ -224,7 +229,7 @@ def play_game(white_fn, black_fn, no_adjudication: bool = False):
     """
     Play one game. Returns (result, end_reason, move_list).
 
-    result is '1-0', '0-1', '1/2-1/2', or '*' (move cap hit with no
+    result is '1-0', '0-1', '1/2-1/2', or '*' (ply cap hit with no
     resolution — a genuinely undecided position, not just an unforced mate).
 
     end_reason is one of "checkmate", "rule_draw" (real legal termination —
@@ -237,7 +242,7 @@ def play_game(white_fn, black_fn, no_adjudication: bool = False):
     named material-adjudication score").
 
     no_adjudication=True disables the material-adjudication early stop
-    entirely and raises the move cap to MAX_GAME_MOVES_NO_ADJUDICATION —
+    entirely and raises the ply cap to MAX_GAME_MOVES_NO_ADJUDICATION —
     training and evaluation don't need identical stopping rules, and eval
     can afford to play real games out instead of using training's
     throughput-driven shortcut.
@@ -336,7 +341,7 @@ def _init_eval_log() -> None:
     # than either breaking the column count for new rows or silently
     # inventing history for old ones. Added 10 Sept 2026 so per-game end
     # reason (real checkmate vs material adjudication vs an unresolved
-    # move-cap) is queryable directly instead of needing to replay every
+    # ply-cap) is queryable directly instead of needing to replay every
     # game's moves after the fact -- exactly what the independent Codex
     # assessment had to do to produce this same breakdown.
     with open(_EVAL_LOG_PATH, newline="") as f:
@@ -351,10 +356,18 @@ def _init_eval_log() -> None:
     migrated = [row[:result_pos + 1] + ["unknown"] + row[result_pos + 1:]
                 for row in old_rows]
 
-    with open(_EVAL_LOG_PATH, "w", newline="") as f:
+    # Write to a temp file and replace atomically -- opening the original
+    # log directly for writing would truncate it immediately, so an
+    # interruption partway through (kill, crash, disk full) could destroy
+    # historical eval data instead of just failing the migration. Same
+    # pattern chessai/replay.py's save() already uses (10 Sept 2026
+    # assessment).
+    tmp_path = _EVAL_LOG_PATH + ".tmp"
+    with open(tmp_path, "w", newline="") as f:
         w = csv.writer(f)
         w.writerow(_EVAL_LOG_HEADER)
         w.writerows(migrated)
+    os.replace(tmp_path, _EVAL_LOG_PATH)
 
 def _log_eval_game(matchup: str, result: str, end_reason: str, move_list: list) -> None:
     global _eval_game_num
@@ -376,7 +389,7 @@ def evaluate(label: str, white_fn, black_fn, n: int, no_adjudication: bool = Fal
 
     Breaks wins and draws down by how the game actually ended — a real
     checkmate and a material-adjudicated "win" are not the same claim,
-    and an unresolved move-cap is not the same as a genuine draw (10 Sept
+    and an unresolved ply-cap is not the same as a genuine draw (10 Sept
     2026 assessment: "keep the existing metric as an explicitly named
     material-adjudication score"). See play_game()'s end_reason values.
     """
@@ -415,7 +428,7 @@ def evaluate(label: str, white_fn, black_fn, n: int, no_adjudication: bool = Fal
     print(f"  Black wins: {black_wins:>4} ({black_wins/n*100:5.1f}%)"
           f"  [checkmate: {black_checkmates}, adjudicated: {black_adjudicated}]")
     print(f"  Draws:      {draws:>4} ({draws/n*100:5.1f}%)"
-          f"  [real: {real_draws}, unresolved move-cap: {unresolved}]")
+          f"  [real: {real_draws}, unresolved ply-cap: {unresolved}]")
     print()
 
     return {
@@ -439,8 +452,9 @@ print("=" * 60)
 print(f"Eval games logged to: {_EVAL_LOG_PATH}\n")
 if args.no_adjudication:
     print(f"--no-adjudication: playing to real checkmate/draw or a "
-          f"{MAX_GAME_MOVES_NO_ADJUDICATION}-move cap, not the material-"
-          f"adjudication shortcut. Slower; expect this to take a while.\n")
+          f"{MAX_GAME_MOVES_NO_ADJUDICATION}-ply "
+          f"({MAX_GAME_MOVES_NO_ADJUDICATION // 2} full moves) cap, not the "
+          f"material-adjudication shortcut. Slower; expect this to take a while.\n")
 
 # --- Tier 1: vs Random ---
 print("── Tier 1: HAL vs Random ──────────────────────────────────\n")

@@ -106,11 +106,18 @@ def get_move(request: MoveRequest):
         # request.fen is documented as "used as a sanity check" but was
         # never actually checked against anything -- a desync between the
         # client's tracked position and its move list would silently make
-        # HAL move on the wrong board (10 Sept 2026 assessment). epd()
-        # ignores halfmove/fullmove counters, comparing only what actually
-        # defines "the same position" (pieces, turn, castling, en passant).
+        # HAL move on the wrong board (10 Sept 2026 assessment). epd() alone
+        # ignores the halfmove clock too, but that's a real network input
+        # (encoder.py plane 53, the fifty-move counter) — a client desync
+        # there wouldn't just be cosmetic, it'd change what HAL actually
+        # sees, so it's checked explicitly rather than folded into epd().
+        # fullmove number is the only field genuinely safe to ignore (not
+        # an input anywhere). The replayed board is authoritative for all
+        # of this once request.moves is trusted — this check exists to
+        # catch a client-side desync, not because we use request.fen's
+        # own counters for anything.
         expected = chess.Board(request.fen)
-        if board.epd() != expected.epd():
+        if board.epd() != expected.epd() or board.halfmove_clock != expected.halfmove_clock:
             raise ValueError(
                 f"fen does not match replayed moves — client thinks the "
                 f"position is {request.fen!r}, but replaying moves gives "

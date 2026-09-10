@@ -7,19 +7,39 @@
 **Status:** Changelog and forward plan, addressed to the assessment team.
 Covers every fix made in direct response to `assessment/
 project_assessment_2026-09-10.md`, plus how we intend to tackle the
-larger design-level recommendations that aren't done yet.
+larger design-level recommendations that aren't done yet. Revised once
+after a second review pass on this document itself (five implementation
+notes plus a framing correction, all folded in below rather than
+appended as a separate addendum, since this hadn't gone out yet).
 
 ---
 
 ## 1. Summary
 
-The assessment was right about all of it, including two mistakes in our
-own work done *during* this project's remediation of an earlier finding
-(the `material_probe` correction) — a pooled-bucket comparison that
-looked like independent evidence for bishop and knight but wasn't, and a
-mischaracterisation of `snapshots.csv` as raw network confidence when
-it's actually MCTS visit shares. Both are acknowledged below rather than
-argued with.
+The report's implementation findings held up under direct reproduction —
+every specific bug we could isolate and test (the buffer eviction order,
+the MCTS prior sum, the end-reason key mismatch, the sim-budget
+asymmetry) reproduced exactly as described and stayed fixed under
+verification. That's a different, narrower claim than "the assessment
+was right about all of it," which overstates it: the report's broader
+behavioural interpretations — *why* HAL plays the way it does, what a
+given number implies about capability — are plausible reads of the
+evidence, not verified facts, and this document shouldn't inherit more
+confidence in them than that. Where we've treated something as settled
+below, it's because we independently reproduced it ourselves, not because
+the report asserted it.
+
+This also caught two mistakes in our own work done *during* this
+project's remediation of an earlier finding (the `material_probe`
+correction) — a pooled-bucket comparison that looked like independent
+evidence for bishop and knight but wasn't, and a mischaracterisation of
+`snapshots.csv` as raw network confidence when it's actually MCTS visit
+shares. Both are acknowledged below rather than argued with.
+
+As the assessment itself put it: this materially improves the project's
+experimental foundation. It doesn't yet show HAL plays better — it makes
+the next comparison much more capable of actually answering that
+question.
 
 Every specific, reproducible finding in the report's implementation
 table is fixed, verified, and pushed. The larger design-level
@@ -45,7 +65,7 @@ same bug that the report itself didn't flag (noted below).
 | `/move` never validated its own documented "sanity check" FEN against the replayed board; no rejection of terminal positions; `n_simulations` unbounded; `/health` always reported "ok" regardless of whether the checkpoint loaded | FEN now compared via `epd()`; terminal positions and out-of-range `n_simulations` (1–1000) rejected; `/health` reports `checkpoint_loaded` and a `degraded` status when it's false. Live-tested all five cases (no `httpx` in this venv, so tested by calling the route functions directly). | `b10148c` |
 | Requested audit of `train_chess.py`/`eval_watcher.py` for dead code and stale docs | `eval_watcher.py`'s docstring still named `run12` though the code has followed `run_config.LOG_DIR` dynamically for a while. `train_chess.py` imported `RUN_NAME` and never used it (removed), and tracked a rolling window of per-game durations (`_game_times`) that was written every game and never read — replaced with a deque of completion *timestamps* and a real "recent games/h" figure in the progress line, since durations don't sum to a valid rate when 16 games run concurrently in the lockstep pool. | `e13084c` |
 | Uncalibrated Stockfish-depth→ELO mapping in `eval_chess.py`'s docstring; closing report's "0 draws... across the entire project" overclaimed beyond what it actually measured | ELO mapping replaced with an explicit note that fixed-depth Stockfish is a repeatable opponent, not a rating instrument. Added a dated addendum to `phase3_rl_arc_closing_report.md` citing the real, earlier draws (`run_notes.md`, Run 10, game 59) the "entire project" wording missed. | `ecf9094` |
-| Headline win-rate metric conflated real chess outcomes with material-adjudicated ones; no way to play evaluation out to genuine conclusion | `play_game()` now returns an explicit `end_reason`; `evaluate()` reports checkmate vs adjudicated wins and real vs unresolved-move-cap draws separately, not one blended number. New `--no-adjudication` flag plays real games to actual conclusion or a 400-move cap instead of training's throughput-driven shortcut. `eval_games.csv` gets an `end_reason` column via an in-place migration (old rows backfilled `"unknown"`, not guessed) rather than breaking the column count for a file that already has rows in every prior run. `dashboard.py` updated to match. | `72c263a` |
+| Headline win-rate metric conflated real chess outcomes with material-adjudicated ones; no way to play evaluation out to genuine conclusion | `play_game()` now returns an explicit `end_reason`; `evaluate()` reports checkmate vs adjudicated wins and real vs unresolved-move-cap draws separately, not one blended number. New `--no-adjudication` flag plays real games to actual conclusion or a 400-ply (200-move) cap instead of training's throughput-driven shortcut. `eval_games.csv` gets an `end_reason` column via an in-place migration (old rows backfilled `"unknown"`, not guessed) rather than breaking the column count for a file that already has rows in every prior run. `dashboard.py` updated to match. | `72c263a` |
 
 ### Where we scoped differently than the letter of a recommendation
 
@@ -79,16 +99,32 @@ the same kind of sample-composition issue the assessment found in
 clean unseen test set). Covering: a hanging piece (is a free capture
 taken), mate-in-1 (find it), mate-in-1 defence (prevent it — the
 `Qxf7#` pattern the assessment found is exactly this category), and
-elementary K+Q/K+R vs K conversion (reusing `curate_buffer.py`'s existing
-canonical-position generators as a starting point, since that
-infrastructure already exists and is trusted). Each position scored
-against both the raw policy prior alone and a fixed search budget, per
-the report's own suggestion, specifically to separate "the prior doesn't
-know" from "the search didn't look." We'll validate the position set's
-own "correct answers" against Stockfish before trusting it as a
-benchmark — the `material_probe` lesson this whole assessment is built
-on is that an unvalidated test can be wrong in ways nobody notices for a
-long time.
+elementary K+Q/K+R vs K conversion.
+
+Two corrections to that plan from a second review pass, both real gaps
+in what was written above, not just style notes:
+
+- **Hand-curated still needs realistic history, or this recreates the
+  exact problem it's meant to avoid.** A hand-built FEN with no move
+  history behind it is precisely `material_probe`'s original defect —
+  encoder.py fills 48 of 55 input planes from history, and HAL has never
+  seen a position with real tactics paired with an empty history any more
+  than it saw a missing queen that way. Every benchmark position needs an
+  actual move sequence reaching it (played out, e.g., from a real or
+  synthetic game opening), not just an end-state FEN.
+- **Reusing `curate_buffer.py`'s canonical-position generators isn't
+  automatically an unseen test set.** Those exact positions (or the same
+  generator's output) are already in the training buffer's permanent
+  partition — evaluating on them would be measuring fit to training data,
+  not generalisation. If we reuse that infrastructure at all, it has to
+  generate a *disjoint* set (different squares, different generator seed,
+  explicitly diffed against what's actually in the current buffer), not
+  the same positions HAL trains on directly.
+
+We'll also validate the position set's own "correct answers" against
+Stockfish before trusting it as a benchmark — the `material_probe` lesson
+this whole assessment is built on is that an unvalidated test can be
+wrong in ways nobody notices for a long time.
 
 **3. Paired LR experiment, third — after the benchmark exists.** The
 existing `lr_schedule_design.md` proposal needs revising before it's run,
