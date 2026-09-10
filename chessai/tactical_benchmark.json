@@ -1,0 +1,110 @@
+[
+  {
+    "name": "undefended_knight_on_e4",
+    "category": "hanging_piece",
+    "moves": [
+      "e2e4",
+      "e7e5",
+      "g1f3",
+      "f8c5",
+      "f1c4",
+      "g8f6",
+      "d2d3",
+      "f6e4"
+    ],
+    "correct_moves": [
+      "d3e4"
+    ]
+  },
+  {
+    "name": "undefended_bishop_on_f5",
+    "category": "hanging_piece",
+    "moves": [
+      "d2d4",
+      "d7d5",
+      "c1f4",
+      "c8f5",
+      "b1c3",
+      "g8f6",
+      "d1d3",
+      "a7a6"
+    ],
+    "correct_moves": [
+      "d3f5"
+    ]
+  },
+  {
+    "name": "fools_mate",
+    "category": "mate_in_1",
+    "moves": [
+      "g2g4",
+      "e7e5",
+      "f2f3"
+    ],
+    "correct_moves": [
+      "d8h4"
+    ]
+  },
+  {
+    "name": "fools_mate_reversed",
+    "category": "mate_in_1",
+    "moves": [
+      "e2e4",
+      "g7g5",
+      "c2c3",
+      "f7f6"
+    ],
+    "correct_moves": [
+      "d1h5"
+    ]
+  },
+  {
+    "name": "scholars_mate_threat",
+    "category": "defend_mate_in_1",
+    "moves": [
+      "e2e4",
+      "e7e5",
+      "d1h5",
+      "b8c6",
+      "f1c4"
+    ],
+    "correct_moves": [
+      "g8h6",
+      "e8e7",
+      "d8e7",
+      "d8f6",
+      "d8g5",
+      "d8h4",
+      "g7g6",
+      "d7d5"
+    ]
+  },
+  {
+    "name": "queen_won_for_a_pawn",
+    "category": "conversion",
+    "moves": [
+      "e2e4",
+      "e7e5",
+      "d1h5",
+      "b8c6",
+      "h5e5",
+      "c6e5",
+      "b1c3"
+    ],
+    "reference_cp": 601
+  },
+  {
+    "name": "knight_won_for_a_pawn",
+    "category": "conversion",
+    "moves": [
+      "e2e4",
+      "e7e5",
+      "g1f3",
+      "d7d6",
+      "f3e5",
+      "d6e5",
+      "d2d4"
+    ],
+    "reference_cp": 387
+  }
+]
