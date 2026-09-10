@@ -60,7 +60,7 @@ import json
 import chess
 import chess.engine
 
-ENGINE_PATH = "/opt/homebrew/bin/stockfish"
+ENGINE_PATH = "stockfish"   # assumes stockfish is on PATH -- same convention as eval_chess.py
 OUTPUT_PATH = "chessai/tactical_benchmark.json"
 VALIDATE_DEPTH = 16
 

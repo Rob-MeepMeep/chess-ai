@@ -37,7 +37,7 @@ from chessai.moves import move_to_index, get_mirror_indices_np
 from run_config import CKPT_PATH
 
 BENCHMARK_PATH = "chessai/tactical_benchmark.json"
-ENGINE_PATH    = "/opt/homebrew/bin/stockfish"
+ENGINE_PATH    = "stockfish"   # assumes stockfish is on PATH -- same convention as eval_chess.py
 CONVERSION_DEPTH = 14
 CONVERSION_STILL_WINNING_CP = 100   # generous margin -- this checks "didn't
                                     # throw the win away", not "played the
