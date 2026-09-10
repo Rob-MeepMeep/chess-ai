@@ -28,6 +28,25 @@ from chessai.moves import move_to_index
 
 SNAPSHOT_SIMS = 100   # simulations per canonical position — lightweight, for logging only
 
+# Maps every end_reason string train_chess.py's _finish_game() actually
+# produces to the window/end_reasons.csv bucket it counts toward. Explicit
+# on purpose, not name-matching (`key = end_reason.replace(...); if key in
+# window`) -- that approach silently dropped every material_adjudication/
+# material_adjudication_moderate game from end_reasons.csv's totals for
+# the entire project (64% of run20's games, confirmed against games.csv,
+# 10 Sept 2026 assessment). The CSV column stays named "material_resigns"
+# for continuity with already-logged runs; it counts both adjudication
+# tiers together, not a "material_resign" outcome that no longer exists
+# in train_chess.py (if it ever did).
+_END_REASON_TO_WINDOW_KEY = {
+    "checkmate":                      "checkmate",
+    "material_adjudication":          "material_adjudication",
+    "material_adjudication_moderate": "material_adjudication",
+    "value_resign":                   "value_resign",
+    "cap_draw":                       "cap_draw",
+    "rule_draw":                      "rule_draw",
+}
+
 CANONICAL_POSITIONS = {
     "start":         "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
     "after_e4":      "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
@@ -154,8 +173,9 @@ class Logger:
         winner      : chess.WHITE, chess.BLACK, or None for draw
         moves       : list of UCI strings played in the game
         loss        : training loss for this game's batch (0.0 if no training step yet)
-        end_reason  : one of "checkmate", "material_resign", "value_resign",
-                      "cap_draw", "rule_draw"
+        end_reason  : one of "checkmate", "material_adjudication",
+                      "material_adjudication_moderate", "value_resign",
+                      "cap_draw", "rule_draw" -- see _END_REASON_TO_WINDOW_KEY
         steps       : agent.steps at game completion — enables elapsed-time accounting
         policy_loss, value_loss : loss's two components (0.0 if no training
                       step yet) — accumulated into loss_breakdown.csv,
@@ -183,9 +203,13 @@ class Logger:
             self._window["draws"] += 1
 
         # Track game-end distribution
-        key = end_reason.replace("-", "_")
-        if key in self._window:
+        key = _END_REASON_TO_WINDOW_KEY.get(end_reason)
+        if key:
             self._window[key] += 1
+        else:
+            print(f"  Warning: unrecognised end_reason '{end_reason}' at game "
+                  f"{game_num} -- not counted in end_reasons.csv. Add it to "
+                  f"_END_REASON_TO_WINDOW_KEY in chessai/logger.py.")
 
         self._window["losses"].append(loss)
         self._window["policy_losses"].append(policy_loss)
@@ -309,8 +333,10 @@ class Logger:
             "white_wins": 0, "black_wins": 0, "draws": 0,
             "losses": [], "lengths": [],
             "policy_losses": [], "value_losses": [],
-            # Keys match end_reason strings from train_chess.py exactly
-            "checkmate": 0, "material_resign": 0,
+            # Bucket names, not raw end_reason strings -- see
+            # _END_REASON_TO_WINDOW_KEY for the mapping from what
+            # train_chess.py actually produces to these keys.
+            "checkmate": 0, "material_adjudication": 0,
             "value_resign": 0, "cap_draw": 0, "rule_draw": 0,
             "steps": 0,
         }
@@ -342,7 +368,7 @@ class Logger:
         ])
         self._append(self._end_reason_path, [
             game_num,
-            w["checkmate"], w["material_resign"], w["value_resign"],
+            w["checkmate"], w["material_adjudication"], w["value_resign"],
             w["cap_draw"], w["rule_draw"],
         ])
 

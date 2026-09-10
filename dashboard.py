@@ -186,11 +186,17 @@ if "games" in dfs:
             labels={"_bin": "Game", "count": "Games", "end_reason": "Reason"},
             height=320,
             color_discrete_map={
-                "checkmate":       "#50c050",
-                "material_resign": "#f0c040",
-                "value_resign":    "#e09000",
-                "cap_draw":        "#6060c0",
-                "rule_draw":       "#aaaaaa",
+                # Keys are games.csv's actual end_reason strings (see
+                # train_chess.py's _finish_game) -- "material_resign" was
+                # never a real value here, it silently matched nothing
+                # (10 Sept 2026 assessment; see chessai/logger.py's
+                # _END_REASON_TO_WINDOW_KEY for the same bug's other spot).
+                "checkmate":                      "#50c050",
+                "material_adjudication":          "#f0c040",
+                "material_adjudication_moderate": "#f0a060",
+                "value_resign":                   "#e09000",
+                "cap_draw":                       "#6060c0",
+                "rule_draw":                      "#aaaaaa",
             },
         )
         fig3.update_layout(margin=dict(t=40, b=20))
