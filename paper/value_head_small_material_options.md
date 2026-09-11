@@ -442,23 +442,34 @@ desktop.
 
 **Full games (137,636 opportunities across both logs' games):**
 
-| Piece value | n | took it | take rate |
+| Piece | n | took it | take rate |
 |---|---|---|---|
 | queen (9) | 4,709 | 3,640 | 77.3% |
 | rook (5) | 12,990 | 6,323 | 48.7% |
-| bishop (3) | 33,091 | 13,949 | 42.2% |
+| bishop (3) | 16,915 | 7,483 | 44.2% |
+| knight (3) | 16,176 | 6,466 | 40.0% |
 | pawn (1) | 86,846 | 17,473 | 20.1% |
 
 **Restricted to the greedy phase only (ply ≥ 31, past `TEMP_MOVES=30`
 where self-play switches from stochastic sampling + Dirichlet noise to
 plain argmax — the same selection mode the benchmark itself measures):**
 
-| Piece value | n | took it | take rate |
+| Piece | n | took it | take rate |
 |---|---|---|---|
 | queen (9) | 3,589 | 2,930 | 81.6% |
 | rook (5) | 9,620 | 5,331 | 55.4% |
-| bishop (3) | 21,509 | 10,313 | 47.9% |
+| bishop (3) | 10,947 | 5,526 | 50.5% |
+| knight (3) | 10,562 | 4,787 | 45.3% |
 | pawn (1) | 56,180 | 12,639 | 22.5% |
+
+(Correction, 12 Sept 2026: the first version of this table reported a
+single "bishop" row at each value=3 level. Knight and bishop share the
+same material value and `mine_real_hanging_pieces.py` originally grouped
+by value alone, silently merging the two under whichever piece name
+happened to be picked first — not wrong in overall shape, but mislabeled.
+Fixed to group by piece type; the two split out close to each other as
+shown above, bishop consistently a few points higher than knight in both
+cuts.)
 
 Two things worth noting immediately: the magnitude-ordered pattern
 (queen > rook > bishop, pawn excluded — see below) holds in real games
@@ -519,3 +530,53 @@ reliably correct, not that it's wrong in one consistent direction), but
 strong enough to treat "HAL leaves real material on the board in real
 games at a materially significant rate" as established rather than
 speculative going into any decision about Option 2.
+
+## 11. run21 overnight check (330 games, ~1,650 steps, 12 Sept 2026)
+
+run21 (warm-started from run20, per §4/§6) ran overnight: 330 games,
+steps 0 → ~1,650 (run20 finished at 18,725, so this is under 10% more
+training on top of that). Only the logged CSVs were pulled, not the
+checkpoint itself (`checkpoints/` stays local, same as every prior run)
+— so this is a game-log-only check, not a check against run21's actual
+trained weights.
+
+**Standard training metrics look healthy, nothing alarming:** `avg_loss`
+flat around 1.70-1.71, policy/value loss both flat, white/black win
+balance roughly even (~45-55% split each interval), average game length
+73-80 plies, end reasons dominated by material adjudication as usual.
+`material_probe` readings (missing_queen ≈ -0.60, missing_rook ≈ -0.47,
+missing_bishop ≈ -0.08, missing_knight ≈ +0.02, missing_two_pawns ≈
+-0.35) are flat across all 16 readings in this window — no meaningful
+movement either direction, which is expected this early and isn't a red
+flag on its own.
+
+**`mine_real_hanging_pieces.py` on run21's own 330 games (no checkpoint
+needed, just the move log) closely tracks the run19+run20 baseline:**
+
+| Piece | run19+run20 (137,636 opps) | run21, 330 games (9,601 opps) |
+|---|---|---|
+| queen | 77.3% | 75.8% |
+| rook | 48.7% | 51.0% |
+| bishop | 44.2% | 46.2% |
+| knight | 40.0% | 41.0% |
+| pawn | 20.1% | 22.0% |
+
+Every row is within a couple of points of the baseline — no sign of
+either improvement or further drift yet. That's the expected result, not
+a null finding worth alarm: run21 has no training intervention in it
+(Option 2 is still on hold), so there was never a reason to expect ~330
+games / ~1,650 steps to move a pattern that was stable across run19 and
+run20's much larger combined sample. This overnight run is functioning
+correctly as the "short, measured baseline" it was scoped to be — it
+just hasn't run long enough yet to be informative one way or the other
+on the search-misranking question specifically.
+
+**What would make this check more informative:** a checkpoint-based
+comparison (running `run_tactical_benchmark.py` and the step 1-3
+diagnostics against run21's actual trained weights, not just its game
+log) would need `checkpoints/run21_hal_chess.pt` transferred over as
+well. Given how little the logged metrics have moved, that's probably
+not worth doing yet at this step count — better to let it accumulate
+substantially more training first, or use the next check-in to decide
+whether it's time to revisit Option 2 instead of waiting longer on
+unmodified self-play.

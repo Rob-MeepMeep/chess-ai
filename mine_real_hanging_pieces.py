@@ -128,14 +128,18 @@ def main():
 
     print(f"\n{len(all_opps)} total opportunities across all games.\n")
 
-    by_value: dict = {}
+    # Grouped by piece, not by value -- knight and bishop share value=3, and
+    # grouping by value alone silently merged them under whichever piece name
+    # happened to appear first, hiding that they're tactically distinct
+    # pieces with (it turns out) noticeably different take rates.
+    by_piece: dict = {}
     for opp in all_opps:
-        by_value.setdefault(opp["value"], []).append(opp)
+        by_piece.setdefault(opp["piece"], []).append(opp)
 
     print(f"{'value':>6} {'piece':>8} {'n':>6} {'took it':>9} {'missed':>8} {'take rate':>10}")
-    for value in sorted(by_value, reverse=True):
-        group = by_value[value]
-        piece_name = group[0]["piece"]
+    for piece_name in sorted(by_piece, key=lambda p: -by_piece[p][0]["value"]):
+        group = by_piece[piece_name]
+        value = group[0]["value"]
         n = len(group)
         took = sum(o["took_it"] for o in group)
         print(f"{value:>6} {piece_name:>8} {n:>6} {took:>9} {n - took:>8} {100*took/n:>9.1f}%")
