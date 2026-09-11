@@ -217,17 +217,17 @@ plausible contributing factors — inaccurate leaf values, exploration/prior
 effects, search depth, batching — is actually driving the backwards `Q`
 ranking. A deliberately small, four-step plan:
 
-1. **Inspect the two policy-correct/search-wrong cases in detail.**
-   `undefended_knight_on_e4` and `undefended_knight_on_d5_black_captures`.
-   Record visits, priors, immediate post-move network values, and
-   representative continuations for both the correct move and search's
-   chosen move. Compare values from the same player's perspective
-   throughout.
-2. **Run a controlled search comparison.** Try serial search
-   (`batch_sims=1`) against the current batching, keeping weights and
-   simulation budget fixed. Tests whether batching materially changes the
-   result — if the misranking persists identically under serial search,
-   batching is not the explanation.
+1. **Inspect the two policy-correct/search-wrong cases in detail.** ✅ done
+   — see §7. `undefended_knight_on_e4` and
+   `undefended_knight_on_d5_black_captures`. Record visits, priors,
+   immediate post-move network values, and representative continuations
+   for both the correct move and search's chosen move. Compare values
+   from the same player's perspective throughout.
+2. **Run a controlled search comparison.** ✅ done — see §7. Try serial
+   search (`batch_sims=1`) against the current batching, keeping weights
+   and simulation budget fixed. Tests whether batching materially changes
+   the result — if the misranking persists identically under serial
+   search, batching is not the explanation.
 3. **Check network values against Stockfish on the actual sampled leaves.**
    Rather than only comparing root `Q`, evaluate the specific leaf
    positions search's tree actually visited against Stockfish. This is
@@ -246,3 +246,75 @@ ranking. A deliberately small, four-step plan:
 
 This investigation is scoped to run before deciding on Option 2, not
 before starting a short, explicitly measured run21 baseline (§4).
+
+## 7. Results: steps 1 and 2 (run20, 18,725 steps, desktop, 600 sims)
+
+**Step 2 (batched vs serial) — batching is not the explanation.** All 5
+hanging-piece positions were run through search with `batch_sims=32`
+(current default) and `batch_sims=1` (fully serial), same weights, same
+600-simulation budget:
+
+| Position | Correct | Batched (32) | Serial (1) |
+|---|---|---|---|
+| `undefended_knight_on_e4` | `d3e4` | fail: `c4e6` (Q=-0.138) | fail: `c4e6` (Q=-0.152) |
+| `undefended_bishop_on_f5` | `d3f5` | fail: `h2h4` (Q=+0.023) | fail: `h2h4` (Q=-0.113) |
+| `undefended_knight_on_d5_black_captures` | `f6d5` | fail: `e7e6` (Q=+0.426) | fail: `b8a6` (Q=+0.338) |
+| `undefended_queen_on_a5` | `b6a5` | pass (Q=+0.866) | pass (Q=+0.867) |
+| `undefended_pawn_on_e5` | `d6e5` | fail: `g7g5` (Q=+0.391) | fail: `f7f5` (Q=+0.396) |
+
+Pass/fail is identical between batched and serial search on all 5
+positions — serial search reproduces every failure. That rules out
+in-tree batching (and the virtual-loss approximation it relies on) as
+the explanation for these specific misrankings. Worth noting: on 2 of
+the 3 failing positions, the *specific* wrong move chosen differs between
+batched and serial (`e7e6` vs `b8a6`; `g7g5` vs `f7f5`) — so batching
+does have some influence on which losing move search settles on, just
+not on whether the position is misjudged at all.
+
+**Step 1 (shallow value vs Stockfish, no search) — points at the value
+head, not just search dynamics.** For the two policy-correct/search-wrong
+positions, the raw network value one ply deeper — no search, just the
+value head's own read of the position immediately after each candidate
+move, flipped to the mover's perspective so it's directly comparable to
+root `Q` — was checked against the correct and chosen moves:
+
+| Position | Move | Search Q (600 sims) | 1-ply value, no search |
+|---|---|---|---|
+| `undefended_knight_on_e4` | `d3e4` (correct, +400cp per Stockfish) | -0.490 | **-0.595** |
+| `undefended_knight_on_e4` | `c4e6` (chosen, -297cp per Stockfish) | -0.138 | **+0.795** |
+| `undefended_knight_on_d5_black_captures` | `f6d5` (correct) | +0.136 | +0.605 |
+| `undefended_knight_on_d5_black_captures` | `e7e6` (chosen) | +0.426 | +0.701 |
+
+For `undefended_knight_on_e4`, the misranking is already fully present at
+one ply with zero search: the network's own value head rates the move
+Stockfish scores at +400cp as *bad* for White (-0.595) and the move
+Stockfish scores at -297cp as *very good* for White (+0.795) — a
+complete reversal, before search has contributed anything. Search's
+600-sim `Q` for `c4e6` (-0.138) is notably less extreme than this raw
+1-ply read (+0.795), meaning search partially self-corrected the initial
+overestimate as it explored continuations — but not enough to overtake
+`d3e4`'s Q, and not enough sims were spent to see whether more search
+would keep correcting it further.
+
+For `undefended_knight_on_d5_black_captures`, the effect is present but
+much smaller: both moves get a favourable-looking 1-ply value, and the
+correct move (`f6d5`, winning a whole knight) reads *lower* than the
+declined capture (`e7e6`) by about 0.1 — the wrong direction, but a much
+smaller gap than the `e4` case's near-1.4 swing.
+
+**Reading across both steps together:** the evidence now more directly
+implicates the value head itself, at least for `undefended_knight_on_e4`
+— the reversal is visible in the network's own one-ply evaluation with no
+search involved at all, and persists under both batched and serial
+search. This doesn't yet establish *why* the value head reads this
+particular post-capture position so wrongly (representation gap, a
+training-data gap on ...Bxe6-type positions, something else), and the
+`d5` case shows the same direction of error but far more mildly, so this
+still isn't confirmed as a clean, general pattern across positions —
+consistent with the paper's standing caution against generalising past
+n=2. Step 3 (Stockfish against the actual deeper leaves search explored,
+not just this one-ply read) is the natural next check: it would show
+whether the miscalibration is confined to the immediate post-move
+position or persists through the specific continuations search built
+underneath it (e.g. the `c4e6 f7e6 ...` line search favoured 105/232
+times for the wrong move).
