@@ -46,6 +46,27 @@ script — no Stockfish required. (run18 originally baked the blend into
 the relabelling script itself, which meant every alpha test needed a full
 ~1h Stockfish re-run; fixed 28 August.)
 
+HANGING-PIECE CONTINUATION POSITIONS (search-misranking investigation,
+Option 2, 12 Sept 2026): same idea, second independent raw file. Steps
+1-4 of paper/value_head_small_material_options.md found the value head's
+own read of positions immediately after a hanging-piece capture is
+frequently wrong — not whether to capture, the read of the resulting
+position — and confirmed it at scale in real self-play (Sec 9-10), not
+just the hand-authored benchmark. relabel_hanging_piece_continuations.py
+targets exactly that (knight/bishop only — see its own docstring for
+why), producing both good (after capturing) and bad (after actually
+declining) continuations. Loaded from HANGING_PIECE_RAW_PATH and blended
+at its own HANGING_PIECE_ALPHA, independently of STOCKFISH_ALPHA above,
+same reasoning: retune without re-running Stockfish.
+
+NOT YET WIRED for a specific run: GAMES_CSV and OUTPUT_PATH below still
+say run18/run19 (this script hasn't been re-run to bootstrap a fresh seed
+buffer since run19 — run20 and run21 both warm-started by reusing the
+previous run's own live accumulated buffer directly, bypassing this
+pipeline entirely). Update both before using this to build run22's seed
+buffer, or the self-play-replay component below will be sampling from a
+three-runs-stale game log.
+
 Usage:
   venv/bin/python3 curate_buffer.py
 
@@ -73,6 +94,7 @@ from chessai.replay   import ReplayBuffer
 GAMES_CSV      = "logs/run18/games.csv"
 OUTPUT_PATH    = "checkpoints/run19_seed_buffer.pt"
 STOCKFISH_RAW_PATH = "checkpoints/stockfish_relabeled_raw.pt"
+HANGING_PIECE_RAW_PATH = "checkpoints/stockfish_relabeled_hanging_pieces_raw.pt"
 
 # Escalated from run18's 0.2 (80% Stockfish trust) — run18's material_probe
 # result showed queen/rook-scale material solved decisively (100%/76-95%
@@ -85,6 +107,14 @@ STOCKFISH_RAW_PATH = "checkpoints/stockfish_relabeled_raw.pt"
 # self-play floor (0.05) is kept rather than 0.0 -- a safety net against
 # an occasional misleading Stockfish read, not a meaningful dilution.
 STOCKFISH_ALPHA = 0.05   # self-play weight; (1 - alpha) = 0.95 on Stockfish
+
+# Untested starting point, not tuned the way STOCKFISH_ALPHA above was —
+# there's no prior run's material_probe result to calibrate against yet.
+# Started at the same value as a reasonable default; revisit with the
+# tactical benchmark (run_tactical_benchmark.py) and real-game mining
+# (mine_real_hanging_pieces.py) after the run that uses this, the same
+# way STOCKFISH_ALPHA's value was actually arrived at.
+HANGING_PIECE_ALPHA = 0.05   # self-play weight; (1 - alpha) = 0.95 on Stockfish
 
 # Mid-game material positions reviewed by external agent (Run 11 addition)
 REVIEWED_JSON  = "paper/buffer_candidates_reviewed.json"
@@ -391,6 +421,22 @@ def main():
               f"relabel_with_stockfish.py first if this run is meant to "
               f"include Option C. Continuing without it.")
 
+    # Hanging-piece continuation positions (search-misranking investigation
+    # Option 2, 12 Sept 2026) — same raw-then-blend split, own alpha. See
+    # module docstring and relabel_hanging_piece_continuations.py.
+    hanging_piece_count = 0
+    if os.path.exists(HANGING_PIECE_RAW_PATH):
+        raw = torch.load(HANGING_PIECE_RAW_PATH, weights_only=False)
+        for state, policy, z, sf_value in raw:
+            blended = HANGING_PIECE_ALPHA * z + (1 - HANGING_PIECE_ALPHA) * sf_value
+            canonical_batch.append((state, policy, float(blended)))
+        hanging_piece_count = len(raw)
+    else:
+        print(f"  Note: {HANGING_PIECE_RAW_PATH} not found — run "
+              f"relabel_hanging_piece_continuations.py first if this run is "
+              f"meant to include the hanging-piece Option 2 data. "
+              f"Continuing without it.")
+
     buf.add_permanent(canonical_batch)
     print(f"  {static_count:,} static canonical positions "
           f"({len(CANONICAL_POSITIONS)} × {CANONICAL_REPEATS})")
@@ -400,6 +446,10 @@ def main():
         print(f"  {stockfish_count:,} Stockfish-relabelled positions "
               f"(Option C, alpha={STOCKFISH_ALPHA} self-play / "
               f"{1-STOCKFISH_ALPHA:.2f} Stockfish)")
+    if hanging_piece_count:
+        print(f"  {hanging_piece_count:,} hanging-piece continuation positions "
+              f"(Option 2, alpha={HANGING_PIECE_ALPHA} self-play / "
+              f"{1-HANGING_PIECE_ALPHA:.2f} Stockfish)")
 
     # --- Save ---
     print(f"\nFinal buffer: {len(buf):,} rolling / {len(buf._permanent):,} permanent "
