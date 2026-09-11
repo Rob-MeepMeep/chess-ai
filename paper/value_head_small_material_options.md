@@ -4,9 +4,9 @@
 **Phase:** 3 — AlphaZero-style chess agent (HAL-4000)
 **Authors:** Rob Kirkland, Ellis Ward
 **Date:** 11 September 2026 (run20, step 18,725); revised 11 September 2026
-after external review
-**Status:** Decision document. Investigation direction agreed (see §6);
-options 3 and 4 are the next work, option 5 to follow, option 2 on hold.
+after external review; revised 12 September 2026 with steps 1-4 results
+**Status:** Steps 1-4 of the agreed investigation (§6) are complete. Option
+5 (checkpoint-based monitoring) and a decision on Option 2 remain open.
 
 ---
 
@@ -234,8 +234,9 @@ ranking. A deliberately small, four-step plan:
    Stockfish. This is much stronger evidence of where — and whether —
    evaluation error enters the search, as opposed to inferring it
    indirectly from the root summary statistic.
-4. **Expand to unseen positions and real games** (this is Option 3 and
-   Option 4 above, run together with steps 1–3): rook and queen cases,
+4. **Expand to unseen positions and real games.** ✅ done — see §9 and
+   §10. (this is Option 3 and Option 4 above, run together with steps
+   1–3): rook and queen cases,
    both colours, and captures that should be *declined* — not only
    positions where capturing is correct. Otherwise the benchmark risks
    rewarding "always capture" rather than sound judgement. If Option 2
@@ -382,3 +383,139 @@ diagnostic. It also still doesn't establish how far this generalises
 beyond these two specific opening lines — that's exactly what step 4
 (Option 3: broaden the benchmark; Option 4: check real games) is for,
 and is now the clear next step rather than an optional add-on.
+
+## 9. Results: step 4, Option 3 (benchmark expansion)
+
+`generate_tactical_benchmark.py` gained 4 new positions, all validated
+the same way as the original 5 (a legal capture must exist at the target
+square, and — newly enforced for these additions — `chess.Board.
+is_attacked_by()` confirms the target really is undefended, not just
+capturable):
+
+- `undefended_rook_on_a1_black_captures` and `undefended_rook_on_a8` —
+  rook-scale, both colours (the original set had none).
+- `undefended_queen_on_h4` — a second queen-scale case, opposite colour
+  and opposite capturing piece from the original `undefended_queen_on_a5`
+  (there Black's pawn takes White's queen; here White's knight takes
+  Black's). Directly addresses the "n=1 for the one success case" gap
+  §1 and §3 flagged.
+- `elephant_trap_qgd` — a new category, `declined_capture`: the
+  well-documented "Elephant Trap" line in the Queen's Gambit Declined,
+  where the tempting recapture `6.Nxd5??` looks like it just wins back a
+  pawn but is a real piece-losing blunder (`6...Nxd5 7.Bxd8 Bb4+ 8.Qd2
+  Bxd2+ 9.Kxd2 Kxd8`). Verified with Stockfish before trusting it from
+  memory: the position is +35cp for White, the bait move collapses it to
+  -361cp, and 32 of the other 35 legal replies (e.g. simple development)
+  hold the position. Without a category like this, the benchmark could
+  reward "always capture" as a trivial heuristic rather than sound
+  judgement (external review, 11 Sept 2026) — this is a first example,
+  not full coverage of that risk.
+
+The benchmark is now 14 positions across 5 categories. `run_tactical_
+benchmark.py` and `diagnose_search_disagreements.py` needed no changes —
+both already route any category other than `advantage_preservation`
+through the same "chosen move must be in `correct_moves`" check, so
+`declined_capture` slots in automatically. `pytest` gained one new test
+(`test_declined_capture_bait_move_is_excluded_from_correct_moves`) and
+the two existing category-coverage tests were extended; 49/49 pass.
+
+One honest limitation: `declined_capture` positions are, by construction,
+easy to pass by chance when most legal replies are fine (32/36 here) — a
+policy with no particular affinity for the bait move will avoid it most
+of the time regardless of whether it "understands" the trap. This is
+inherent to how real chess traps work (there are usually many safe
+alternatives), not a flaw specific to this implementation, but it means
+a single `declined_capture` pass/fail is a much weaker signal than a
+`hanging_piece` one — worth more positions in this category before
+reading much into any one checkpoint's score here.
+
+## 10. Results: step 4, Option 4 (real self-play games)
+
+`mine_real_hanging_pieces.py` scans a `games.csv` ply by ply and flags
+every position where the side to move has a legal, genuinely undefended
+capture available (same `is_attacked_by` check used to validate the new
+benchmark positions above), then checks whether the move actually played
+took the most valuable one available. This Mac happens to have local
+copies of `logs/run19/games.csv` and `logs/run20/games.csv` already, so
+this ran directly against real self-play data rather than waiting on the
+desktop.
+
+**Full games (137,636 opportunities across both logs' games):**
+
+| Piece value | n | took it | take rate |
+|---|---|---|---|
+| queen (9) | 4,709 | 3,640 | 77.3% |
+| rook (5) | 12,990 | 6,323 | 48.7% |
+| bishop (3) | 33,091 | 13,949 | 42.2% |
+| pawn (1) | 86,846 | 17,473 | 20.1% |
+
+**Restricted to the greedy phase only (ply ≥ 31, past `TEMP_MOVES=30`
+where self-play switches from stochastic sampling + Dirichlet noise to
+plain argmax — the same selection mode the benchmark itself measures):**
+
+| Piece value | n | took it | take rate |
+|---|---|---|---|
+| queen (9) | 3,589 | 2,930 | 81.6% |
+| rook (5) | 9,620 | 5,331 | 55.4% |
+| bishop (3) | 21,509 | 10,313 | 47.9% |
+| pawn (1) | 56,180 | 12,639 | 22.5% |
+
+Two things worth noting immediately: the magnitude-ordered pattern
+(queen > rook > bishop, pawn excluded — see below) holds in real games
+across tens of thousands of instances, not just the 5-position
+benchmark's n=1 queen case. And the pattern is if anything *slightly
+stronger* in the greedy-only cut than the full-game numbers, which rules
+out "this is just training-time exploration noise from Dirichlet noise
+and stochastic sampling" as an explanation for the whole effect — it's
+still there, and slightly worse, when only greedy (argmax) choices are
+counted.
+
+**The pawn row should not be read the same way as the others.** A
+material-only, defense-based check like this one can't tell a genuine
+blunder from a materially-free pawn that has a legitimate positional
+reason to decline (king safety, development, structure) — real games are
+full of those, unlike the hand-authored benchmark where every "correct"
+answer was designed to have no such downside. A ~20-23% pawn take rate
+may partly or mostly reflect *sound* declines, not misjudgement. Knight
+value and above is a much cleaner signal, since it's harder to have an
+innocent positional reason to leave a whole minor piece or more
+uncontested.
+
+**Spot-checked against Stockfish, not just asserted.** The detector's
+"undefended and capturable" rule also can't distinguish a real blunder
+from a case where declining was correct for a reason it can't see (a
+`declined_capture`-style trap, or something else). `verify_missed_hangs.py`
+sampled 25 random knight-value-and-above misses and compared Stockfish's
+eval after the capturing move against its eval after the move actually
+played:
+
+- Full-game sample (25 positions): **14/25 (56%) confirmed real blunders**
+  (capturing would have scored ≥150cp better), median swing +185cp. 6/25
+  were "fine to decline" (the played move actually scored *better* than
+  capturing — a real tactical reason existed). The rest were mild.
+- Greedy-phase-only sample (25 positions, ply ≥ 31): **16/25 (64%)
+  confirmed real blunders**, median swing +328cp — if anything a
+  stronger result than the full-game sample.
+- One striking example from the greedy-phase sample: `logs/run20/
+  games.csv` game 1378, ply 12 — Stockfish rates the position after
+  taking the free knight at +241cp, but the move actually played leads
+  to a position Stockfish scores as essentially lost (a swing north of
+  +10,000cp on the scale used here). This is a concrete instance of
+  exactly the kind of large, avoidable blunder the tactical benchmark
+  was built to detect — found in a real game, not a constructed one.
+
+**Reading steps 1-4 together:** the search-misranking pattern step 1-3
+found in two hand-authored positions is not an artefact of those
+specific lines. It shows up at scale in real self-play games, correlates
+with material magnitude in the direction the original benchmark
+suggested (queen best, then rook, then bishop), persists (slightly
+worse, if anything) when training-time exploration noise is excluded,
+and a solid majority of a random sample of flagged instances are
+confirmed by Stockfish to be genuine, substantial blunders rather than
+detector false positives. This is now a well-supported claim across a
+large, real sample — not proof of a single root cause (steps 1-3's own
+finding was that the value head is noisy in a way search doesn't
+reliably correct, not that it's wrong in one consistent direction), but
+strong enough to treat "HAL leaves real material on the board in real
+games at a materially significant rate" as established rather than
+speculative going into any decision about Option 2.

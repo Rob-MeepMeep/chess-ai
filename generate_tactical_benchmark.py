@@ -1,8 +1,21 @@
 """
 generate_tactical_benchmark.py — Build a small, hand-authored tactical
-benchmark: hanging pieces, mate-in-1, mate-in-1 defence, and advantage
-preservation (formerly called "conversion" -- see the category note
-below for why that name overclaimed what's actually tested).
+benchmark: hanging pieces, mate-in-1, mate-in-1 defence, declined
+captures, and advantage preservation (formerly called "conversion" --
+see the category note below for why that name overclaimed what's
+actually tested).
+
+12 Sept 2026 addition (step 4 of the search-misranking investigation,
+paper/value_head_small_material_options.md Sec 6/8, Options 3+4): the
+original 5 hanging_piece positions were knight/bishop/pawn scale plus
+one queen case (n=1) -- not enough to say whether search's misranking
+scales with material magnitude or was specific to those lines. Added
+rook- and a second queen-scale position, both colours represented across
+the set, plus a new declined_capture category: a position where the
+objectively correct move is NOT to take a tempting piece, because doing
+so is a real, Stockfish-confirmed blunder. Without this, the benchmark
+could reward "always capture" as a trivial heuristic rather than sound
+judgement -- exactly the gap flagged in the 11 Sept 2026 external review.
 
 Why this exists (10 Sept 2026 assessment, forward plan item 2): a
 compact, fixed benchmark to separate "the policy prior doesn't know"
@@ -41,6 +54,13 @@ Categories:
                           answer): scored by "does the opponent still
                           have a mate-in-1 after this move", not by
                           matching a specific UCI move
+  declined_capture      — a tempting capture (the "bait_move") is
+                          available but Stockfish confirms it's a real
+                          blunder (drops the mover's own eval below
+                          DECLINED_CAPTURE_REGRESSION_CP); multiple
+                          acceptable moves, same shape as
+                          defend_mate_in_1 but judged by eval collapse
+                          instead of an immediate forced mate
   advantage_preservation — a real, Stockfish-confirmed decisive material
                           advantage reached through actual play (not
                           necessarily reduced to bare kings -- see the
@@ -162,6 +182,66 @@ HANGING_PIECE_CANDIDATES = [
         "name": "undefended_pawn_on_e5",
         "moves": ["e2e4", "d7d6", "e4e5"],
         "expect_capture_of": "e5",
+    },
+    # 12 Sept 2026 additions -- rook- and a second queen-scale position,
+    # both colours, to address the "n=1 for the one success (queen)
+    # case" gap flagged after step 3 of the investigation. Verified
+    # directly with python-chess before adding (not just by construction
+    # like the pawn/knight cases above): the target square really is
+    # empty of any defender for its own side.
+    {
+        # 1.b3 clears b2, opening the long diagonal all the way from g7
+        # to a1 before White's rook has moved. 2.e4 Bg7 puts a bishop
+        # directly on that diagonal; 3.Nf3 (deliberately not touching
+        # c3/d4/e5/f6, which would re-block it) does nothing about the
+        # threat. Confirmed: Bxa1 is legal and a1 has no other defender.
+        "name": "undefended_rook_on_a1_black_captures",
+        "moves": ["b2b3", "g7g6", "e2e4", "f8g7", "g1f3"],
+        "expect_capture_of": "a1",
+    },
+    {
+        # Mirror image: 1.g3 opens the long diagonal for a future
+        # fianchettoed bishop; 1...b6 (Black's own careless mirroring)
+        # clears b7, opening the diagonal all the way to a8; 2.Bg2 puts
+        # White's bishop on it. 2...Nf6 does nothing to defend a8.
+        # Confirmed: Bxa8 is legal and a8 has no other defender.
+        "name": "undefended_rook_on_a8",
+        "moves": ["g2g3", "b7b6", "f1g2", "g8f6"],
+        "expect_capture_of": "a8",
+    },
+    {
+        # A second queen-scale case, opposite colour and opposite
+        # capturing piece from undefended_queen_on_a5 (there, Black's
+        # pawn captures White's queen; here, White's knight captures
+        # Black's). 3...Qh4?? walks the queen onto a square already
+        # attacked by White's f3 knight, with nothing defending it.
+        "name": "undefended_queen_on_h4",
+        "moves": ["e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "d8h4"],
+        "expect_capture_of": "h4",
+    },
+]
+
+# A capture that LOOKS free but Stockfish confirms is a real blunder --
+# without this category, the benchmark could reward "always capture" as
+# a trivial heuristic rather than sound judgement (external review, 11
+# Sept 2026). Scoring needs an engine, so validated in
+# build_declined_capture() rather than at import time like the
+# python-chess-only categories above.
+DECLINED_CAPTURE_CANDIDATES = [
+    {
+        # The "Elephant Trap" line in the Queen's Gambit Declined:
+        # 6.Nxd5?? looks like it just wins back the pawn Black spent
+        # recapturing on d5, but 6...Nxd5 7.Bxd8 Bb4+ 8.Qd2 Bxd2+
+        # 9.Kxd2 Kxd8 nets Black a full piece -- White is forced to
+        # recapture on d5 with the bishop and walks into the queen-
+        # trading intermezzo check. Verified with Stockfish (depth 16)
+        # before trusting it from memory, not asserted by hand: this
+        # position is +35cp for White; the bait move collapses it to
+        # -369cp, while simple development (e3, Nf3) holds +26/+29cp.
+        "name": "elephant_trap_qgd",
+        "moves": ["d2d4", "d7d5", "c2c4", "e7e6", "b1c3", "g8f6",
+                  "c1g5", "b8d7", "c4d5", "e6d5"],
+        "bait_move": "c3d5",
     },
 ]
 
@@ -296,6 +376,72 @@ def build_defend_mate_in_1():
     return result
 
 
+DECLINED_CAPTURE_REGRESSION_CP = -150   # a move dropping the mover's own eval
+                                          # (from their perspective, right after
+                                          # they play it) below this counts as a
+                                          # real blunder, not just slightly
+                                          # suboptimal -- matched to this
+                                          # candidate's -369 bait vs +26/+29
+                                          # alternatives, with headroom either way
+
+
+def build_declined_capture(engine):
+    result = []
+    for cand in DECLINED_CAPTURE_CANDIDATES:
+        board = _replay(cand["moves"])
+        bait = cand["bait_move"]
+        if chess.Move.from_uci(bait) not in board.legal_moves:
+            print(f"  SKIP {cand['name']}: bait move {bait} isn't legal here")
+            continue
+
+        # Exhaustive, not spot-checked: every legal reply gets its own
+        # Stockfish read, same rigor build_defend_mate_in_1() applies to
+        # its own "does every naive move still walk into it" check, just
+        # judged by eval collapse instead of an immediate forced mate.
+        acceptable = []
+        bait_cp = None
+        total_legal = 0
+        for move in board.legal_moves:
+            total_legal += 1
+            b2 = board.copy()
+            b2.push(move)
+            if b2.is_game_over():
+                cp = 10000 if b2.is_checkmate() else 0
+            else:
+                info = engine.analyse(b2, chess.engine.Limit(depth=VALIDATE_DEPTH))
+                score = info["score"].pov(not b2.turn)   # mover's own perspective
+                if score.is_mate():
+                    cp = 10000 if score.mate() > 0 else -10000
+                else:
+                    cp = score.score()
+
+            uci = move.uci()
+            if uci == bait:
+                bait_cp = cp
+            elif cp is not None and cp >= DECLINED_CAPTURE_REGRESSION_CP:
+                acceptable.append(uci)
+
+        if bait_cp is None or bait_cp >= DECLINED_CAPTURE_REGRESSION_CP:
+            print(f"  SKIP {cand['name']}: bait move doesn't validate as a "
+                  f"real blunder (cp={bait_cp}) -- not a fair trap")
+            continue
+        if not acceptable:
+            print(f"  SKIP {cand['name']}: no legal alternative avoids a "
+                  f"similar collapse -- not a fair test")
+            continue
+
+        result.append({
+            "name": cand["name"],
+            "category": "declined_capture",
+            "moves": cand["moves"],
+            "correct_moves": acceptable,
+            "bait_move": bait,
+        })
+        print(f"  OK {cand['name']}: bait {bait} cp={bait_cp}, "
+              f"{len(acceptable)}/{total_legal} legal replies hold the position")
+    return result
+
+
 def build_advantage_preservation(engine):
     result = []
     for cand in ADVANTAGE_PRESERVATION_CANDIDATES:
@@ -333,14 +479,16 @@ def main():
     print("\nBuilding defend_mate_in_1 positions...")
     defences = build_defend_mate_in_1()
 
-    print("\nBuilding advantage_preservation positions (needs Stockfish)...")
+    print("\nBuilding declined_capture and advantage_preservation "
+          "positions (needs Stockfish)...")
     engine = chess.engine.SimpleEngine.popen_uci(ENGINE_PATH)
     try:
+        declined = build_declined_capture(engine)
         advantage_preservations = build_advantage_preservation(engine)
     finally:
         engine.quit()
 
-    all_positions = hanging + mates + defences + advantage_preservations
+    all_positions = hanging + mates + defences + declined + advantage_preservations
 
     # Overlap check against curate_buffer.py's fixed canonical positions
     # (the randomised generators produce different positions per build,

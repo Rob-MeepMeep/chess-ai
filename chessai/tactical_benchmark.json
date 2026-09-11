@@ -72,6 +72,48 @@
     ]
   },
   {
+    "name": "undefended_rook_on_a1_black_captures",
+    "category": "hanging_piece",
+    "moves": [
+      "b2b3",
+      "g7g6",
+      "e2e4",
+      "f8g7",
+      "g1f3"
+    ],
+    "correct_moves": [
+      "g7a1"
+    ]
+  },
+  {
+    "name": "undefended_rook_on_a8",
+    "category": "hanging_piece",
+    "moves": [
+      "g2g3",
+      "b7b6",
+      "f1g2",
+      "g8f6"
+    ],
+    "correct_moves": [
+      "g2a8"
+    ]
+  },
+  {
+    "name": "undefended_queen_on_h4",
+    "category": "hanging_piece",
+    "moves": [
+      "e2e4",
+      "e7e5",
+      "g1f3",
+      "b8c6",
+      "f1c4",
+      "d8h4"
+    ],
+    "correct_moves": [
+      "f3h4"
+    ]
+  },
+  {
     "name": "fools_mate",
     "category": "mate_in_1",
     "moves": [
@@ -118,6 +160,57 @@
     ]
   },
   {
+    "name": "elephant_trap_qgd",
+    "category": "declined_capture",
+    "moves": [
+      "d2d4",
+      "d7d5",
+      "c2c4",
+      "e7e6",
+      "b1c3",
+      "g8f6",
+      "c1g5",
+      "b8d7",
+      "c4d5",
+      "e6d5"
+    ],
+    "correct_moves": [
+      "g5f6",
+      "g5h4",
+      "g5f4",
+      "g5e3",
+      "g5d2",
+      "g5c1",
+      "c3b5",
+      "c3a4",
+      "c3b1",
+      "g1h3",
+      "g1f3",
+      "e1d2",
+      "d1a4",
+      "d1d3",
+      "d1b3",
+      "d1d2",
+      "d1c2",
+      "d1c1",
+      "d1b1",
+      "a1c1",
+      "a1b1",
+      "h2h3",
+      "g2g3",
+      "f2f3",
+      "e2e3",
+      "b2b3",
+      "a2a3",
+      "h2h4",
+      "g2g4",
+      "f2f4",
+      "e2e4",
+      "a2a4"
+    ],
+    "bait_move": "c3d5"
+  },
+  {
     "name": "queen_won_for_a_pawn",
     "category": "advantage_preservation",
     "moves": [
@@ -129,7 +222,7 @@
       "c6e5",
       "b1c3"
     ],
-    "reference_cp": 601
+    "reference_cp": 609
   },
   {
     "name": "knight_won_for_a_pawn",
@@ -143,6 +236,6 @@
       "d6e5",
       "d2d4"
     ],
-    "reference_cp": 387
+    "reference_cp": 401
   }
 ]

@@ -33,7 +33,8 @@ def test_benchmark_file_is_non_empty_and_covers_expected_categories():
     positions = _load()
     assert len(positions) > 0
     categories = {p["category"] for p in positions}
-    assert categories <= {"hanging_piece", "mate_in_1", "defend_mate_in_1", "advantage_preservation"}
+    assert categories <= {"hanging_piece", "mate_in_1", "defend_mate_in_1",
+                           "declined_capture", "advantage_preservation"}
 
 
 def test_every_position_move_sequence_is_legal():
@@ -47,7 +48,8 @@ def test_every_position_move_sequence_is_legal():
 
 def test_choice_based_categories_have_legal_correct_moves():
     for pos in _load():
-        if pos["category"] not in ("hanging_piece", "mate_in_1", "defend_mate_in_1"):
+        if pos["category"] not in ("hanging_piece", "mate_in_1",
+                                    "defend_mate_in_1", "declined_capture"):
             continue
         board = _replay(pos["moves"])
         legal = {m.uci() for m in board.legal_moves}
@@ -87,6 +89,21 @@ def _delivers_mate(board, move):
     result = board.is_checkmate()
     board.pop()
     return result
+
+
+def test_declined_capture_bait_move_is_excluded_from_correct_moves():
+    for pos in _load():
+        if pos["category"] != "declined_capture":
+            continue
+        board = _replay(pos["moves"])
+        legal = {m.uci() for m in board.legal_moves}
+        assert "bait_move" in pos
+        assert pos["bait_move"] in legal, f"{pos['name']}: bait_move isn't legal here"
+        assert pos["correct_moves"], f"{pos['name']}: no correct_moves recorded"
+        assert pos["bait_move"] not in pos["correct_moves"], (
+            f"{pos['name']}: the move this position exists to test isn't "
+            f"actually excluded from what counts as correct"
+        )
 
 
 def test_advantage_preservation_positions_have_a_reference_eval():
