@@ -32,7 +32,19 @@ Change RUN_NAME here when starting a new run — nowhere else.
 # -- run19's own file has the old synthetic-FEN readings before the fix
 # and the new real-position ones after, not directly comparable within
 # one file.
-RUN_NAME = "run20"
+#
+# run21 (12 Sept 2026): warm-starts from run20's checkpoint
+# (warm_start_run21.py), otherwise unchanged -- same architecture, same
+# accumulated replay buffer carried forward. This is the "short,
+# explicitly measured baseline" scoped in paper/value_head_small_
+# material_options.md Sec 4 after the search-misranking investigation
+# (steps 1-4, Sec 6-10 of that doc): a real, documented baseline exists
+# at run20/18,725 steps (tactical benchmark + real-game mining results,
+# Sec 7-10), so this run isn't going in blind. No training intervention
+# is included (Option 2 is still on hold) -- re-run the tactical
+# benchmark scripts against run21's checkpoint periodically rather than
+# assuming continued self-play alone will move it.
+RUN_NAME = "run21"
 
 CKPT_PATH   = f"checkpoints/{RUN_NAME}_hal_chess.pt"
 BUFFER_PATH = f"checkpoints/{RUN_NAME}_replay_buffer.pt"
