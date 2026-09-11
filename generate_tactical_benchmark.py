@@ -119,6 +119,39 @@ HANGING_PIECE_CANDIDATES = [
                   "d1d3", "a7a6"],
         "expect_capture_of": "f5",
     },
+    # 11 Sept 2026 addition, testing whether the search-vs-policy
+    # disagreement found on undefended_knight_on_e4 (policy correctly
+    # favours the capture, search at 200 AND 600 sims prefers an
+    # objectively much worse move instead -- Stockfish: +400cp vs -297cp)
+    # is a pattern or an isolated quirk of that one line. Three more
+    # hanging-piece positions, deliberately varied: mirrored colour
+    # (Black captures this time), a different piece value each
+    # (knight/queen/pawn), and different capturing piece each
+    # (knight/pawn/pawn) -- not just cosmetic variations on the same shape.
+    {
+        # Mirror of the original: White's knight jumps to d5 undefended,
+        # Black's own knight takes it for free.
+        "name": "undefended_knight_on_d5_black_captures",
+        "moves": ["b1c3", "g8f6", "c3d5"],
+        "expect_capture_of": "d5",
+    },
+    {
+        # White's queen wanders to a5, defended by nothing, attacked by
+        # Black's own b6 pawn -- a full queen hangs to a pawn capture.
+        "name": "undefended_queen_on_a5",
+        "moves": ["e2e4", "b7b6", "d1h5", "c8b7", "h5a5"],
+        "expect_capture_of": "a5",
+    },
+    {
+        # Smallest magnitude of the set: White pushes e5 without
+        # noticing Black's d6 pawn can simply take it. Real, but a much
+        # smaller material swing than the other three -- worth knowing
+        # whether the same disagreement pattern shows up even at pawn
+        # stakes or only at larger ones.
+        "name": "undefended_pawn_on_e5",
+        "moves": ["e2e4", "d7d6", "e4e5"],
+        "expect_capture_of": "e5",
+    },
 ]
 
 MATE_IN_1_CANDIDATES = [

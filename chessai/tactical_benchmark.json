@@ -34,6 +34,44 @@
     ]
   },
   {
+    "name": "undefended_knight_on_d5_black_captures",
+    "category": "hanging_piece",
+    "moves": [
+      "b1c3",
+      "g8f6",
+      "c3d5"
+    ],
+    "correct_moves": [
+      "f6d5"
+    ]
+  },
+  {
+    "name": "undefended_queen_on_a5",
+    "category": "hanging_piece",
+    "moves": [
+      "e2e4",
+      "b7b6",
+      "d1h5",
+      "c8b7",
+      "h5a5"
+    ],
+    "correct_moves": [
+      "b6a5"
+    ]
+  },
+  {
+    "name": "undefended_pawn_on_e5",
+    "category": "hanging_piece",
+    "moves": [
+      "e2e4",
+      "d7d6",
+      "e4e5"
+    ],
+    "correct_moves": [
+      "d6e5"
+    ]
+  },
+  {
     "name": "fools_mate",
     "category": "mate_in_1",
     "moves": [
