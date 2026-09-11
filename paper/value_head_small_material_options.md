@@ -229,11 +229,11 @@ ranking. A deliberately small, four-step plan:
    the result — if the misranking persists identically under serial
    search, batching is not the explanation.
 3. **Check network values against Stockfish on the actual sampled leaves.**
-   Rather than only comparing root `Q`, evaluate the specific leaf
-   positions search's tree actually visited against Stockfish. This is
-   much stronger evidence of where — and whether — evaluation error enters
-   the search, as opposed to inferring it indirectly from the root
-   summary statistic.
+   ✅ done — see §7. Rather than only comparing root `Q`, evaluate the
+   specific leaf positions search's tree actually visited against
+   Stockfish. This is much stronger evidence of where — and whether —
+   evaluation error enters the search, as opposed to inferring it
+   indirectly from the root summary statistic.
 4. **Expand to unseen positions and real games** (this is Option 3 and
    Option 4 above, run together with steps 1–3): rook and queen cases,
    both colours, and captures that should be *declined* — not only
@@ -318,3 +318,67 @@ whether the miscalibration is confined to the immediate post-move
 position or persists through the specific continuations search built
 underneath it (e.g. the `c4e6 f7e6 ...` line search favoured 105/232
 times for the wrong move).
+
+## 8. Results: step 3 (leaves vs Stockfish, run20, 18,725 steps, desktop, 600 sims)
+
+`check_leaves_against_stockfish.py` walked every node visited ≥5 times,
+up to 4 plies below each candidate move, and compared search's `Q`, the
+raw network value at that exact position (no further search), and
+Stockfish (depth 16) — all in the same "value for whoever just moved"
+convention. 34 nodes had a materially decisive Stockfish score (|eval|
+≥ 0.3 pawns; 7 near-neutral nodes were excluded as not meaningfully
+signed either way). Scoring each node as "correct" when the sign of
+`net` (or `Q`) matches the sign of Stockfish's eval:
+
+| | net correct | Q correct | nodes checked |
+|---|---|---|---|
+| `undefended_knight_on_e4` subtree | 5/21 (24%) | 9/21 (43%) | 21 |
+| `undefended_knight_on_d5_black_captures` subtree | 8/13 (62%) | 4/13 (31%) | 13 |
+| **combined** | **13/34 (38%)** | **13/34 (38%)** | 34 |
+
+Two things this changes about the read on this problem:
+
+**The miscalibration is not confined to the first ply — it runs through
+the whole local neighbourhood of positions search explored.** Under both
+candidate moves, at every depth checked (not just the immediate
+post-move position), the raw network value disagrees with Stockfish's
+sign roughly 60-75% of the time in the `e4` subtree. This is a much
+broader claim than step 1 supported on its own: it isn't one bad leaf,
+it's the network being unreliable across a whole family of related
+positions reached from this opening line.
+
+**Search's aggregation does not reliably improve on the raw value — it
+helps in one subtree and hurts in the other.** In the `e4` subtree, `Q`
+is right more often than the raw `net` read (43% vs 24%) — some
+self-correction, consistent with what step 1's root-level numbers
+suggested. But in the `d5` subtree, it's reversed: `Q` is right *less*
+often than `net` (31% vs 62%) — search's own visit-allocation made
+things worse in that case, not better. An earlier draft of this
+investigation (§7) read the `e4` result as search "partially
+self-correcting" the value head's error; that generalisation doesn't
+hold up once the `d5` subtree is checked the same way, and is corrected
+here. Combined across both, `net` and `Q` end up exactly tied (13/34
+each) — there's no consistent direction to whether search helps or hurts
+relative to a single raw value read; it depends on the specific tree.
+
+One example of search making things worse on its own terms:
+`f6d5 h2h4` (case 2) has a raw net value of -0.415, correctly signed
+against Stockfish's -5.07 — but after 11 visits, search's own `Q` for
+that same node is +0.7433, a bad misjudgement search *introduced* on top
+of an already-correct shallow read. Whatever is driving this looks like
+general noise in how search integrates values across a subtree, not a
+single fixable direction of bias.
+
+**What this does and doesn't establish.** It's now well supported (34
+data points, not 1) that the value head is frequently, non-directionally
+wrong across this specific local neighbourhood of post-tactical
+middlegame positions — sometimes overrating the losing side, sometimes
+underrating the winning side, in both the correct-move and the
+wrong-move subtrees. It does not establish *why* (representation gap,
+undertrained region of position-space, something structural) — that
+needs the positions to be checked for how well-represented they and
+their neighbours are in training data, which is out of scope for this
+diagnostic. It also still doesn't establish how far this generalises
+beyond these two specific opening lines — that's exactly what step 4
+(Option 3: broaden the benchmark; Option 4: check real games) is for,
+and is now the clear next step rather than an optional add-on.
