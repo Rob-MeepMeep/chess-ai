@@ -32,8 +32,8 @@ from run_config import CKPT_PATH
 
 BENCHMARK_PATH = "chessai/tactical_benchmark.json"
 ENGINE_PATH = "stockfish"
-CONVERSION_DEPTH = 14
-CONVERSION_STILL_WINNING_CP = 100
+ADVANTAGE_PRESERVATION_DEPTH = 14
+ADVANTAGE_PRESERVATION_CP = 100
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--ckpt", default=None)
@@ -91,32 +91,40 @@ def _print_comparison(rows, search_uci, correct_ucis):
     correct_rows = [by_move[u] for u in correct_ucis if u in by_move]
     if search_row and correct_rows:
         best_correct_q = max(r[2] for r in correct_rows)
+        # Q is an accumulated estimate from whatever continuations search
+        # actually explored -- priors, visit allocation, search depth, and
+        # batching all influence which leaves feed into it. A higher Q for
+        # the wrong move means search ranked these moves incorrectly; it
+        # doesn't by itself isolate the value head as the cause over
+        # exploration/batching effects (external review, 11 Sept 2026 --
+        # see paper/value_head_small_material_options.md).
         if search_row[2] > best_correct_q:
-            print("  -> search's own Q is HIGHER than the correct move's -- "
-                  "value-head miscalibration in that move's subtree, not "
-                  "an exploration/prior problem.")
+            print("  -> search ranks these moves incorrectly (the chosen move's Q "
+                  "reads higher than the correct move's). Inaccurate leaf values "
+                  "are one possible cause; exploration and batching effects "
+                  "haven't been ruled out.")
         else:
-            print("  -> the correct move's own Q reads at least as good -- "
-                  "if it still lost the visit contest, that points at "
-                  "PUCT/exploration dynamics or an insufficient budget "
-                  "instead.")
+            print("  -> the correct move's own Q reads at least as good, so this "
+                  "case doesn't show the same Q-inversion -- it still lost the "
+                  "visit contest, worth investigating on its own rather than "
+                  "assuming a single cause.")
 
 
 def _is_ok(category, board, chosen_uci, correct_moves, engine):
     """Same scoring rule run_tactical_benchmark.py uses, factored out so
     both the policy-only and search choices are checked identically."""
-    if category != "conversion":
+    if category != "advantage_preservation":
         return chosen_uci in correct_moves
     b2 = board.copy()
     b2.push_uci(chosen_uci)
     if b2.is_game_over():
         return b2.is_checkmate()
-    info = engine.analyse(b2, chess.engine.Limit(depth=CONVERSION_DEPTH))
+    info = engine.analyse(b2, chess.engine.Limit(depth=ADVANTAGE_PRESERVATION_DEPTH))
     score = info["score"].pov(not b2.turn)
     if score.is_mate():
         return score.mate() > 0
     cp = score.score()
-    return cp is not None and cp >= CONVERSION_STILL_WINNING_CP
+    return cp is not None and cp >= ADVANTAGE_PRESERVATION_CP
 
 
 def main():
@@ -144,7 +152,7 @@ def main():
             search_uci = rows[0][0]   # most-visited = what greedy selection returns
 
             category = pos["category"]
-            correct_moves = pos.get("correct_moves", [])   # empty for conversion
+            correct_moves = pos.get("correct_moves", [])   # empty for advantage_preservation
             policy_ok = _is_ok(category, board, policy_uci, correct_moves, engine)
             search_ok = _is_ok(category, board, search_uci, correct_moves, engine)
 
@@ -153,7 +161,7 @@ def main():
                   f"search={'OK' if search_ok else search_uci}")
 
             # Only choice-based categories have a fixed correct_moves list
-            # to compare the search's tree stats against -- conversion's
+            # to compare the search's tree stats against -- advantage_preservation's
             # "correct answer" is "didn't blunder," not one specific move,
             # so there's nothing to diff its root stats against here.
             if not search_ok and correct_moves:

@@ -14,10 +14,14 @@ Each category is scored differently, matching how generate_tactical_
 benchmark.py validated it:
   hanging_piece, mate_in_1, defend_mate_in_1 — chosen move must be in
       the position's pre-validated correct_moves list
-  conversion — chosen move must not blunder the win: after playing it,
-      Stockfish must still rate the position as winning for the side
-      that was ahead (checked live here, not pre-computed, since the
-      "correct" answer depends on what HAL actually played)
+  advantage_preservation — chosen move must not blunder the win: after
+      playing it, Stockfish must still rate the position as winning for
+      the side that was ahead (checked live here, not pre-computed,
+      since the "correct" answer depends on what HAL actually played).
+      Renamed from "conversion" (11 Sept 2026, external review) -- this
+      checks the advantage survives, not that HAL demonstrated actually
+      converting it to checkmate, a different and stronger claim the
+      old name implied without testing it.
 
 Usage:
   venv/bin/python3 run_tactical_benchmark.py [--ckpt PATH] [--sims N]
@@ -38,8 +42,8 @@ from run_config import CKPT_PATH
 
 BENCHMARK_PATH = "chessai/tactical_benchmark.json"
 ENGINE_PATH    = "stockfish"   # assumes stockfish is on PATH -- same convention as eval_chess.py
-CONVERSION_DEPTH = 14
-CONVERSION_STILL_WINNING_CP = 100   # generous margin -- this checks "didn't
+ADVANTAGE_PRESERVATION_DEPTH = 14
+ADVANTAGE_PRESERVATION_CP = 100   # generous margin -- this checks "didn't
                                     # throw the win away", not "played the
                                     # engine's top choice"
 
@@ -86,7 +90,7 @@ def score_choice_move(position: dict, chosen_uci: str) -> bool:
     return chosen_uci in position["correct_moves"]
 
 
-def score_conversion(position: dict, board: chess.Board, chosen_uci: str, engine) -> bool:
+def score_advantage_preservation(position: dict, board: chess.Board, chosen_uci: str, engine) -> bool:
     board = board.copy()
     board.push_uci(chosen_uci)
     if board.is_game_over():
@@ -94,12 +98,12 @@ def score_conversion(position: dict, board: chess.Board, chosen_uci: str, engine
         # stalemate is the one real way to "blunder" a totally won
         # position into a draw, so it must fail the check
         return board.is_checkmate()
-    info = engine.analyse(board, chess.engine.Limit(depth=CONVERSION_DEPTH))
+    info = engine.analyse(board, chess.engine.Limit(depth=ADVANTAGE_PRESERVATION_DEPTH))
     score = info["score"].pov(not board.turn)   # from the mover's own POV
     if score.is_mate():
         return score.mate() > 0
     cp = score.score()
-    return cp is not None and cp >= CONVERSION_STILL_WINNING_CP
+    return cp is not None and cp >= ADVANTAGE_PRESERVATION_CP
 
 
 def main():
@@ -124,9 +128,9 @@ def main():
             policy_uci = policy_only_move(agent, board, history)
             search_uci = search_move(agent, board, history, args.sims)
 
-            if pos["category"] == "conversion":
-                policy_ok = score_conversion(pos, board, policy_uci, engine)
-                search_ok = score_conversion(pos, board, search_uci, engine)
+            if pos["category"] == "advantage_preservation":
+                policy_ok = score_advantage_preservation(pos, board, policy_uci, engine)
+                search_ok = score_advantage_preservation(pos, board, search_uci, engine)
             else:
                 policy_ok = score_choice_move(pos, policy_uci)
                 search_ok = score_choice_move(pos, search_uci)

@@ -33,7 +33,7 @@ def test_benchmark_file_is_non_empty_and_covers_expected_categories():
     positions = _load()
     assert len(positions) > 0
     categories = {p["category"] for p in positions}
-    assert categories <= {"hanging_piece", "mate_in_1", "defend_mate_in_1", "conversion"}
+    assert categories <= {"hanging_piece", "mate_in_1", "defend_mate_in_1", "advantage_preservation"}
 
 
 def test_every_position_move_sequence_is_legal():
@@ -89,9 +89,9 @@ def _delivers_mate(board, move):
     return result
 
 
-def test_conversion_positions_have_a_reference_eval():
+def test_advantage_preservation_positions_have_a_reference_eval():
     for pos in _load():
-        if pos["category"] != "conversion":
+        if pos["category"] != "advantage_preservation":
             continue
         assert "reference_cp" in pos
         assert pos["reference_cp"] >= 300

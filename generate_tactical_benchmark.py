@@ -1,7 +1,8 @@
 """
 generate_tactical_benchmark.py — Build a small, hand-authored tactical
-benchmark: hanging pieces, mate-in-1, mate-in-1 defence, and elementary
-K+Q/K+R vs K conversion.
+benchmark: hanging pieces, mate-in-1, mate-in-1 defence, and advantage
+preservation (formerly called "conversion" -- see the category note
+below for why that name overclaimed what's actually tested).
 
 Why this exists (10 Sept 2026 assessment, forward plan item 2): a
 compact, fixed benchmark to separate "the policy prior doesn't know"
@@ -27,27 +28,37 @@ start rather than bolted on after:
 
 Every position's "correct answer" is verified programmatically here, not
 asserted by hand -- python-chess directly confirms checkmate claims;
-Stockfish confirms hanging-piece eval swings and that conversion
-positions are genuinely won. The `material_probe` lesson this whole
-assessment is built on is that an unvalidated test can be wrong in ways
-nobody notices for a long time.
+Stockfish confirms hanging-piece eval swings and that advantage-
+preservation positions are genuinely won. The `material_probe` lesson
+this whole assessment is built on is that an unvalidated test can be
+wrong in ways nobody notices for a long time.
 
 Categories:
-  hanging_piece    — a free capture is on the board; correct move takes it
-  mate_in_1        — a forced mate in one; correct move delivers it
-  defend_mate_in_1 — multiple acceptable moves (not one exact answer):
-                     scored by "does the opponent still have a mate-in-1
-                     after this move", not by matching a specific UCI move
-  conversion       — a real, Stockfish-confirmed decisive material
-                     advantage reached through actual play (not
-                     necessarily reduced to bare kings -- see the module
-                     docstring's note on why an exact K+Q/K+R vs K
-                     reduction turned out harder to hand-author reliably
-                     than expected, and honesty about what was actually
-                     built beat insisting on the original ambition);
-                     scored by Stockfish agreeing the position stays
-                     winning after HAL's move (not a blunder), rather
-                     than requiring one exact move
+  hanging_piece         — a free capture is on the board; correct move
+                          takes it
+  mate_in_1             — a forced mate in one; correct move delivers it
+  defend_mate_in_1      — multiple acceptable moves (not one exact
+                          answer): scored by "does the opponent still
+                          have a mate-in-1 after this move", not by
+                          matching a specific UCI move
+  advantage_preservation — a real, Stockfish-confirmed decisive material
+                          advantage reached through actual play (not
+                          necessarily reduced to bare kings -- see the
+                          module docstring's note on why an exact
+                          K+Q/K+R vs K reduction turned out harder to
+                          hand-author reliably than expected); scored by
+                          Stockfish agreeing the position stays winning
+                          after HAL's move (not a blunder). Named
+                          "advantage_preservation", not "conversion" as
+                          this was originally called (11 Sept 2026,
+                          external review of paper/value_head_small_
+                          material_options.md): checking that an eval
+                          stays above a threshold tests that HAL didn't
+                          throw the win away, not that it demonstrated
+                          the technique to actually convert it to
+                          checkmate -- those are different claims, and
+                          the original name asserted the stronger one
+                          without testing it.
 
 Output: chessai/tactical_benchmark.json
 
@@ -182,7 +193,7 @@ DEFEND_MATE_IN_1_CANDIDATES = [
     },
 ]
 
-CONVERSION_CANDIDATES = [
+ADVANTAGE_PRESERVATION_CANDIDATES = [
     {
         # Verified with Stockfish before being trusted, not by hand: 2.Qh5
         # attacks Nc6, but 3.Qxe5+ walks into Nxe5 -- White has traded a
@@ -190,7 +201,7 @@ CONVERSION_CANDIDATES = [
         # queen-for-a-pawn material swing with the rest of the position
         # still on the board), but real history, real legal moves, and a
         # decisive, Stockfish-confirmed advantage for the side to move --
-        # a fair conversion/technique test either way.
+        # a fair test of whether the advantage survives HAL's next move.
         "name": "queen_won_for_a_pawn",
         "moves": ["e2e4", "e7e5", "d1h5", "b8c6", "h5e5", "c6e5", "b1c3"],
     },
@@ -285,9 +296,9 @@ def build_defend_mate_in_1():
     return result
 
 
-def build_conversion(engine):
+def build_advantage_preservation(engine):
     result = []
-    for cand in CONVERSION_CANDIDATES:
+    for cand in ADVANTAGE_PRESERVATION_CANDIDATES:
         board = _replay(cand["moves"])
         info = engine.analyse(board, chess.engine.Limit(depth=VALIDATE_DEPTH))
         score = info["score"].pov(board.turn)
@@ -298,7 +309,7 @@ def build_conversion(engine):
         if cp is None or cp < 300:   # roughly a minor piece or more, clearly decisive
             print(f"  SKIP {cand['name']}: Stockfish doesn't rate this as "
                   f"clearly winning for the side to move (cp={cp}) "
-                  f"-- not a fair conversion test")
+                  f"-- not a fair advantage-preservation test")
             continue
         # "Correct" here isn't one move -- it's "don't blunder the win."
         # Store the pre-move eval so run_tactical_benchmark.py can check
@@ -306,7 +317,7 @@ def build_conversion(engine):
         # requiring one specific move.
         result.append({
             "name": cand["name"],
-            "category": "conversion",
+            "category": "advantage_preservation",
             "moves": cand["moves"],
             "reference_cp": cp,
         })
@@ -322,14 +333,14 @@ def main():
     print("\nBuilding defend_mate_in_1 positions...")
     defences = build_defend_mate_in_1()
 
-    print("\nBuilding conversion positions (needs Stockfish)...")
+    print("\nBuilding advantage_preservation positions (needs Stockfish)...")
     engine = chess.engine.SimpleEngine.popen_uci(ENGINE_PATH)
     try:
-        conversions = build_conversion(engine)
+        advantage_preservations = build_advantage_preservation(engine)
     finally:
         engine.quit()
 
-    all_positions = hanging + mates + defences + conversions
+    all_positions = hanging + mates + defences + advantage_preservations
 
     # Overlap check against curate_buffer.py's fixed canonical positions
     # (the randomised generators produce different positions per build,

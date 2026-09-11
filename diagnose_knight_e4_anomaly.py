@@ -91,16 +91,23 @@ def main():
     if correct_row and chosen_row:
         print(f"\n{CORRECT_MOVE}: N={correct_row[1]} Q={correct_row[2]:+.4f} P={correct_row[3]:.4f}")
         print(f"{SEARCH_CHOSEN_MOVE}: N={chosen_row[1]} Q={chosen_row[2]:+.4f} P={chosen_row[3]:.4f}")
+        # Q is an accumulated estimate from whatever continuations search
+        # actually explored -- priors, visit allocation, search depth, and
+        # batching all influence which leaves feed into it. A higher Q for
+        # the wrong move means search ranked these moves incorrectly; it
+        # doesn't by itself isolate the value head as the cause over
+        # exploration/batching effects (external review, 11 Sept 2026 --
+        # see paper/value_head_small_material_options.md).
         if chosen_row[2] > correct_row[2]:
-            print(f"\n-> {SEARCH_CHOSEN_MOVE}'s own Q is HIGHER than {CORRECT_MOVE}'s despite "
-                  f"being objectively much worse -- this points at the VALUE HEAD "
-                  f"misjudging positions reached after {SEARCH_CHOSEN_MOVE}, not an "
-                  f"exploration/prior issue.")
+            print(f"\n-> Search ranks these moves incorrectly ({SEARCH_CHOSEN_MOVE}'s Q "
+                  f"reads higher than {CORRECT_MOVE}'s despite being objectively much "
+                  f"worse). Inaccurate leaf values are one possible cause; exploration "
+                  f"and batching effects haven't been ruled out.")
         else:
-            print(f"\n-> {CORRECT_MOVE}'s own Q is actually higher or equal -- if it still "
-                  f"lost the visit-count contest, that points at exploration/PUCT "
-                  f"dynamics (or too few total sims to converge) rather than the "
-                  f"value head being wrong about either move directly.")
+            print(f"\n-> {CORRECT_MOVE}'s own Q is actually higher or equal, so this "
+                  f"specific case doesn't show the same Q-inversion. It still lost the "
+                  f"visit-count contest, which is worth investigating on its own terms "
+                  f"rather than assuming a single cause.")
 
 
 if __name__ == "__main__":
