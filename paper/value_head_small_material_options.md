@@ -580,3 +580,70 @@ not worth doing yet at this step count — better to let it accumulate
 substantially more training first, or use the next check-in to decide
 whether it's time to revisit Option 2 instead of waiting longer on
 unmodified self-play.
+
+## 12. Option 2, decided: run22 setup (12 Sept 2026)
+
+run21's overnight check (§11) showed the expected null result — no
+training intervention, no movement — which closed out the "let it run
+and see" question and made the Option 2 decision concrete rather than
+theoretical. Implemented as follows:
+
+**Data generation** (`relabel_hanging_piece_continuations.py`): reuses
+`mine_real_hanging_pieces.py`'s exact detection logic across
+run19+run20+run21's games.csv, scoped to knight/bishop only (value=3) —
+the worst real-game take rates (40-46%) and the least ambiguous (unlike
+pawns, a free minor piece rarely has a legitimate positional reason to
+decline; unlike rook/queen at 48-82%, there's real evidence of a
+problem here). For every real hanging-piece moment found, generates two
+Stockfish-labelled (depth 16) continuations — the position after
+capturing (always, even when HAL didn't actually play it) and the
+position after whatever HAL actually played when it missed — covering
+both good and bad continuations per the reviewer's explicit instruction,
+not just success cases. Generated 4,000 positions (2,737 capture /
+1,263 decline) in ~11 minutes.
+
+**Folding it in** (`extend_buffer_with_hanging_pieces.py`): run21's own
+startup log ("200,000 rolling + 9,750 permanent") was checked against
+the arithmetic of what should be in there — 45 static canonical + 512
+generated endgames + 193 reviewed midgame + 9,000 from the *original*
+Option C Stockfish pass (relabel_with_stockfish.py, run18-era) sums to
+exactly 9,750. That confirms the original small/medium-material
+Stockfish relabelling has been carried forward unchanged in the live
+buffer since run19's bootstrap and didn't need regenerating. So rather
+than rebuilding a buffer from scratch with `curate_buffer.py` (which
+would replay only run21's 344 games and discard the 200,000-entry
+rolling buffer accumulated since run19 — correct for bootstrapping a
+fresh random network, wrong for warm-starting run22 from run21's
+trained weights), this script loads run21's buffer as-is, blends the
+new hanging-piece data at `HANGING_PIECE_ALPHA`, and adds it to the
+permanent partition in place. Verified end-to-end against a synthetic
+buffer (rolling unchanged, permanent grows by exactly the added count,
+blend arithmetic exact) before being handed off — the real ~2GB buffer
+only exists on the desktop, so this couldn't be tested against it
+directly from here.
+
+**Blend weight:** `HANGING_PIECE_ALPHA = 0.05` (95% Stockfish / 5%
+self-play), matching `STOCKFISH_ALPHA`'s current value as a starting
+point. Explicitly not tuned the way `STOCKFISH_ALPHA` was — that value
+came from comparing material_probe results across several real runs;
+this one has no such history yet. Re-run the tactical benchmark
+(`run_tactical_benchmark.py`) and real-game mining
+(`mine_real_hanging_pieces.py`) against run22's checkpoint once it has
+enough steps to be worth checking, and retune if the pattern hasn't
+moved or has moved too little.
+
+**run22 setup:** `run_config.py` → `RUN_NAME = "run22"`,
+`warm_start_run22.py` copies run21's trained weights (fresh optimizer
+and step count, same as every prior warm start), `train_chess.py`'s
+`BUFFER_LOAD` points at `checkpoints/run22_seed_buffer.pt` (the output
+of the extend script) instead of the previous run's own buffer file
+directly, since this is the first run where the buffer being loaded
+isn't simply "the prior run's buffer, unchanged."
+
+**What would make the next check meaningful:** run22 needs enough steps
+for the new permanent-partition data to actually influence the value
+head before re-checking — the earlier run21 check (§11) is the cautionary
+example of checking too early. Once there's a reasonable step count,
+compare `mine_real_hanging_pieces.py`'s knight/bishop take rates and
+`run_tactical_benchmark.py`'s scores directly against the run21 baseline
+already on record (§10-11), not just eyeball whether numbers moved.

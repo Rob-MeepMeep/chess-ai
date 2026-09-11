@@ -44,7 +44,21 @@ Change RUN_NAME here when starting a new run — nowhere else.
 # is included (Option 2 is still on hold) -- re-run the tactical
 # benchmark scripts against run21's checkpoint periodically rather than
 # assuming continued self-play alone will move it.
-RUN_NAME = "run21"
+#
+# run22 (12 Sept 2026): the Option 2 run. run21's own overnight check
+# (Sec 11) showed 344 games moved nothing, as expected with no
+# intervention -- this is the actual intervention. Warm-starts network
+# weights from run21 (warm_start_run22.py), but the DATA changes:
+# BUFFER_LOAD below points at checkpoints/run22_seed_buffer.pt, run21's
+# full accumulated buffer (200,000 rolling, carried forward unchanged
+# since run19) extended with ~4,000 Stockfish-labelled hanging-piece
+# continuation positions (extend_buffer_with_hanging_pieces.py) --
+# see paper/value_head_small_material_options.md Sec 12 for the exact
+# generation and blend details. HANGING_PIECE_ALPHA is
+# an untested starting guess (0.05, same as STOCKFISH_ALPHA) -- re-run
+# the tactical benchmark and real-game mining after this run to check
+# whether it actually moved the pattern, and retune if not.
+RUN_NAME = "run22"
 
 CKPT_PATH   = f"checkpoints/{RUN_NAME}_hal_chess.pt"
 BUFFER_PATH = f"checkpoints/{RUN_NAME}_replay_buffer.pt"

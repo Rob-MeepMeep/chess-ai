@@ -110,10 +110,12 @@ MATERIAL_ADJUDICATE_MODERATE_SCALE  = 0.7   # confidence — between a draw and 
 # BUFFER_LOAD: None = load RUN_NAME's own buffer; set to a path to load from another run.
 # RUN_NAME itself lives in run_config.py — shared with eval/watcher/API.
 CKPT_LOAD   = None
-# run21 continues run20's own accumulated buffer (not the original curated
-# seed) -- nothing about the data pipeline changed, so there's no reason
-# to throw away run20's self-play. See run_config.py.
-BUFFER_LOAD = "checkpoints/run20_replay_buffer.pt"
+# run22 loads a SEED buffer, not the previous run's own accumulated
+# buffer directly -- checkpoints/run22_seed_buffer.pt IS run21's full
+# accumulated buffer (200,000 rolling, unchanged), just extended with the
+# new Option 2 hanging-piece continuation positions in its permanent
+# partition. See extend_buffer_with_hanging_pieces.py and run_config.py.
+BUFFER_LOAD = "checkpoints/run22_seed_buffer.pt"
 
 # ---------------------------------------------------------------------------
 # Helpers
